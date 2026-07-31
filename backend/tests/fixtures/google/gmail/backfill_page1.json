@@ -1,0 +1,143 @@
+{
+  "messages": [
+    {
+      "id": "18a1b2c3d4e5f6g7",
+      "threadId": "18a1b2c3d4e5f6g7"
+    },
+    {
+      "id": "18h8i9j0k1l2m3n4",
+      "threadId": "18h8i9j0k1l2m3n4"
+    },
+    {
+      "id": "18o5p6q7r8s9t0u1",
+      "threadId": "18o5p6q7r8s9t0u1"
+    }
+  ],
+  "nextPageToken": "page2_token_gmail_abc",
+  "resultSizeEstimate": 3,
+  "full_messages": [
+    {
+      "id": "18a1b2c3d4e5f6g7",
+      "threadId": "18a1b2c3d4e5f6g7",
+      "labelIds": ["INBOX", "UNREAD"],
+      "snippet": "Hi team, please review the attached proposal...",
+      "internalDate": "1721995200000",
+      "sizeEstimate": 15234,
+      "payload": {
+        "headers": [
+          {
+            "name": "From",
+            "value": "sender@example.com"
+          },
+          {
+            "name": "To",
+            "value": "recipient@example.com"
+          },
+          {
+            "name": "Subject",
+            "value": "Project Proposal Review"
+          },
+          {
+            "name": "Date",
+            "value": "Fri, 26 Jul 2026 10:00:00 +0000"
+          }
+        ],
+        "body": {
+          "size": 234,
+          "data": "SGkgdGVhbSwgcGxlYXNlIHJldmlldyB0aGUgYXR0YWNoZWQgcHJvcG9zYWwgZm9yIHRoZSBuZXcgcHJvamVjdC4gTG9va2luZyBmb3J3YXJkIHRvIHlvdXIgZmVlZGJhY2su"
+        }
+      }
+    },
+    {
+      "id": "18h8i9j0k1l2m3n4",
+      "threadId": "18h8i9j0k1l2m3n4",
+      "labelIds": ["INBOX", "IMPORTANT"],
+      "snippet": "Reminder: Team meeting tomorrow at 2 PM...",
+      "internalDate": "1722081600000",
+      "sizeEstimate": 8456,
+      "payload": {
+        "headers": [
+          {
+            "name": "From",
+            "value": "manager@example.com"
+          },
+          {
+            "name": "To",
+            "value": "team@example.com"
+          },
+          {
+            "name": "Subject",
+            "value": "Team Meeting Reminder"
+          },
+          {
+            "name": "Date",
+            "value": "Sat, 27 Jul 2026 09:00:00 +0000"
+          }
+        ],
+        "body": {
+          "size": 156,
+          "data": "UmVtaW5kZXI6IFRlYW0gbWVldGluZyB0b21vcnJvdyBhdCAyIFBNLiBQbGVhc2UgYnJpbmcgeW91ciBzdGF0dXMgdXBkYXRlcy4="
+        },
+        "parts": [
+          {
+            "mimeType": "text/plain",
+            "filename": "",
+            "body": {
+              "size": 156,
+              "data": "UmVtaW5kZXI6IFRlYW0gbWVldGluZyB0b21vcnJvdyBhdCAyIFBNLiBQbGVhc2UgYnJpbmcgeW91ciBzdGF0dXMgdXBkYXRlcy4="
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "18o5p6q7r8s9t0u1",
+      "threadId": "18o5p6q7r8s9t0u1",
+      "labelIds": ["INBOX"],
+      "snippet": "Thank you for your order. Your items will ship soon...",
+      "internalDate": "1722168000000",
+      "sizeEstimate": 12345,
+      "payload": {
+        "headers": [
+          {
+            "name": "From",
+            "value": "orders@shop.example.com"
+          },
+          {
+            "name": "To",
+            "value": "customer@example.com"
+          },
+          {
+            "name": "Subject",
+            "value": "Order Confirmation #12345"
+          },
+          {
+            "name": "Date",
+            "value": "Sun, 28 Jul 2026 08:00:00 +0000"
+          }
+        ],
+        "body": {
+          "size": 345,
+          "data": "VGhhbmsgeW91IGZvciB5b3VyIG9yZGVyLiBZb3VyIGl0ZW1zIHdpbGwgc2hpcCBzb29uLiBUcmFja2luZyBudW1iZXI6IFVQU0FiYzEyMzQ1Ng=="
+        },
+        "parts": [
+          {
+            "mimeType": "text/html",
+            "filename": "",
+            "body": {
+              "size": 456,
+              "data": "PGh0bWw+PGJvZHk+VGhhbmsgeW91IGZvciB5b3VyIG9yZGVyLiBZb3VyIGl0ZW1zIHdpbGwgc2hpcCBzb29uLjwvYm9keT48L2h0bWw+"
+            }
+          },
+          {
+            "mimeType": "application/pdf",
+            "filename": "invoice.pdf",
+            "body": {
+              "attachmentId": "ANGjdJ8..."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
