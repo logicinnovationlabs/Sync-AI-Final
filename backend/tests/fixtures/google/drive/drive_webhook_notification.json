@@ -1,0 +1,11 @@
+{
+  "headers": {
+    "X-Goog-Channel-Id": "drive-tenant123-abc12345",
+    "X-Goog-Channel-Token": "secret_token_xyz",
+    "X-Goog-Resource-Id": "resource_xyz789",
+    "X-Goog-Resource-State": "update",
+    "X-Goog-Resource-URI": "https://www.googleapis.com/drive/v3/changes?pageToken=abc123",
+    "X-Goog-Changed": "content,properties"
+  },
+  "body": {}
+}

@@ -1,0 +1,52 @@
+# SnyQ Backend - Block A + Block B Dependencies
+# Generated from pyproject.toml for pip compatibility
+# Install: pip install -r requirements.txt
+
+# Core Framework
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+python-multipart==0.0.18
+
+# Data Validation
+pydantic==2.9.0
+pydantic-settings==2.6.0
+# pydantic-core is automatically installed by pydantic, no need to pin it separately
+
+# Database (Async PostgreSQL)
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+
+# Redis (Async)
+redis[hiredis]==5.2.0
+
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.2.0
+cryptography==43.0.0
+
+# HTTP Client
+httpx==0.28.0
+
+# Azure Key Vault (Optional - for production)
+azure-keyvault-secrets==4.9.0
+azure-identity==1.19.0
+email-validator==2.2.0
+
+# Block B - Celery & Task Queue
+celery[redis]==5.4.0
+kombu==5.4.0
+
+# Block B - Google APIs
+google-api-python-client==2.149.0
+google-auth-oauthlib==1.2.1
+google-auth-httplib2==0.2.0
+google-generativeai==0.8.3
+
+# Block B - Vector Database
+qdrant-client==1.12.0
+
+# Block B - Configuration
+pyyaml==6.0.2
+nest-asyncio==1.6.0

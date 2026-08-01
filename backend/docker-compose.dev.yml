@@ -1,0 +1,111 @@
+# Docker Compose for Development & Testing
+# Usage: docker-compose -f docker-compose.dev.yml up
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: snyq_postgres_dev
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: control_plane
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - snyq_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: snyq_redis_dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - snyq_network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: snyq_app_dev
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      CONTROL_PLANE_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/control_plane
+      REDIS_URL: redis://redis:6379
+      VAULT_URL: ""
+      JWT_PRIVATE_KEY_PATH: /app/keys/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/keys/public.pem
+      TOKEN_TTL_ACCESS: 3600
+      TOKEN_TTL_REFRESH: 604800
+      TENANT_CACHE_TTL_SECONDS: 1800
+      ENVIRONMENT: development
+      LOG_LEVEL: INFO
+    volumes:
+      - ./app:/app/app
+      - ./tests:/app/tests
+      - ./scripts:/app/scripts
+      - ./migrations:/app/migrations
+      - ./keys:/app/keys
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - snyq_network
+
+  # Test runner service - runs tests on demand
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: snyq_test_runner
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      CONTROL_PLANE_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/control_plane
+      REDIS_URL: redis://redis:6379
+      VAULT_URL: ""
+      JWT_PRIVATE_KEY_PATH: /app/keys/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/keys/public.pem
+      TOKEN_TTL_ACCESS: 3600
+      TOKEN_TTL_REFRESH: 604800
+      TENANT_CACHE_TTL_SECONDS: 1800
+      ENVIRONMENT: test
+      LOG_LEVEL: DEBUG
+    volumes:
+      - ./app:/app/app
+      - ./tests:/app/tests
+      - ./scripts:/app/scripts
+      - ./keys:/app/keys
+    profiles:
+      - testing
+    command: pytest tests/test_signoff.py -v --tb=short
+    networks:
+      - snyq_network
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:
+
+networks:
+  snyq_network:
+    driver: bridge

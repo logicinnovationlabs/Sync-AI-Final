@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# Poetry
+poetry.lock
+.poetry/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Environment
+.env
+.env.local
+.env.*.local
+.tokens*.json
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.pid
+*.seed
+*.pid.lock
+
+# Keys (never commit!)
+keys/
+*.pem
+*.key
+
+# Alembic
+# Note: keep migrations/ in git, but ignore local alembic.ini overrides
+alembic.ini.local
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# Backup files
+*.bak
+*~
+

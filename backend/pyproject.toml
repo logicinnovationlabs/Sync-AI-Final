@@ -1,0 +1,62 @@
+[tool.poetry]
+name = "snyq-backend"
+version = "0.1.0"
+description = "SnyQ Phase 2 Backend - Block A (Tenancy, Identity, Auth) + Core Foundation"
+authors = ["SnyQ Team"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.115.0"
+uvicorn = {extras = ["standard"], version = "^0.32.0"}
+pydantic = "^2.9.0"
+pydantic-settings = "^2.6.0"
+email-validator = "^2.2.0"
+sqlalchemy = {extras = ["asyncio"], version = "^2.0.36"}
+asyncpg = "^0.30.0"
+alembic = "^1.14.0"
+redis = {extras = ["hiredis"], version = "^5.2.0"}
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+httpx = "^0.28.0"
+python-multipart = "^0.0.18"
+azure-keyvault-secrets = "^4.9.0"
+azure-identity = "^1.19.0"
+celery = {extras = ["redis"], version = "^5.4.0"}
+google-api-python-client = "^2.149.0"
+google-auth-oauthlib = "^1.2.1"
+google-auth-httplib2 = "^0.2.0"
+google-generativeai = "^0.8.3"
+qdrant-client = "^1.12.0"
+pyyaml = "^6.0.2"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.0"
+pytest-asyncio = "^0.24.0"
+pytest-cov = "^6.0.0"
+black = "^24.10.0"
+ruff = "^0.8.0"
+mypy = "^1.13.0"
+httpx = "^0.28.0"
+respx = "^0.21.1"
+responses = "^0.25.3"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+
+[tool.black]
+line-length = 100
+target-version = ['py312']
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

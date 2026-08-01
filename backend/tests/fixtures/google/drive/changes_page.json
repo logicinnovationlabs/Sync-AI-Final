@@ -1,0 +1,75 @@
+{
+  "kind": "drive#changeList",
+  "nextPageToken": null,
+  "newStartPageToken": "new_page_token_xyz789",
+  "changes": [
+    {
+      "kind": "drive#change",
+      "changeType": "file",
+      "removed": false,
+      "fileId": "1a2b3c4d5e6f",
+      "file": {
+        "id": "1a2b3c4d5e6f",
+        "name": "Project Proposal.docx (UPDATED)",
+        "mimeType": "application/vnd.google-apps.document",
+        "webViewLink": "https://docs.google.com/document/d/1a2b3c4d5e6f",
+        "createdTime": "2026-07-01T10:00:00.000Z",
+        "modifiedTime": "2026-07-30T10:15:00.000Z",
+        "size": "26624",
+        "fileExtension": "docx",
+        "owners": [
+          {
+            "emailAddress": "owner@example.com",
+            "displayName": "Project Owner"
+          }
+        ],
+        "permissions": [
+          {
+            "type": "user",
+            "emailAddress": "owner@example.com",
+            "role": "owner"
+          }
+        ],
+        "parents": ["0BwwA4oUTeiV1TGRPeTVjaWRDY1E"],
+        "driveId": null
+      }
+    },
+    {
+      "kind": "drive#change",
+      "changeType": "file",
+      "removed": true,
+      "fileId": "3m4n5o6p7q8r"
+    },
+    {
+      "kind": "drive#change",
+      "changeType": "file",
+      "removed": false,
+      "fileId": "5y6z7a8b9c0d",
+      "file": {
+        "id": "5y6z7a8b9c0d",
+        "name": "New Presentation.pptx",
+        "mimeType": "application/vnd.google-apps.presentation",
+        "webViewLink": "https://docs.google.com/presentation/d/5y6z7a8b9c0d",
+        "createdTime": "2026-07-29T14:00:00.000Z",
+        "modifiedTime": "2026-07-29T14:00:00.000Z",
+        "size": "512000",
+        "fileExtension": "pptx",
+        "owners": [
+          {
+            "emailAddress": "presenter@example.com",
+            "displayName": "Presenter"
+          }
+        ],
+        "permissions": [
+          {
+            "type": "user",
+            "emailAddress": "presenter@example.com",
+            "role": "owner"
+          }
+        ],
+        "parents": ["0BwwA4oUTeiV1TGRPeTVjaWRDY1E"],
+        "driveId": null
+      }
+    }
+  ]
+}

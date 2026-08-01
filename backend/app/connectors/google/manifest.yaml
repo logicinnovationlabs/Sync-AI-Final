@@ -1,0 +1,30 @@
+source_type: google
+display_name: "Google Workspace"
+auth_type: oauth2
+oauth_scopes:                       # combined scope list — every enabled service's scope goes here
+  - https://www.googleapis.com/auth/drive.readonly
+  - https://www.googleapis.com/auth/gmail.readonly
+services:
+  google_drive:
+    display_name: "Google Drive"
+    supports_deletion_detection: true
+    push_mechanism: drive_watch_channel
+    allowed_metadata_keys:
+      - mime_type
+      - file_extension
+      - owner_email
+      - shared_drive_id
+      - parent_folder_id
+      - web_view_link
+      - size_bytes
+  google_gmail:
+    display_name: "Gmail"
+    supports_deletion_detection: true
+    push_mechanism: gmail_pubsub_watch
+    allowed_metadata_keys:
+      - from_email
+      - to_emails
+      - thread_id
+      - label_ids
+      - has_attachments
+      - message_size_bytes

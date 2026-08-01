@@ -1,0 +1,31 @@
+# Development Dockerfile with test dependencies
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy dependency files
+COPY requirements.txt requirements-dev.txt ./
+
+# Install Python dependencies (core + dev)
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt && \
+    pip install -r requirements-dev.txt
+
+# Copy application code
+COPY . .
+
+# Create keys directory
+RUN mkdir -p /app/keys
+
+# Expose port
+EXPOSE 8000
+
+# Default command (can be overridden)
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

@@ -1,0 +1,152 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: snyq_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: control_plane
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: snyq_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Block B: Vector database for embeddings
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: snyq_qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6333
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: snyq_app
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    environment:
+      CONTROL_PLANE_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/control_plane
+      REDIS_URL: redis://redis:6379
+      VAULT_URL: ""
+      JWT_PRIVATE_KEY_PATH: /app/keys/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/keys/public.pem
+      TOKEN_TTL_ACCESS: 3600
+      TOKEN_TTL_REFRESH: 604800
+      TENANT_CACHE_TTL_SECONDS: 1800
+      ENVIRONMENT: development
+      LOG_LEVEL: INFO
+      # Block B: Qdrant & Embedding
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION_NAME: documents
+      EMBEDDING_PROVIDER: fake
+      EMBEDDING_DIMENSION: 3072
+      # Block B: Celery
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      CELERY_TASK_ALWAYS_EAGER: false
+    volumes:
+      - ./app:/app/app
+      - ./keys:/app/keys
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Block B: Celery worker for async tasks
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: snyq_celery_worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    environment:
+      CONTROL_PLANE_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/control_plane
+      REDIS_URL: redis://redis:6379
+      VAULT_URL: ""
+      ENVIRONMENT: development
+      LOG_LEVEL: INFO
+      # Block B: Qdrant & Embedding
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION_NAME: documents
+      EMBEDDING_PROVIDER: fake
+      EMBEDDING_DIMENSION: 3072
+      # Block B: Celery
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      CELERY_TASK_ALWAYS_EAGER: false
+      # Block B: Google OAuth (add your credentials in .env)
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_PUBSUB_PROJECT_ID: ${GOOGLE_PUBSUB_PROJECT_ID:-}
+      GOOGLE_PUBSUB_TOPIC: ${GOOGLE_PUBSUB_TOPIC:-gmail-watch-notifications}
+    volumes:
+      - ./app:/app/app
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+
+  # Block B: Celery beat for periodic tasks (watch renewal)
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: snyq_celery_beat
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      CONTROL_PLANE_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/control_plane
+      REDIS_URL: redis://redis:6379
+      VAULT_URL: ""
+      ENVIRONMENT: development
+      LOG_LEVEL: INFO
+      # Block B: Celery
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      # Block B: Google OAuth
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      # Block B: Watch renewal settings
+      WATCH_RENEWAL_CHECK_HOURS: 24
+      WATCH_RENEWAL_BEFORE_EXPIRY_HOURS: 48
+    volumes:
+      - ./app:/app/app
+    command: celery -A app.workers.celery_app beat --loglevel=info
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:
