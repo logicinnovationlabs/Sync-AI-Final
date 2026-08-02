@@ -4,7 +4,7 @@ Tests basic functionality, cache isolation, and TTL behavior.
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from tenant_router.tenant_router import TenantRouter
 from tenant_router.models import TenancyMode
 from tests.mocks import MockDatabaseClient, MockVaultClient
@@ -37,7 +37,7 @@ class TestTenantRouter:
             "db_schema_name": "tenant_123",
             "object_store_prefix": "tenant_123",
             "secrets_key_ref": "secret_key_tenant_123",
-            "created_at": datetime.utcnow(),
+            "created_at": datetime.now(timezone.utc),
             "status": "active"
         }
     
@@ -92,7 +92,7 @@ class TestTenantRouter:
             "db_schema_name": "tenant_a",
             "object_store_prefix": "tenant_a",
             "secrets_key_ref": "secret_key_a",
-            "created_at": datetime.utcnow(),
+            "created_at": datetime.now(timezone.utc),
             "status": "active"
         }
         
@@ -102,7 +102,7 @@ class TestTenantRouter:
             "db_schema_name": "tenant_b",
             "object_store_prefix": "tenant_b",
             "secrets_key_ref": "secret_key_b",
-            "created_at": datetime.utcnow(),
+            "created_at": datetime.now(timezone.utc),
             "status": "active"
         }
         
@@ -144,7 +144,7 @@ class TestTenantRouter:
         # Manually expire the cache entry by setting expiry in the past
         tenant_id = "tenant_123"
         routing_info, _ = router._cache[tenant_id]
-        past_expiry = datetime.utcnow() - timedelta(minutes=1)
+        past_expiry = datetime.now(timezone.utc) - timedelta(minutes=1)
         router._cache[tenant_id] = (routing_info, past_expiry)
         
         # Second call - cache miss due to expiry
@@ -177,7 +177,7 @@ class TestTenantRouter:
                 "db_schema_name": f"tenant_{i}",
                 "object_store_prefix": f"tenant_{i}",
                 "secrets_key_ref": f"secret_key_{i}",
-                "created_at": datetime.utcnow(),
+                "created_at": datetime.now(timezone.utc),
                 "status": "active"
             }
             mock_db.create_tenant(tenant_data)

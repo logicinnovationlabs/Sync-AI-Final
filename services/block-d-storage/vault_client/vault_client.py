@@ -181,6 +181,7 @@ class TableVaultBackend(VaultBackend):
         result = self.db_client.fetch_one(query, (key_ref,))
         
         if result:
+            # value_jsonb is already a dict from the database, convert to JSON string
             return json.dumps(result["value_jsonb"])
         return None
     

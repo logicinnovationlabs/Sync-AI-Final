@@ -21,9 +21,12 @@ NOTE: This test requires Docker to be running. It will start a Postgres containe
 import pytest
 import subprocess
 import time
+import sys
+import platform
 import psycopg2
 from psycopg2 import sql
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+
 
 
 class TestD3StorageIsolationRealPostgres:
@@ -38,25 +41,25 @@ class TestD3StorageIsolationRealPostgres:
         container_name = "block_d_d3_test_postgres"
         
         # Remove existing container if present
-        subprocess.run(
-            "docker rm -f " + container_name,
-            shell=True,
-            capture_output=True
-        )
+        try:
+            subprocess.run(["docker", "rm", "-f", container_name])
+        except Exception:
+            pass  # Container may not exist
         
         # Start Postgres container
+        # NOTE: Cannot use capture_output=True due to Windows handle duplication issues
+        # (OSError: [WinError 50] The request is not supported) when running in full pytest suite.
+        # Error output from docker failures will be less verbose as a result.
         result = subprocess.run(
-            "docker run -d --name " + container_name +
-            " -e POSTGRES_PASSWORD=testpassword" +
-            " -e POSTGRES_USER=postgres" +
-            " -p 5433:5432" +
-            " postgres:15",
-            shell=True,
-            capture_output=True,
+            ["docker", "run", "-d", "--name", container_name,
+             "-e", "POSTGRES_PASSWORD=testpassword",
+             "-e", "POSTGRES_USER=postgres",
+             "-p", "5433:5432",
+             "postgres:15"],
             text=True
         )
         if result.returncode != 0:
-            raise RuntimeError(f"Docker run failed: {result.stderr}")
+            raise RuntimeError(f"Docker run failed: {result.stderr if hasattr(result, 'stderr') else 'unknown error'}")
         
         # Wait for Postgres to be ready
         max_retries = 30
@@ -79,11 +82,10 @@ class TestD3StorageIsolationRealPostgres:
         yield container_name
         
         # Cleanup
-        subprocess.run(
-            "docker rm -f " + container_name,
-            shell=True,
-            capture_output=True
-        )
+        try:
+            subprocess.run(["docker", "rm", "-f", container_name])
+        except Exception:
+            pass  # Container may already be cleaned up
     
     @pytest.fixture(scope="class")
     def postgres_connection(self, postgres_container):

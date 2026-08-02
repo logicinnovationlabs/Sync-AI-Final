@@ -4,7 +4,7 @@ Single entry point for tenant routing resolution.
 """
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional, Tuple
 import logging
 
@@ -113,7 +113,7 @@ class TenantRouter:
         
         routing_info, expiry = self._cache[tenant_id]
         
-        if datetime.utcnow() > expiry:
+        if datetime.now(timezone.utc) > expiry:
             # Entry expired, remove it
             del self._cache[tenant_id]
             return None
@@ -122,7 +122,7 @@ class TenantRouter:
     
     def _store_in_cache(self, tenant_id: str, routing_info: TenantRoutingInfo):
         """Store routing info in cache with expiry."""
-        expiry = datetime.utcnow() + self.cache_ttl
+        expiry = datetime.now(timezone.utc) + self.cache_ttl
         self._cache[tenant_id] = (routing_info, expiry)
         logger.debug(f"Cached routing info for tenant {tenant_id} (expires at {expiry})")
     

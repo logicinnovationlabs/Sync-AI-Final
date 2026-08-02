@@ -3,9 +3,10 @@ Mock clients for Block Z dependencies (Phase 1 testing).
 These will be replaced with real implementations in Phase 2.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
+import json
 
 
 class MockRow:
@@ -42,14 +43,22 @@ class MockDatabaseClient:
                     db_schema_name=data["db_schema_name"],
                     object_store_prefix=data["object_store_prefix"],
                     secrets_key_ref=data["secrets_key_ref"],
-                    created_at=data.get("created_at", datetime.utcnow()),
+                    created_at=data.get("created_at", datetime.now(timezone.utc)),
                     status=data.get("status", "active")
                 )
         elif "secrets" in query and "WHERE key_ref" in query:
             key_ref = params[0]
             if key_ref in self._secrets:
                 # Return the value as value_jsonb field (dict) for vault client
-                return MockRow(value_jsonb=self._secrets[key_ref])
+                # The vault_client.set() already converts to JSON string, so we need to parse it back
+                # to simulate how the real database returns JSONB as a dict
+                value = self._secrets[key_ref]
+                if isinstance(value, str):
+                    try:
+                        value = json.loads(value)
+                    except:
+                        value = {}
+                return MockRow(value_jsonb=value)
         elif "pg_extension" in query and "pgsodium" in query:
             # Return None to indicate pgsodium not available
             return None
@@ -83,6 +92,8 @@ class MockDatabaseClient:
             if len(params) >= 2:
                 key_ref = params[0]
                 value_json = params[1]
+                # Store as-is to simulate JSONB storage (database handles JSONB conversion)
+                # The vault_client already converts to JSON string before calling this
                 self._secrets[key_ref] = value_json
             elif len(params) == 2 and isinstance(params[0], str) and isinstance(params[1], dict):
                 # Handle UPDATE with (key_ref, value_json) order
@@ -104,7 +115,7 @@ class MockDatabaseClient:
                     db_schema_name=data["db_schema_name"],
                     object_store_prefix=data["object_store_prefix"],
                     secrets_key_ref=data["secrets_key_ref"],
-                    created_at=data.get("created_at", datetime.utcnow()),
+                    created_at=data.get("created_at", datetime.now(timezone.utc)),
                     status=data.get("status", "active")
                 )
                 for data in self._tenants.values()

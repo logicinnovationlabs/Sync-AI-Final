@@ -5,7 +5,7 @@ Per Glean Arch v1.3 §24, Block D signoff table.
 Criterion: Rotate the KMS key while the service is live under read/write load
 Pass threshold: 0 downtime, 0 data loss on read-after-rotation
 
-This test runs against the real Supabase instance with pgsodium enabled.
+This test runs against the real Supabase instance with pgcrypto enabled.
 """
 
 import pytest
@@ -25,10 +25,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from encryption.encryption_client import EncryptionClient
 from encryption.db_client import DatabaseClient
+from vault_client.vault_client import VaultClient
 
 
 class TestD4KeyRotationReal:
-    """D4 test with real Supabase instance and pgsodium."""
+    """D4 test with real Supabase instance and pgcrypto."""
     
     @pytest.fixture(scope="class")
     def db_connection_string(self):
@@ -118,8 +119,20 @@ class TestD4KeyRotationReal:
         print(f"  Load pattern: 10 concurrent workers, 70% reads / 30% writes")
         print(f"  Duration: 10s stabilization + rotation + 30s post-rotation")
         
-        # Create EncryptionClient
-        encryption_client = EncryptionClient(DatabaseClient(db_connection_string))
+        # Create VaultClient and EncryptionClient
+        db_client = DatabaseClient(db_connection_string)
+        vault_client = VaultClient(db_client, use_pgsodium=False)  # Use table backend to avoid pgsodium
+        encryption_client = EncryptionClient(db_client, vault_client)
+        
+        # Use unique key names with timestamp to avoid conflicts
+        timestamp = int(time.time())
+        old_key_name = f"d4_test_old_key_{timestamp}"
+        new_key_name = f"d4_test_new_key_{timestamp}"
+        
+        # Create real pgcrypto keys for the test
+        print(f"\n  Creating pgcrypto keys...")
+        old_key_id = encryption_client.create_key(old_key_name)
+        print(f"  Old key created: key_id={old_key_id}, name={old_key_name}")
         
         # Metrics tracking
         metrics = {
@@ -131,7 +144,8 @@ class TestD4KeyRotationReal:
             'rotation_start_time': None,
             'rotation_end_time': None,
             'failed_during_rotation': 0,
-            'latencies': []
+            'latencies': [],
+            'active_key_id': old_key_id  # Track the currently active key
         }
         
         # Lock for thread-safe metrics updates
@@ -145,6 +159,7 @@ class TestD4KeyRotationReal:
         ]
         
         # Store pre-rotation encrypted data for verification
+        # Format: {plaintext: (ciphertext, key_id)}
         pre_rotation_data = {}
         
         # Load generation function
@@ -155,9 +170,12 @@ class TestD4KeyRotationReal:
                     start_time = time.time()
                     
                     if operation_type == 'encrypt':
-                        # Encrypt operation
+                        # Encrypt operation - use currently active key
+                        with metrics_lock:
+                            current_key_id = metrics['active_key_id']
+                        
                         plaintext = random.choice(test_plaintexts)
-                        ciphertext = encryption_client.encrypt(plaintext, key_id="old_key")
+                        ciphertext = encryption_client.encrypt(plaintext, key_id=current_key_id)
                         
                         with metrics_lock:
                             metrics['total_requests'] += 1
@@ -166,16 +184,17 @@ class TestD4KeyRotationReal:
                             metrics['latencies'].append(time.time() - start_time)
                         
                         # Store some pre-rotation data for verification
+                        # Store both ciphertext and the key_id used to encrypt it
                         if metrics['total_requests'] <= 100:
-                            pre_rotation_data[plaintext] = ciphertext
+                            pre_rotation_data[plaintext] = (ciphertext, current_key_id)
                             
                     elif operation_type == 'decrypt':
                         # Decrypt operation
                         if pre_rotation_data:
                             # Decrypt pre-rotation data
                             plaintext = random.choice(list(pre_rotation_data.keys()))
-                            ciphertext = pre_rotation_data[plaintext]
-                            decrypted = encryption_client.decrypt(ciphertext)
+                            ciphertext, key_id = pre_rotation_data[plaintext]
+                            decrypted = encryption_client.decrypt(ciphertext, key_id=key_id)
                             
                             # Verify decryption correctness
                             if decrypted == plaintext:
@@ -208,6 +227,9 @@ class TestD4KeyRotationReal:
                         ):
                             metrics['failed_during_rotation'] += 1
                     
+                    # Log the actual exception for diagnosis
+                    print(f"    [{operation_type.upper()}] Exception: {type(e).__name__}: {e}")
+                    
                     # Small delay on error to avoid tight error loop
                     time.sleep(0.1)
         
@@ -238,10 +260,16 @@ class TestD4KeyRotationReal:
                 metrics['rotation_start_time'] = time.time()
             
             try:
-                encryption_client.rotate_key("old_key", "new_key")
+                new_key_id = encryption_client.rotate_key(old_key_id, new_key_name)
+                
+                # Update the active key for new encrypt operations
                 with metrics_lock:
+                    metrics['active_key_id'] = new_key_id
                     metrics['rotation_end_time'] = time.time()
+                
                 print(f"  Key rotation completed successfully")
+                print(f"  Old key_id: {old_key_id}")
+                print(f"  New key_id: {new_key_id}")
                 print(f"  Rotation duration: {metrics['rotation_end_time'] - metrics['rotation_start_time']:.3f}s")
             except Exception as e:
                 with metrics_lock:
@@ -292,15 +320,15 @@ class TestD4KeyRotationReal:
         # Verify zero data loss - decrypt all pre-rotation data
         print(f"    Verifying pre-rotation data decryption...")
         decryption_failures = 0
-        for plaintext, ciphertext in pre_rotation_data.items():
+        for plaintext, (ciphertext, key_id) in pre_rotation_data.items():
             try:
-                decrypted = encryption_client.decrypt(ciphertext)
+                decrypted = encryption_client.decrypt(ciphertext, key_id=key_id)
                 if decrypted != plaintext:
                     decryption_failures += 1
-                    print(f"      WARNING: Decryption mismatch for '{plaintext}'")
+                    print(f"      WARNING: Decryption mismatch for '{plaintext}' (key_id={key_id})")
             except Exception as e:
                 decryption_failures += 1
-                print(f"      WARNING: Decryption failed for '{plaintext}': {e}")
+                print(f"      WARNING: Decryption failed for '{plaintext}' (key_id={key_id}): {e}")
         
         print(f"    Zero data loss: {decryption_failures == 0}")
         assert decryption_failures == 0, f"D4 FAILED: {decryption_failures} decryption failures detected"

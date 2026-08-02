@@ -6,7 +6,7 @@ restore_tenant(tenant_id, backup_id) restores into a schema, does not touch othe
 
 import logging
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from dataclasses import dataclass
 
@@ -42,7 +42,7 @@ def backup_tenant(db_client, tenant_id: str) -> BackupMetadata:
         BackupMetadata with backup details including checksum
     """
     schema_name = f"tenant_{tenant_id}"
-    backup_id = f"backup_{tenant_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')}"
+    backup_id = f"backup_{tenant_id}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S_%f')}"
     
     logger.info(f"Starting backup for tenant {tenant_id} (schema: {schema_name})")
     
@@ -67,7 +67,7 @@ def backup_tenant(db_client, tenant_id: str) -> BackupMetadata:
         backup_id=backup_id,
         tenant_id=tenant_id,
         schema_name=schema_name,
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
         row_count=row_count,
         checksum=checksum,
         size_bytes=size_bytes
@@ -136,7 +136,7 @@ def _dump_schema(db_client, schema_name: str) -> str:
     """
     
     # For mocks, return a placeholder
-    return f"-- Schema dump for {schema_name}\n-- Generated at {datetime.utcnow()}"
+    return f"-- Schema dump for {schema_name}\n-- Generated at {datetime.now(timezone.utc)}"
 
 
 def _count_schema_rows(db_client, schema_name: str) -> int:
@@ -196,7 +196,7 @@ def _retrieve_backup_metadata(backup_id: str) -> BackupMetadata:
         backup_id=backup_id,
         tenant_id=tenant_id,
         schema_name=f"tenant_{tenant_id}",
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
         row_count=0,
         checksum="simulated_checksum",
         size_bytes=0

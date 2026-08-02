@@ -6,7 +6,7 @@ Supports partial-failure reporting and feature-flagged gradual rollout.
 import logging
 from typing import List, Optional, Set
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class MigrationResult:
     
     def __post_init__(self):
         if self.timestamp is None:
-            self.timestamp = datetime.utcnow()
+            self.timestamp = datetime.now(timezone.utc)
 
 
 @dataclass
