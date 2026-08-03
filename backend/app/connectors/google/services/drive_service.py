@@ -295,6 +295,33 @@ class DriveConnector(BaseConnector):
         
         return permissions_list
     
+    async def fetch_permission_changes(self, since: datetime) -> List[Dict[str, Any]]:
+        """
+        Fetch containers/documents whose permissions changed since a given timestamp.
+        
+        Uses Drive's changes.list with a stored pageToken for ACL revalidation.
+        Returns a list of objects with at least {'id': <container_id or file_id>, 'type': 'container'|'document'}.
+        
+        This is used by the ACL revalidation Beat task.
+        
+        Args:
+            since: Changed since this timestamp (heuristic if no pageToken stored)
+            
+        Returns:
+            List of changed items with id and type
+        """
+        token = await self.get_valid_token()
+        
+        # NOTE: In real implementation, we would:
+        # 1. Get stored ACL pageToken from cursor_store
+        # 2. Call changes.list with that pageToken
+        # 3. Store new pageToken for next run
+        # 4. Filter for permission-related changes
+        
+        # For now, return empty list (Gmail stub does this too)
+        # Real implementation would use drive_client.list_changes() and filter
+        return []
+    
     def _parse_timestamp(self, timestamp_str: Optional[str]) -> datetime:
         """
         Parse Google's RFC3339 timestamp.

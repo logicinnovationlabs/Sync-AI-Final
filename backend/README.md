@@ -1,7 +1,7 @@
-# SnyQ Phase 2 Backend - Blocks A + B
+# SnyQ Phase 2 Backend - Blocks A + B + C
 
-**Version:** 0.2.0  
-**Build:** Block A (Tenancy, Identity, Auth) + Block B (Google Connector + Push Ingestion)
+**Version:** 0.3.0  
+**Build:** Block A (Tenancy, Identity, Auth) + Block B (Google Connector + Push Ingestion) + Block C (Normalization, Identity Resolution, ACL)
 
 ---
 
@@ -11,6 +11,7 @@ This is the Python backend foundation for a Glean-like enterprise knowledge plat
 
 - **Block A** (Tenancy, Identity, Auth) - Multi-tenant auth with OIDC/SSO and native email/password
 - **Block B** (Google Connector Package) - Push-based ingestion for Google Drive & Gmail with Celery workers
+- **Block C** (Normalization, Identity Resolution, ACL) - Text extraction, identity resolution, materialized ACL compilation
 
 ### Architecture Principles
 
@@ -40,13 +41,22 @@ This is the Python backend foundation for a Glean-like enterprise knowledge plat
 - **Alembic** for migrations
 - **pytest + pytest-asyncio** for tests
 
-### Block B (Google Connector + Push Ingestion) 🆕
+### Block B (Google Connector + Push Ingestion)
 - **Celery** (Redis broker) for async task processing
 - **google-api-python-client** for Drive & Gmail APIs
 - **Qdrant** vector database for document embeddings
 - **google-generativeai** (Gemini) for embeddings
 - **Push notifications** via Drive watch channels & Gmail Pub/Sub
 - **Docker Compose** with Qdrant, Celery worker, Celery beat
+
+### Block C (Normalization, Identity Resolution, ACL) 🆕
+- **python-magic** for MIME type detection (magic bytes)
+- **pdfplumber**, **python-docx**, **openpyxl**, **python-pptx** for text extraction
+- **pytesseract** (Pillow) for OCR fallback
+- **beautifulsoup4** for HTML text extraction
+- **Materialized ACL compilation** with container inheritance and group expansion
+- **Identity resolution** (tenant-scoped, email-based with username fallback)
+- **Cycle-safe** container and group traversal
 
 ---
 
@@ -596,18 +606,70 @@ poetry run alembic upgrade head
 
 ---
 
-## Next Steps (Block B and Beyond)
+## Block C: Normalization, Identity Resolution, and ACL 🆕
 
-After Block A passes signoff (A1–A7):
+**Integrates between Block B's connector output and the indexer, adding:**
 
-1. **Block B**: Connector Framework — implement real connectors (Google Drive, Slack, etc.)
-2. **Block C**: Normalization & ACL Compiler — canonical document schema, identity resolution
-3. **Block D**: Storage Substrate — backup/restore, KMS encryption
-4. **Block E**: Chunking & Embedding Pipeline
-5. **Block F**: Lexical Search Service (OpenSearch/Elasticsearch)
-6. **Block G**: Vector Search Service
-7. **Block H**: Knowledge Graph Service
-8. ... (see architecture doc for full build order)
+1. **Text Extraction** — MIME-aware extraction with OCR fallback, bounded by size/time limits
+2. **Identity Resolution** — Merges identities across sources (Drive + Gmail) within a tenant, never globally
+3. **ACL Compilation** — Materializes permissions (direct + inherited + group-expanded) for query-time filtering
+4. **Container Inheritance** — Cycle-safe folder hierarchy traversal
+5. **Group Expansion** — Cycle-safe group membership resolution
+
+### Adding a Real Normalizer for a Future Source (e.g., Outlook)
+
+When you add an Outlook connector (not built yet), add its normalizer:
+
+1. **Create `app/normalizer/strategies/outlook.py`**:
+   ```python
+   class OutlookNormalizer(NormalizerStrategy):
+       def get_source_type(self) -> str:
+           return "outlook"
+       
+       async def extract_text(self, raw):
+           # Outlook-specific text extraction
+           ...
+   ```
+
+2. **Register in `app/normalizer/strategies/__init__.py`**:
+   ```python
+   from app.normalizer.strategies.outlook import OutlookNormalizer
+   normalizer_registry.register("outlook", OutlookNormalizer)
+   ```
+
+**That's it!** No changes to `Pipeline`, `IdentityResolver`, or `ACLCompiler` — they're source-agnostic by design.
+
+### Block C Signoff Criteria (C1–C9)
+
+| ID | Criterion | Pass Threshold |
+|----|-----------|---------------|
+| **C1** | Determinism | Byte-identical CanonicalDocument across 3 runs (excluding updated_at) |
+| **C2** | ACL fidelity | 100% agreement with acl_matrix.json expectations |
+| **C3** | Revocation propagation | ACL updates within ≤15 min |
+| **C4** | Identity resolution accuracy | ≥95% correct merges, 0 false merges (25-hint fixture) |
+| **C5** | Container cycle safety | No hang, cycle logged, no incorrect inheritance |
+| **C6** | Group membership cycle safety | Terminates correctly, no duplicate entries |
+| **C7** | MIME spoofing detection | mime_mismatch=True, logged at WARNING, processed without crash |
+| **C8** | Oversized content bounding | Truncated/bounded, not crashed, completes in bounded time |
+| **C9** | Concurrent identity resolution race | Exactly one Principal row, both callers get same ID |
+
+**Block signoff: PASS only if C1–C9 all PASS.**
+
+Run signoff tests:
+```bash
+pytest tests/test_signoff_block_c.py -v
+```
+
+## Next Steps (Beyond Block C)
+
+After Blocks A, B, and C pass signoff:
+
+1. **Block D**: Storage Substrate — backup/restore, KMS encryption
+2. **Block E**: Chunking & Embedding Pipeline (extended)
+3. **Block F**: Lexical Search Service (OpenSearch/Elasticsearch)
+4. **Block G**: Vector Search Service (query-time ACL filtering)
+5. **Block H**: Knowledge Graph Service
+6. ... (see architecture doc for full build order)
 
 ---
 
@@ -620,9 +682,258 @@ After Block A passes signoff (A1–A7):
 
 ---
 
+## Block C — Normalization, Identity Resolution & ACL Compilation
+
+> **Status:** ✅ All signoff tests passing (C1–C9 + ADV-1 to ADV-16)
+
+Block C is the security and enrichment layer that sits between **Block B's** raw connector output and the indexer. Every document passes through it before a single byte reaches the search index.
+
+---
+
+### What Block C Does (in 30 seconds)
+
+```
+Raw document (JSON from Drive/Gmail connector)
+    ↓  ① MIME detection  (magic bytes — never trust the source)
+    ↓  ② Text extraction (PDF / DOCX / HTML / OCR — hard bounded)
+    ↓  ③ Identity resolution  (email → stable principal_id per tenant)
+    ↓  ④ ACL compilation (direct + inherited folders + expanded groups)
+    ↓  ⑤ Persist CanonicalDocument + ACLEntry rows (REPLACE, not append)
+    ↓
+CanonicalDocument + UnifiedDocument (ready for Qdrant indexer)
+```
+
+---
+
+### Block C Components
+
+```
+app/
+├── services/pipeline.py           # Orchestrator (MAX_EXTRACTED_CHARS guard)
+├── normalizer/
+│   ├── base.py                    # NormalizerStrategy ABC
+│   ├── registry.py                # Strategy lookup (source_type → class)
+│   ├── mime_detector.py           # Magic-byte MIME detection
+│   ├── text_extractor.py          # Multi-format extractor (hard bounded)
+│   ├── ocr.py                     # Tesseract OCR (fake impl for tests)
+│   └── strategies/
+│       ├── google_drive.py        # Drive: permissions + metadata mapping
+│       ├── google_gmail.py        # Gmail: mailbox ownership model
+│       └── generic.py             # Fallback for unknown sources
+├── identity/
+│   ├── resolver.py                # Email-first resolver, race-safe creation
+│   └── matchers/
+│       ├── email_matcher.py       # Case-insensitive, tenant-scoped lookup
+│       └── username_matcher.py    # Fallback for sources without email
+├── acl/
+│   ├── compiler.py                # Direct + inherited + group expansion
+│   ├── container_service.py       # Cycle-safe ancestor traversal + cache
+│   └── inheritance.py             # Deny-override distance algorithm
+└── storage/
+    └── canonical_repo.py          # Repository (in-memory for tests; SQLAlchemy for prod)
+```
+
+**Adding a new connector source** requires only:
+1. Create `app/normalizer/strategies/outlook.py`
+2. Register it in `strategies/__init__.py`
+3. Zero changes to `Pipeline`, `IdentityResolver`, or `ACLCompiler`.
+
+---
+
+### Security Controls — In Detail
+
+#### ① MIME Spoofing Detection
+
+**Threat:** A user uploads an `.exe` renamed as `report.txt`. Drive faithfully reports `mimeType: "text/plain"`.
+
+**Control:** `mime_detector.detect_mime(raw_bytes, stated_mime)` reads the file's **magic bytes** via `python-magic` (libmagic) and cross-checks against the source-stated type.
+
+```
+Source claims:    "text/plain"
+Magic bytes show: "application/x-executable"
+Result:           mime_mismatch = True  ← logged at WARNING, persisted on CanonicalDocument
+```
+
+- Documents are **not dropped** on mismatch — user content must not silently disappear.
+- Only *material* mismatches flag: `text/plain` → `application/zip|exe` is dangerous; `text/plain` → `text/x-c` (source code) is benign.
+- The `mime_mismatch` field is queryable for downstream trust/safety review.
+
+---
+
+#### ② Content Bounding (DoS Prevention)
+
+**Threat:** A 500 MB Google Doc exported as plain text exhausts worker memory and blocks Celery queues.
+
+**Control — two independent hard limits:**
+
+| Layer | Location | What it does |
+|---|---|---|
+| `TextExtractor` | `text_extractor.py:96–100` | Truncates extracted text at `max_chars` (default 500 000) |
+| `Pipeline` | `pipeline.py` after `strategy.extract_text()` | **Second backstop** — catches strategies that bypass TextExtractor |
+
+```python
+MAX_EXTRACTED_CHARS = 500_000   # pipeline.py
+
+content = await strategy.extract_text(raw)
+if len(content) > MAX_EXTRACTED_CHARS:      # second backstop
+    content = content[:MAX_EXTRACTED_CHARS]
+```
+
+Two layers mean no single strategy implementation can accidentally bypass the limit.
+
+---
+
+#### ③ Identity Resolution — Tenant-Scoped, Race-Safe
+
+**Threat:** The same person appears in Drive (email), Gmail (email), and Slack (username). Without dedup, the same person has 3+ `principal_id` values, breaking ACL filtering.
+
+**Resolution ladder** (`IdentityResolver.resolve`):
+```
+1. Normalize email: lowercase + strip + validate (email-validator library)
+2. DB lookup: get_principal_by_email(normalized, tenant_id)  ← exact, tenant-scoped
+3. Found     → update source_identities mapping, return existing principal_id
+4. Not found + email present → create new Principal (race-safe, see below)
+5. Not found + no email      → username matcher (source-scoped, 0.8 confidence)
+6. No match at all           → raise ValueError  (no orphaned principals)
+```
+
+**Race condition handling:**
+```
+Task A: resolve("alice@corp.com") → not found → creates Principal
+Task B: resolve("alice@corp.com") → not found → tries to create
+                                               ↓
+                           DB unique constraint (tenant_id, lower(email)) fires
+                                               ↓
+Task B catches IntegrityError → re-queries → gets Task A's winner → same principal_id
+```
+
+**Cross-tenant isolation:** `alice@corp.com` in tenant A and tenant B are **always** distinct `principal_id` values. The DB key is `(tenant_id, lower(email))` — never global.
+
+**Email normalization:** Lowercase + strip whitespace only. No Gmail dot-folding (`alice.smith` ≠ `alicesmith`) because that would incorrectly merge identities on non-Gmail sources.
+
+---
+
+#### ④ ACL Compilation — Direct + Inherited + Group Expansion
+
+**Threat:** Drive permissions cascade through folder hierarchies and can be granted to groups with nested sub-groups. Storing only the raw Drive permission list produces incorrect ACL filtering at query time.
+
+**`ACLCompiler.compile()` materializes permissions in four steps:**
+
+**Step 1 — Direct entries**
+Every `(IdentityHint, PermissionLevel)` pair → resolved `principal_id` or `group_id` row.
+
+**Step 2 — Container inheritance**
+Walk folder ancestors upward (`ContainerService.get_ancestors()`):
+```
+Document (in /Marketing/Campaigns/Q4)
+    ↑  Q4 folder ACL
+    ↑  Campaigns folder ACL     ← nearest ancestor wins on conflict
+    ↑  Marketing folder ACL
+```
+
+**Deny-override distance algorithm** (`inheritance.py`):
+- Track `deny_distance` and `allow_distance` per identity key.
+- If deny at distance `d_deny ≤ d_allow` → deny wins. The allow is suppressed.
+- Matches Google Drive's own semantics.
+
+**Step 3 — Group expansion (recursive, cycle-safe)**
+```
+Group A (READ) → Group B → Group C → Group D → alice@corp.com
+                                              ↑
+                           alice gets READ via granted_via="group_membership"
+```
+Cycle detection via `visited: Set[UUID]` — revisited groups stop and log `WARNING`.
+
+**Step 4 — Deny override + dedup**
+- Principal with both allow and deny → deny wins, all allows removed.
+- Duplicate `(document_id, principal_id)` rows → keep highest level (`OWNER > DELETE > WRITE > READ > NONE`).
+
+**ACL replace semantics (revocation guarantee):**
+```python
+await canonical_repo.replace_acl_entries(doc.id, new_entries)
+# Atomically DELETE old rows, INSERT new ones.
+# Revoked permissions cannot linger.
+```
+
+---
+
+### Block C Test Suite
+
+#### Signoff Tests C1–C9 (`test_signoff_block_c.py`)
+
+| ID | Scenario | Validates |
+|---|---|---|
+| C1 | Same raw doc processed twice | Idempotency / determinism |
+| C2 | Drive doc with 5 different role levels | ACL role mapping fidelity |
+| C3 | Permission removed on re-processing | Revocation via replace semantics |
+| C4 | 25 identity hints across 3 sources | Dedup accuracy across sources |
+| C5 | Folder A→B→C→A cycle | Container cycle safety |
+| C6 | Group A contains B, B contains A | Group membership cycle safety |
+| C7 | exe-as-text vs text-as-text | MIME spoofing detection |
+| C8 | 600k char content | Content bounding at 500k |
+| C9 | 10 concurrent email resolutions | Race condition → 1 principal |
+
+#### Advanced Adversarial Tests ADV-1–16 (`test_block_c_advanced.py`)
+
+| ID | Scenario | Property tested |
+|---|---|---|
+| ADV-1 | Alice in Drive (×2) + Gmail | Multi-source identity unification |
+| ADV-2 | 3-level hierarchy, deny at parent | Deny overrides farther allows |
+| ADV-3 | Group chain A→B→C→D→alice | 4-level deep group expansion |
+| ADV-4 | Same email, tenant A and tenant B | Cross-tenant never merged |
+| ADV-5 | 20 concurrent coroutines, same email | Race → exactly 1 principal |
+| ADV-6 | Alice removed between two passes | Stale ACL entries are 0 |
+| ADV-7 | Content at M-1, M, M+1, M+100k | Boundary bounding (4 cases) |
+| ADV-8 | exe claimed as text/plain | `mime_mismatch=True` persisted |
+| ADV-9 | Mixed-case email + bad email | Normalization + rejection |
+| ADV-10 | Gmail subject in payload.headers | Title extraction regression |
+| ADV-11 | Group deny in container chain | Group deny-override correctness |
+| ADV-12 | Same raw doc, two passes | Full pipeline determinism |
+| ADV-13 | Empty string + whitespace content | Zero-byte no-crash guarantee |
+| ADV-14 | 60-level folder chain, depth=50 | Max-depth backstop at 50 |
+| ADV-15 | `type=anyone` Drive permission | Wildcard ACL tenant-scoped |
+| ADV-16 | Owner + inherited READ, dedup | Highest permission wins |
+
+```bash
+# Run all Block C tests
+pytest tests/test_signoff_block_c.py tests/test_block_c_smoke.py tests/test_block_c_advanced.py -v
+
+# Expected: 31 passed
+```
+
+---
+
+### Block C Data Models
+
+| Model | Key field | Purpose |
+|---|---|---|
+| `CanonicalDocument` | `id = f"{source_type}_{source_id}"` | Enriched queryable document (stable ID) |
+| `Principal` | `(tenant_id, lower(email))` unique | Resolved individual identity |
+| `Group` | `(source_type, source_id, tenant_id)` unique | Group with nested members |
+| `ACLEntry` | `(document_id, principal_id\|group_id)` | Materialized permission |
+| `ContainerACLEntry` | `(container_id, principal_id\|group_id, tenant_id)` | Permission on folder |
+| `ContainerEdge` | `(child_id, tenant_id)` → `parent_id` | Folder parent-child relationship |
+
+---
+
+### Known Limitations & Roadmap
+
+| Item | Status | Next step |
+|---|---|---|
+| `CanonicalRepo` is in-memory | Test-only | Wire SQLAlchemy + Block A tenant DB |
+| Drive text extraction is stubbed | Placeholder | Add `drive_client.download_file()` path |
+| Fake OCR in tests | Test-only | Real Tesseract works if binary in PATH |
+| Redis identity cache | Not implemented | Add Redis with `IDENTITY_CACHE_TTL` |
+| Proactive group sync | Not implemented | Periodic sync from Drive Groups API |
+| ACL revalidation beat task | Stub | Add Drive `pageToken` tracking |
+
+---
+
 ## License
 
+
 Proprietary — SnyQ Platform
+
 
 ---
 

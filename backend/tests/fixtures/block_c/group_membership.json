@@ -1,0 +1,39 @@
+{
+  "groups": [
+    {
+      "id": "group_1",
+      "name": "Engineering Team",
+      "email": "eng@example.com",
+      "member_emails": ["alice@example.com", "bob@example.com", "charlie@example.com"],
+      "member_groups": []
+    },
+    {
+      "id": "group_2",
+      "name": "Product Team",
+      "email": "product@example.com",
+      "member_emails": ["diana@example.com", "eve@example.com"],
+      "member_groups": []
+    },
+    {
+      "id": "group_3",
+      "name": "All Staff",
+      "email": "allstaff@example.com",
+      "member_emails": ["frank@example.com"],
+      "member_groups": ["group_1", "group_2"]
+    },
+    {
+      "id": "cycle_group_a",
+      "name": "Cycle Group A",
+      "email": "cycle_a@example.com",
+      "member_emails": [],
+      "member_groups": ["cycle_group_b"]
+    },
+    {
+      "id": "cycle_group_b",
+      "name": "Cycle Group B",
+      "email": "cycle_b@example.com",
+      "member_emails": [],
+      "member_groups": ["cycle_group_a"]
+    }
+  ]
+}

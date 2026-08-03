@@ -1,0 +1,20 @@
+{
+  "edges": [
+    {"parent": "root", "child": "folder_a"},
+    {"parent": "folder_a", "child": "folder_b"},
+    {"parent": "folder_b", "child": "folder_c"},
+    {"parent": "folder_c", "child": "folder_d"},
+    {"parent": "folder_a", "child": "folder_e"},
+    {"parent": "folder_e", "child": "folder_f"},
+    {"parent": "cycle_a", "child": "cycle_b"},
+    {"parent": "cycle_b", "child": "cycle_c"},
+    {"parent": "cycle_c", "child": "cycle_a"}
+  ],
+  "acls": [
+    {"container": "root", "principal_email": "admin@example.com", "permission": "OWNER"},
+    {"container": "folder_a", "principal_email": "alice@example.com", "permission": "WRITE"},
+    {"container": "folder_b", "principal_email": "bob@example.com", "permission": "READ"},
+    {"container": "folder_c", "principal_email": "charlie@example.com", "permission": "WRITE"},
+    {"container": "folder_e", "principal_email": "alice@example.com", "permission": "READ", "is_deny": true}
+  ]
+}
