@@ -4,11 +4,13 @@ AST-based code chunker using tree-sitter.
 Per v7.0 §3.2: Node-type mappings are empirically verified via dump scripts.
 Per v7.0 §3.4: Implements min_tokens floor (20) and max_tokens ceiling (2048).
 Per v7.0 §2.1: Implements 8KB object-storage threshold.
+Per Phase 1.2 (Aug 4, 2026): Uses tiktoken for accurate token counting (cl100k_base encoding).
 """
 
 from dataclasses import dataclass
 from typing import List, Optional
 import tree_sitter
+import tiktoken
 
 
 @dataclass
@@ -47,6 +49,8 @@ class CodeChunker:
         self.MAX_TOKENS = 2048
         self.INLINE_THRESHOLD = 8192
         self._initialize_languages()
+        # Initialize tiktoken with cl100k_base encoding (matches Azure OpenAI text-embedding-3-large)
+        self.tokenizer = tiktoken.get_encoding("cl100k_base")
     
     def _initialize_languages(self):
         """Initialize tree-sitter language parsers for supported languages."""
@@ -79,10 +83,10 @@ class CodeChunker:
     
     def _estimate_tokens(self, text: str) -> int:
         """
-        Estimate token count for code.
-        Code typically has ~1 token per 3-4 characters.
+        Count actual tokens using tiktoken (cl100k_base encoding).
+        Per Phase 1.2 decision (Aug 4, 2026): replaced character-based estimate with real tokenizer.
         """
-        return len(text) // 3
+        return len(self.tokenizer.encode(text))
     
     def _extract_import_blocks(self, source: str, tree: tree_sitter.Tree, language: str) -> List[CodeChunk]:
         """Extract import block chunks."""
@@ -97,8 +101,8 @@ class CodeChunker:
             # Empirically verified per v7.0 §3.2 from dump_go_node_types.py
             self._find_nodes_by_type(root, ['import_declaration'], import_nodes)
         elif language == 'javascript':
-            # JavaScript import detection (to be verified with dump_js_node_types.py)
-            self._find_nodes_by_type(root, ['import_statement', 'import_declaration'], import_nodes)
+            # Empirically verified per v7.0 §3.2 from dump_js_imports.py
+            self._find_nodes_by_type(root, ['import_statement'], import_nodes)
         
         if import_nodes:
             # Group consecutive imports into a single block
@@ -183,8 +187,8 @@ class CodeChunker:
             # Empirically verified per v7.0 §3.2 from dump_go_node_types.py
             self._find_nodes_by_type(root, ['type_declaration'], class_nodes)
         elif language == 'javascript':
-            # JavaScript class detection (to be verified with dump_js_node_types.py)
-            self._find_nodes_by_type(root, ['class_declaration', 'class_expression'], class_nodes)
+            # Empirically verified per v7.0 §3.2 from dump_js_imports.py
+            self._find_nodes_by_type(root, ['class_declaration'], class_nodes)
         
         for i, node in enumerate(class_nodes):
             text = self._extract_text(source, node)
@@ -255,8 +259,8 @@ class CodeChunker:
             # Comment extraction may need different approach
             pass
         elif language == 'javascript':
-            # JavaScript comment detection (to be verified)
-            self._find_nodes_by_type(root, ['comment', 'block_comment', 'line_comment'], comment_nodes)
+            # Empirically verified per v7.0 §3.2 from dump_js_node_types.py
+            self._find_nodes_by_type(root, ['comment'], comment_nodes)
         
         for i, node in enumerate(comment_nodes):
             text = self._extract_text(source, node)

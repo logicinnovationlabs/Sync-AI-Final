@@ -3,11 +3,13 @@ Component 3: Prose Chunker
 Sentence-boundary-preserving chunker for prose documents.
 Does not split mid-sentence (E1 requirement).
 Token-budgeted per target chunk size with overlap.
+Per Phase 1.2 (Aug 4, 2026): Uses tiktoken for accurate token counting (cl100k_base encoding).
 """
 
 import re
 from typing import List, Dict, Any
 from dataclasses import dataclass
+import tiktoken
 
 
 @dataclass
@@ -49,6 +51,8 @@ class ProseChunker:
         self.max_tokens = max_tokens
         self.min_tokens = min_tokens  # Per v7.0 §3.4 minimum token floor
         self.overlap_tokens = overlap_tokens
+        # Initialize tiktoken with cl100k_base encoding (matches Azure OpenAI text-embedding-3-large)
+        self.tokenizer = tiktoken.get_encoding("cl100k_base")
         # Simple sentence boundary regex (period, question mark, exclamation followed by space or end)
         self.sentence_boundary_pattern = re.compile(r'(?<=[.!?])\s+(?=[A-Z])|(?<=[.!?])$')
         # Heading pattern for prose_section detection
@@ -56,12 +60,10 @@ class ProseChunker:
     
     def _estimate_tokens(self, text: str) -> int:
         """
-        Estimate token count using word-based approximation.
-        Roughly 1 token ≈ 0.75 words for English text.
-        This is a conservative estimate; actual tokenization depends on the model.
+        Count actual tokens using tiktoken (cl100k_base encoding).
+        Per Phase 1.2 decision (Aug 4, 2026): replaced word-based estimate with real tokenizer.
         """
-        words = text.split()
-        return int(len(words) / 0.75)
+        return len(self.tokenizer.encode(text))
     
     def _split_into_sentences(self, text: str) -> List[str]:
         """

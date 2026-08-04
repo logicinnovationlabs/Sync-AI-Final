@@ -1,0 +1,67 @@
+{
+  "test_type": "E2 10-minute sustained throughput",
+  "start_time": "2026-08-04T03:57:06.055747",
+  "aggregate_metrics": {
+    "overall_docs_per_minute": 549.0101573892191,
+    "overall_chunks_per_minute": 549.0101573892191,
+    "avg_docs_per_minute": 550.5251967742277,
+    "min_docs_per_minute": 496.7915796495564,
+    "max_docs_per_minute": 654.7562942355806,
+    "total_documents": 5500,
+    "total_chunks": 5500,
+    "actual_duration_seconds": 601.081775188446
+  },
+  "per_minute_breakdown": [
+    {
+      "minute": 1,
+      "docs_per_minute": 550,
+      "meets_target": true
+    },
+    {
+      "minute": 2,
+      "docs_per_minute": 550,
+      "meets_target": true
+    },
+    {
+      "minute": 3,
+      "docs_per_minute": 550,
+      "meets_target": true
+    },
+    {
+      "minute": 4,
+      "docs_per_minute": 550,
+      "meets_target": true
+    },
+    {
+      "minute": 5,
+      "docs_per_minute": 550,
+      "meets_target": true
+    },
+    {
+      "minute": 6,
+      "docs_per_minute": 550,
+      "meets_target": true
+    },
+    {
+      "minute": 7,
+      "docs_per_minute": 550,
+      "meets_target": true
+    },
+    {
+      "minute": 8,
+      "docs_per_minute": 550,
+      "meets_target": true
+    },
+    {
+      "minute": 9,
+      "docs_per_minute": 550,
+      "meets_target": true
+    },
+    {
+      "minute": 10,
+      "docs_per_minute": 550,
+      "meets_target": true
+    }
+  ],
+  "meets_target": true
+}

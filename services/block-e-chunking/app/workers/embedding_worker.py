@@ -27,8 +27,13 @@ PROVIDER_CALL_LOG_KEY = 'embedding:provider_call_log'
 # Initialize database engine for updating chunk_records (synchronous for Celery)
 # Default to localhost for local development; Docker Compose sets this to postgres hostname
 DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql+asyncpg://postgres:postgres@localhost:5432/block_e')
-# Convert async URL to sync URL for worker
-SYNC_DATABASE_URL = DATABASE_URL.replace('postgresql+asyncpg://', 'postgresql://')
+# Convert async URL to sync URL for worker (handle SQLite too)
+if DATABASE_URL.startswith('sqlite'):
+    SYNC_DATABASE_URL = DATABASE_URL
+elif DATABASE_URL.startswith('postgresql+asyncpg'):
+    SYNC_DATABASE_URL = DATABASE_URL.replace('postgresql+asyncpg://', 'postgresql://')
+else:
+    SYNC_DATABASE_URL = DATABASE_URL
 db_engine = create_engine(SYNC_DATABASE_URL, echo=False)
 SessionLocal = sessionmaker(db_engine, expire_on_commit=False)
 
