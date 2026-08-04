@@ -3,16 +3,20 @@ Application configuration using Pydantic Settings.
 All environment variables are loaded here.
 """
 
+import os
 from typing import Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# When SNYQ_IGNORE_ENV_FILE=1, do not open .env (verification / CI).
+_ENV_FILE = None if os.getenv("SNYQ_IGNORE_ENV_FILE") == "1" else ".env"
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_ENV_FILE,
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -37,6 +41,8 @@ class Settings(BaseSettings):
     jwt_public_key_path: str = Field(default="/app/keys/public.pem")
     jwt_algorithm: str = Field(default="RS256")
     jwt_issuer: str = Field(default="snyq-platform")
+    # Structural key-rotation support (§14.4): active key id embedded as JWT kid
+    jwt_active_kid: str = Field(default="key-2026-08")
 
     # Token TTLs
     token_ttl_access: int = Field(default=3600)  # 1 hour

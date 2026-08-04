@@ -14,7 +14,7 @@ from datetime import datetime
 from app.core.config import settings
 from app.core.exceptions import SnyQException
 from app.core.errors import ErrorResponse, ErrorDetail
-from app.api.v1 import auth, oauth, me, admin, connectors
+from app.api.v1 import auth, oauth, me, admin, connectors, scoped_probes
 from app.connectors.google.webhooks import router as webhooks_router
 
 from app.middleware.tenant_middleware import TenantMiddleware
@@ -116,6 +116,7 @@ app.include_router(oauth.router, prefix="/api/v1")
 app.include_router(me.router, prefix="/api/v1")
 app.include_router(admin.router, prefix="/api/v1")
 app.include_router(connectors.router, prefix="/api/v1")
+app.include_router(scoped_probes.router, prefix="/api/v1")
 app.include_router(webhooks_router, prefix="/api/v1")
 
 

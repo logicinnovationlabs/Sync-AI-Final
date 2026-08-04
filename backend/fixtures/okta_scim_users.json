@@ -1,0 +1,38 @@
+[
+  {
+    "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+    "id": "00u1okta-subject-alice",
+    "userName": "alice.okta@example.com",
+    "displayName": "Alice Okta",
+    "active": true,
+    "emails": [
+      {"value": "alice.okta@example.com", "primary": true, "type": "work"}
+    ],
+    "name": {"givenName": "Alice", "familyName": "Okta"},
+    "meta": {"resourceType": "User"}
+  },
+  {
+    "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+    "id": "00u1okta-subject-bob",
+    "userName": "bob.okta@example.com",
+    "displayName": "Bob Okta",
+    "active": true,
+    "emails": [
+      {"value": "bob.okta@example.com", "primary": true, "type": "work"}
+    ],
+    "name": {"givenName": "Bob", "familyName": "Okta"},
+    "meta": {"resourceType": "User"}
+  },
+  {
+    "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+    "id": "00u1okta-subject-carol",
+    "userName": "carol.okta@example.com",
+    "displayName": "Carol Okta",
+    "active": true,
+    "emails": [
+      {"value": "carol.okta@example.com", "primary": true, "type": "work"}
+    ],
+    "name": {"givenName": "Carol", "familyName": "Okta"},
+    "meta": {"resourceType": "User"}
+  }
+]

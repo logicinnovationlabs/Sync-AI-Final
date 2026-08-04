@@ -30,6 +30,9 @@ class TokenService:
         self.refresh_ttl = settings.token_ttl_refresh
         self._private_key: Optional[str] = None
         self._public_key: Optional[str] = None
+        # §14.4 key rotation: map of kid -> public PEM; active kid used on issue
+        self._public_keys_by_kid: Dict[str, str] = {}
+        self._active_kid: str = settings.jwt_active_kid
 
     def _load_keys(self):
         """Load RSA keys from disk (lazy loading)."""
@@ -59,6 +62,27 @@ class TokenService:
             public_key_path = Path(settings.jwt_public_key_path)
             if public_key_path.exists():
                 self._public_key = public_key_path.read_text()
+
+        # Register active public key under kid for rotation-aware verify
+        if self._public_key and self._active_kid not in self._public_keys_by_kid:
+            self._public_keys_by_kid[self._active_kid] = self._public_key
+
+    def register_verification_key(self, kid: str, public_pem: str) -> None:
+        """
+        Register an additional public key for verification (JWT key rotation §14.4).
+        Old tokens signed with a previous kid remain verifiable while this key stays registered.
+        """
+        self._public_keys_by_kid[kid] = public_pem
+
+    def rotate_signing_key(self, new_kid: str, private_pem: str, public_pem: str) -> None:
+        """
+        Rotate the active signing key without downtime for already-issued tokens.
+        New tokens use new_kid; previously registered kids remain valid for verify.
+        """
+        self._private_key = private_pem
+        self._public_key = public_pem
+        self._active_kid = new_kid
+        self._public_keys_by_kid[new_kid] = public_pem
 
     async def issue_access_token(
         self,
@@ -92,7 +116,12 @@ class TokenService:
             "jti": jti,
         }
         
-        token = jwt.encode(payload, self._private_key, algorithm=self.algorithm)
+        token = jwt.encode(
+            payload,
+            self._private_key,
+            algorithm=self.algorithm,
+            headers={"kid": self._active_kid},
+        )
         return token
 
     async def issue_refresh_token(
@@ -125,7 +154,12 @@ class TokenService:
             "jti": jti,
         }
         
-        token = jwt.encode(payload, self._private_key, algorithm=self.algorithm)
+        token = jwt.encode(
+            payload,
+            self._private_key,
+            algorithm=self.algorithm,
+            headers={"kid": self._active_kid},
+        )
         return token
 
     async def validate_token(self, token: str) -> Dict[str, Any]:
@@ -143,11 +177,21 @@ class TokenService:
             RevokedTokenError if token has been revoked (A2).
         """
         self._load_keys()
+
+        # Prefer kid-selected public key (§14.4); fall back to active public key
+        try:
+            header = jwt.get_unverified_header(token)
+            kid = header.get("kid")
+            verify_key = self._public_keys_by_kid.get(kid) if kid else None
+            if verify_key is None:
+                verify_key = self._public_key
+        except Exception:
+            verify_key = self._public_key
         
         try:
             payload = jwt.decode(
                 token,
-                self._public_key,
+                verify_key,
                 algorithms=[self.algorithm],
                 issuer=self.issuer,
             )
