@@ -1,0 +1,395 @@
+openapi: 3.0.3
+info:
+  title: Block E: Chunking and Embedding Pipeline API
+  description: |
+    API for Block E's chunking and embedding pipeline.
+    
+    This service provides endpoints to:
+    - Enqueue embedding jobs for chunks or documents
+    - Trigger re-embedding for tenants or specific documents
+    - Poll embedding job status
+    
+    All endpoints require tenant-scoped authorization via the X-Tenant-ID header.
+    In production, this will integrate with Block A's JWT-based authentication.
+  version: 0.1.0
+  contact:
+    name: Block E Team
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: https://chunking-api.example.com
+    description: Production server
+
+tags:
+  - name: embedding
+    description: Embedding job management endpoints
+
+paths:
+  /api/v1/embed:
+    post:
+      tags:
+        - embedding
+      summary: Enqueue embedding for chunks or document
+      description: |
+        Triggers the embedding pipeline for specified chunks or all chunks for a document.
+        The job is processed asynchronously by the Celery worker.
+        
+        **Tenant Isolation:** Tenant ID is extracted from JWT token. Users can only enqueue embedding jobs for their own tenant.
+      operationId: enqueueEmbedding
+      security:
+        - JWTAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbedRequest'
+            examples:
+              embedChunks:
+                summary: Embed specific chunks
+                value:
+                  chunk_ids: ["chunk_abc123", "chunk_def456"]
+                  model_version: "v1"
+              embedDocument:
+                summary: Embed all chunks for a document
+                value:
+                  document_id: "doc_789xyz"
+                  model_version: "v1"
+      responses:
+        '200':
+          description: Embedding job successfully enqueued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedResponse'
+              example:
+                job_id: "a1b2c3d4e5f6..."
+                status: "pending"
+                chunks_targeted: 2
+                message: "Embedding job queued for 2 chunks"
+        '400':
+          description: Invalid request (both chunk_ids and document_id provided, or neither)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid X-Tenant-ID header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Tenant mismatch (request tenant_id does not match authenticated tenant)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/reembed:
+    post:
+      tags:
+        - embedding
+      summary: Force re-embedding for tenant or model version
+      description: |
+        Triggers re-embedding of chunks, typically used when:
+        - The embedding model version is bumped
+        - A specific document needs to be re-processed
+        - All chunks for a tenant need to be re-embedded (force_all=True)
+        
+        **Tenant Isolation:** Tenant ID is extracted from JWT token. Users can only re-embed chunks for their own tenant.
+      operationId: enqueueReembedding
+      security:
+        - JWTAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReembedRequest'
+            examples:
+              reembedModelVersion:
+                summary: Re-embed chunks with different model version
+                value:
+                  model_version: "v2"
+              reembedDocument:
+                summary: Re-embed specific document
+                value:
+                  document_id: "doc_789xyz"
+              reembedAll:
+                summary: Re-embed all chunks for tenant
+                value:
+                  force_all: true
+      responses:
+        '200':
+          description: Re-embedding job successfully enqueued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedResponse'
+              example:
+                job_id: "x9y8z7w6v5u4..."
+                status: "pending"
+                chunks_targeted: 150
+                message: "Re-embedding job queued for 150 chunks"
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid X-Tenant-ID header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Tenant mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/embed/jobs/{job_id}:
+    get:
+      tags:
+        - embedding
+      summary: Poll embedding job status
+      description: |
+        Returns the current status of an embedding or re-embedding job,
+        including progress (chunks_completed vs chunks_targeted).
+        
+        **Tenant Isolation:** Tenant ID is extracted from JWT token. Users can only query jobs belonging to their tenant.
+      operationId: getJobStatus
+      security:
+        - JWTAuth: []
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          description: The job ID to query
+          schema:
+            type: string
+            example: "a1b2c3d4e5f6..."
+      responses:
+        '200':
+          description: Job status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+              example:
+                job_id: "a1b2c3d4e5f6..."
+                tenant_id: "tenant_001"
+                status: "running"
+                chunks_targeted: 100
+                chunks_completed: 75
+                model_version: "v1"
+                created_at: "2024-01-15T10:30:00Z"
+                started_at: "2024-01-15T10:30:05Z"
+                completed_at: null
+                error: null
+                document_id: "doc_789xyz"
+                chunk_id: null
+        '401':
+          description: Missing or invalid X-Tenant-ID header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Access denied (job belongs to different tenant)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    JWTAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT-based authentication from Block A.
+        
+        The JWT token must contain:
+        - tenant_id: Tenant identifier for scope enforcement
+        - scopes: List of scopes (e.g., embed.write, embed.read)
+        
+        Example: Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+  schemas:
+    EmbedRequest:
+      type: object
+      properties:
+        chunk_ids:
+          type: array
+          description: List of chunk IDs to embed
+          items:
+            type: string
+          example: ["chunk_abc123", "chunk_def456"]
+        document_id:
+          type: string
+          description: Document ID to embed all chunks for
+          example: "doc_789xyz"
+        model_version:
+          type: string
+          description: Model version to use (defaults to current)
+          example: "v1"
+      x-examples:
+        embedChunks:
+          chunk_ids: ["chunk_abc123", "chunk_def456"]
+          model_version: "v1"
+        embedDocument:
+          document_id: "doc_789xyz"
+          model_version: "v1"
+
+    ReembedRequest:
+      type: object
+      properties:
+        model_version:
+          type: string
+          description: Target model version (if not specified, uses current)
+          example: "v2"
+        document_id:
+          type: string
+          description: Specific document to re-embed (optional)
+          example: "doc_789xyz"
+        force_all:
+          type: boolean
+          description: Re-embed all chunks for tenant regardless of current version
+          default: false
+          example: false
+
+    EmbedResponse:
+      type: object
+      required:
+        - job_id
+        - status
+        - chunks_targeted
+        - message
+      properties:
+        job_id:
+          type: string
+          description: Unique job identifier
+          example: "a1b2c3d4e5f6..."
+        status:
+          type: string
+          enum: [pending, running, complete, failed]
+          description: Job status
+          example: "pending"
+        chunks_targeted:
+          type: integer
+          description: Number of chunks targeted for embedding
+          example: 100
+        message:
+          type: string
+          description: Human-readable status message
+          example: "Embedding job queued for 100 chunks"
+
+    JobResponse:
+      type: object
+      required:
+        - job_id
+        - tenant_id
+        - status
+        - chunks_targeted
+        - chunks_completed
+        - model_version
+        - created_at
+      properties:
+        job_id:
+          type: string
+          description: Unique job identifier
+          example: "a1b2c3d4e5f6..."
+        tenant_id:
+          type: string
+          description: Tenant ID that owns this job
+          example: "tenant_001"
+        status:
+          type: string
+          enum: [pending, running, complete, failed]
+          description: Current job status
+          example: "running"
+        chunks_targeted:
+          type: integer
+          description: Total number of chunks to process
+          example: 100
+        chunks_completed:
+          type: integer
+          description: Number of chunks successfully processed
+          example: 75
+        model_version:
+          type: string
+          description: Embedding model version being used
+          example: "v1"
+        created_at:
+          type: string
+          format: date-time
+          description: Job creation timestamp
+          example: "2024-01-15T10:30:00Z"
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Job start timestamp (null if not started)
+          example: "2024-01-15T10:30:05Z"
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Job completion timestamp (null if not complete)
+          example: null
+        error:
+          type: string
+          nullable: true
+          description: Error message if job failed
+          example: null
+        document_id:
+          type: string
+          nullable: true
+          description: Document ID if job is document-scoped
+          example: "doc_789xyz"
+        chunk_id:
+          type: string
+          nullable: true
+          description: Chunk ID if job is chunk-scoped
+          example: null
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              description: Error code
+              example: "TENANT_MISMATCH"
+            message:
+              type: string
+              description: Human-readable error message
+              example: "Tenant mismatch: request tenant_id does not match authenticated tenant"
+        request_id:
+          type: string
+          nullable: true
+          description: Request ID for tracing
+          example: "req_abc123"
+        timestamp:
+          type: string
+          format: date-time
+          description: Error timestamp
+          example: "2024-01-15T10:30:00Z"
