@@ -125,3 +125,7 @@ class Row:
     
     def __repr__(self) -> str:
         return f"Row({self._dict})"
+    
+    def to_dict(self) -> dict:
+        """Convert Row to dictionary for JSON serialization."""
+        return self._dict
