@@ -60,6 +60,34 @@ def get_current_chunker_version() -> str:
     
     return match.group(1)
 
+def _git_show_chunker_init(ref: str) -> str:
+    """Return __init__.py content from ref, trying monorepo and service-root paths."""
+    candidates = [
+        f'{ref}:services/block-e-chunking/app/chunkers/__init__.py',
+        f'{ref}:app/chunkers/__init__.py',
+    ]
+    last_err = None
+    for spec in candidates:
+        result = subprocess.run(
+            ['git', 'show', spec],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            return result.stdout
+        last_err = result.stderr
+    raise FileNotFoundError(last_err or f'__init__.py not found in {ref}')
+
+
+def get_chunker_version_at_ref(ref: str) -> str:
+    """Extract CHUNKER_VERSION from a git ref."""
+    content = _git_show_chunker_init(ref)
+    match = re.search(r'CHUNKER_VERSION\s*=\s*["\']([^"\']+)["\']', content)
+    if not match:
+        return "0.0.0"
+    return match.group(1)
+
+
 def get_base_chunker_version(base_ref: str, chunker_files_changed: bool) -> str:
     """Extract CHUNKER_VERSION from base ref.
     
@@ -67,37 +95,19 @@ def get_base_chunker_version(base_ref: str, chunker_files_changed: bool) -> str:
     this is an ambiguous state - fail closed rather than falling back to 0.0.0.
     """
     try:
-        result = subprocess.run(
-            ['git', 'show', f'{base_ref}:app/chunkers/__init__.py'],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        content = result.stdout
-        
-        match = re.search(r'CHUNKER_VERSION\s*=\s*["\']([^"\']+)["\']', content)
-        if not match:
-            # If version didn't exist in base but __init__.py did, treat as "0.0.0"
-            return "0.0.0"
-        
-        return match.group(1)
-    except subprocess.CalledProcessError:
-        # File didn't exist in base ref
+        return get_chunker_version_at_ref(base_ref)
+    except FileNotFoundError:
         if chunker_files_changed:
-            # Ambiguous state: chunker files changed but __init__.py didn't exist in base
-            # We can't determine if version was bumped - fail closed
             print("\n" + "=" * 80)
-            print("✗ CHECK FAILED")
+            print("CHECK FAILED")
             print("=" * 80)
             print("Chunker files changed but app/chunkers/__init__.py doesn't exist in base ref.")
             print(f"Base ref: {base_ref}")
             print("This is an ambiguous state - cannot determine if CHUNKER_VERSION was bumped.")
-            print("Per v7.0 §7: This requires manual verification to ensure version was bumped.")
+            print("Per v7.0 section 7: This requires manual verification to ensure version was bumped.")
             print("\nTo resolve: Ensure __init__.py exists in base ref, or manually verify version bump.")
             sys.exit(1)
-        else:
-            # No chunker files changed, safe to treat as "0.0.0"
-            return "0.0.0"
+        return "0.0.0"
 
 def main():
     import argparse
@@ -131,25 +141,28 @@ def main():
         print("\n✓ No chunker files changed - check passes")
         sys.exit(0)
     
-    # Chunker files changed - verify version was bumped
-    current_version = get_current_chunker_version()
+    # Chunker files changed - verify version was bumped (compare versions at both refs)
+    try:
+        current_version = get_chunker_version_at_ref(args.head_ref)
+    except FileNotFoundError:
+        current_version = get_current_chunker_version()
     base_version = get_base_chunker_version(args.base_ref, chunker_files_changed=True)
     
-    print(f"\nCurrent CHUNKER_VERSION: {current_version}")
-    print(f"Base CHUNKER_VERSION: {base_version}")
+    print(f"\nCurrent CHUNKER_VERSION ({args.head_ref}): {current_version}")
+    print(f"Base CHUNKER_VERSION ({args.base_ref}): {base_version}")
     
     if current_version == base_version:
         print("\n" + "=" * 80)
-        print("✗ CHECK FAILED")
+        print("CHECK FAILED")
         print("=" * 80)
         print("Chunker logic was modified but CHUNKER_VERSION was not bumped.")
-        print("Per v7.0 §7: A change to chunking logic without a corresponding version")
+        print("Per v7.0 section 7: A change to chunking logic without a corresponding version")
         print("bump means old chunks silently coexist with new ones under an identical")
         print("version tag, defeating the re-chunk/re-embed detection.")
         print("\nTo fix: Bump CHUNKER_VERSION in app/chunkers/__init__.py")
         sys.exit(1)
     else:
-        print("\n✓ CHUNKER_VERSION was bumped - check passes")
+        print("\nCHUNKER_VERSION was bumped - check passes")
         sys.exit(0)
 
 if __name__ == "__main__":

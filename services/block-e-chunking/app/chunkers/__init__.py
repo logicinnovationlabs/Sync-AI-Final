@@ -7,7 +7,7 @@ Chunkers for prose and code
 # silently coexist with new ones under an identical version tag, defeating the
 # re-chunk/re-embed detection this whole design relies on.
 # This constant must be bumped whenever chunking logic changes.
-CHUNKER_VERSION = "1.1.0"
+CHUNKER_VERSION = "1.2.0"
 
 from .chunk_id_generator import ChunkIDGenerator
 from .prose_chunker import ProseChunker

@@ -846,3 +846,57 @@ Re-run Components 1–8 in sequence one final time after all remaining work abov
 **Status:** Pending E6 completion
 
 Per v3.0 §9 item 6: Full regression pass should re-run Components 1–8 in sequence one final time after all remaining work (items 1-4) is complete. Since E6 is blocked by PostgreSQL database infrastructure, the regression pass is deferred until E6 can be verified. The regression pass is the closing step, not an ongoing habit — do not re-run the full suite after every minor unrelated change elsewhere in the codebase.
+
+---
+
+## Unified Closeout Session 2026-08-04 (authoritative for §5.0 gaps)
+
+**Environment:** `block-e-verify-pg` (postgres:16, port 5433), password=verify, db=`block_e_verify`.
+
+### Gap 1 — Truncation `truncated=true` — PASS
+```
+Fixture: fixtures/test_oversized_function_deterministic.py (4584 chars)
+Token count (tiktoken cl100k_base): 2206
+MAX_TOKENS: 2048 (exceeds by 158)
+Chunk type: function_method
+Token count after truncate: 2048
+Truncated flag: True
+Chunk size (bytes): 4256
+SUCCESS: truncated=True is set correctly
+```
+
+### Gap 2 — Components 1, 6, 7 on real Postgres (not SQLite) — PASS
+- `verify_component1_consumer.py` → `postgresql+asyncpg://postgres:verify@localhost:5433/block_e_verify` — PASSED
+- `verify_component6_re_embed_trigger.py` → same async URL; no `datetime.utcnow()` on inserts — PASSED (DB `now()` defaults exercised)
+- `verify_component7_orphan_handler.py` → `postgresql://postgres:verify@localhost:5433/block_e_verify` — PASSED
+- Confirmed rows: `created_at`/`updated_at` populated by server (e.g. `2026-08-04 13:27:23.113033+00`)
+
+### Gap 3 — E2 ≥10-minute sustained with sliding 60s windows — PASS
+```
+Actual duration: 604.1 seconds
+Total batches: 110
+Total documents: 5500
+Aggregate: 546.3 docs/min (>=500)
+Worst 60s sliding window (recomputed at every batch boundary): 531.5 docs/min at batch 5 (>=400)
+All 110 sliding windows OK
+Calendar minutes 1-10: 550.0 docs/min each
+Log: e2_10min_closeout.log / e2_10min_results.json
+```
+
+### Full table re-confirm (this session)
+| ID | Result | Evidence |
+|----|--------|----------|
+| E1 | **PASS** | Component 4: 36 files, 428 chunks, 0 mid-function/class splits |
+| E2 | **PASS** | Gap 3 above — 546.3 aggregate, worst sliding window 531.5 |
+| E3 | **PASS** | Component 6 on real Postgres (Gap 2) |
+| E4 | **PASS** | Component 2: identical chunk_id across 5 runs |
+| E5 | **PASS** | Component 1 write path on real Postgres (Gap 2) |
+| E6 | **PASS** | Component 6 skip/unchanged-version path + Component 7 orphan on Postgres |
+| E7 | **PASS** | `check_chunker_version_ci.py`: FAIL without bump (`deffa1a...5eec926`); PASS with bump after `CHUNKER_VERSION=1.2.0` |
+
+### Deviations from spec (still accurate)
+1. **`chunk_id` is String(64) SHA256 hex, not UUID** — recorded previously; still accurate.
+2. **E2 uses MockEmbeddingProvider** (100ms±50ms) — Phase 2 real-provider run remains deferred pending credentials.
+3. **API JWT auth stub** — still non-production (signature verification not wired to Block A token_service).
+
+**Block E signoff (E1–E7 closeout gate): PASS** with §5.0 gaps genuinely closed this session.

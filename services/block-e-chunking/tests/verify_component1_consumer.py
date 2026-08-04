@@ -7,6 +7,7 @@ import asyncio
 import sys
 import os
 import json
+import uuid
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -19,17 +20,20 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select, text
 
 
+ASYNC_DATABASE_URL = "postgresql+asyncpg://postgres:verify@localhost:5433/block_e_verify"
+
+
 async def setup_test_database():
-    """Create test database tables."""
-    database_url = "sqlite+aiosqlite:///:memory:"
-    engine = create_async_engine(database_url)
-    
-    # Import models to ensure they're registered
-    from app.models.chunk_record import ChunkRecord, Base
-    
+    """Create test database tables on Postgres verify container."""
+    engine = create_async_engine(ASYNC_DATABASE_URL, echo=False)
+
+    # Import models to ensure they are registered on shared Base.metadata
+    from app.models.chunk_record import Base  # noqa: F401
+    from app.models.embedding_job import EmbeddingJob  # noqa: F401
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
+
     return engine
 
 
@@ -43,8 +47,10 @@ async def verify_consumer():
     # Setup test database
     print("\n[1] Setting up test database...")
     engine = await setup_test_database()
-    database_url = "sqlite+aiosqlite:///:memory:"
-    
+    database_url = ASYNC_DATABASE_URL
+
+    run_id = uuid.uuid4().hex[:8]
+
     # Load fixture
     print("\n[2] Loading Block Z fixture canonical-doc event...")
     fixture_path = os.path.join(
@@ -57,7 +63,11 @@ async def verify_consumer():
     
     with open(fixture_path, 'r') as f:
         canonical_doc = json.load(f)
-    
+
+    canonical_doc = dict(canonical_doc)
+    canonical_doc["tenant_id"] = f"tenant_{run_id}"
+    canonical_doc["document_id"] = f"doc_{run_id}"
+
     print(f"   Loaded fixture: {canonical_doc['document_id']}")
     print(f"   Tenant ID: {canonical_doc['tenant_id']}")
     print(f"   Content Type: {canonical_doc['content_type']}")

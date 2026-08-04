@@ -6,7 +6,7 @@ Verifies re-embed trigger on model version bump
 import sys
 import os
 import asyncio
-from datetime import datetime
+import uuid
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -26,24 +26,27 @@ async def verify_re_embed_trigger():
     print("COMPONENT 6 VERIFICATION: Re-embed Trigger on Model Version Bump")
     print("=" * 80)
     
-    # Create in-memory SQLite database for testing
+    ASYNC_DATABASE_URL = "postgresql+asyncpg://postgres:verify@localhost:5433/block_e_verify"
+    run_id = uuid.uuid4().hex[:8]
+
     print("\n[1] Creating test database...")
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+    engine = create_async_engine(ASYNC_DATABASE_URL, echo=False)
+    from app.models.embedding_job import EmbeddingJob  # noqa: F401
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
+
     AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    
-    # Create test chunks
+
     print("\n[2] Creating test chunks...")
-    tenant_id = "tenant_001"
-    
+    tenant_id = f"tenant_{run_id}"
+
     async with AsyncSessionLocal() as session:
         for i in range(10):
             chunk = ChunkRecord(
-                chunk_id=f"chunk_{i}",
+                chunk_id=f"chunk_{run_id}_{i}",
                 tenant_id=tenant_id,
-                document_id=f"doc_{i}",
+                document_id=f"doc_{run_id}_{i}",
                 document_version=1,
                 chunk_type="prose",
                 chunk_index=i,
@@ -53,11 +56,9 @@ async def verify_re_embed_trigger():
                 end_byte=(i + 1) * 100,
                 chunker_version="v1",
                 embedding_model_version="v1",
-                content_hash=f"hash_{i}",
-                chunk_content_checksum=f"hash_{i}",
-                source_run_id=f"test_run_{i}",
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+                content_hash=f"hash_{run_id}_{i}",
+                chunk_content_checksum=f"hash_{run_id}_{i}",
+                source_run_id=f"test_run_{run_id}_{i}",
             )
             session.add(chunk)
         
@@ -198,7 +199,7 @@ async def verify_re_embed_trigger():
     print(f"- Full trigger executes correctly with version bump")
     print(f"- Chunk model version update works (10 chunks updated to v3)")
     print(f"- No trigger fires when version unchanged")
-    print(f"- Tenant-scoped enqueuing enforced (only tenant_001 chunks affected)")
+    print(f"- Tenant-scoped enqueuing enforced (only tenant-scoped chunks affected)")
     
     return True
 

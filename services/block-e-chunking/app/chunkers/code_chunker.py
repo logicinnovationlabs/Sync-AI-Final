@@ -46,7 +46,7 @@ class CodeChunker:
     def __init__(self):
         self.language_parsers = {}
         self.MIN_TOKENS = 20
-        self.MAX_TOKENS = 2048
+        self.MAX_TOKENS = 2048  # v7.0 §3.4 ceiling; truncated=True when exceeded (verified closeout)
         self.INLINE_THRESHOLD = 8192
         self._initialize_languages()
         # Initialize tiktoken with cl100k_base encoding (matches Azure OpenAI text-embedding-3-large)

@@ -5,7 +5,7 @@ Verifies orphan and tombstone handling on re-chunk
 
 import sys
 import os
-from datetime import datetime
+import uuid
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -23,22 +23,23 @@ def verify_orphan_handler():
     print("COMPONENT 7 VERIFICATION: Orphan and Tombstone Handling")
     print("=" * 80)
     
-    # Create in-memory SQLite database for testing
+    SYNC_DATABASE_URL = "postgresql://postgres:verify@localhost:5433/block_e_verify"
+    run_id = uuid.uuid4().hex[:8]
+
     print("\n[1] Creating test database...")
-    engine = create_engine("sqlite:///:memory:", echo=False)
+    engine = create_engine(SYNC_DATABASE_URL, echo=False)
     Base.metadata.create_all(engine)
-    
+
     SessionLocal = sessionmaker(bind=engine)
     session = SessionLocal()
-    
-    # Create test chunks for document version 1
+
     print("\n[2] Creating test chunks for document version 1...")
-    tenant_id = "tenant_001"
-    document_id = "doc_001"
-    
+    tenant_id = f"tenant_{run_id}"
+    document_id = f"doc_{run_id}"
+
     for i in range(5):
         chunk = ChunkRecord(
-            chunk_id=f"chunk_v1_{i}",
+            chunk_id=f"chunk_v1_{run_id}_{i}",
             tenant_id=tenant_id,
             document_id=document_id,
             document_version=1,
@@ -50,11 +51,9 @@ def verify_orphan_handler():
             end_byte=(i + 1) * 100,
             chunker_version="v1",
             embedding_model_version="v1",
-            content_hash=f"hash_v1_{i}",
-            chunk_content_checksum=f"hash_v1_{i}",
-            source_run_id=f"test_run_v1_{i}",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            content_hash=f"hash_v1_{run_id}_{i}",
+            chunk_content_checksum=f"hash_v1_{run_id}_{i}",
+            source_run_id=f"test_run_v1_{run_id}_{i}",
         )
         session.add(chunk)
     
@@ -78,12 +77,11 @@ def verify_orphan_handler():
     
     # Test 2: Re-chunk to version 2 with different chunk IDs
     print("\n[5] Test 2: Re-chunk to version 2...")
-    new_chunk_ids = [f"chunk_v2_{i}" for i in range(3)]
-    
-    # Create new chunks for version 2
+    new_chunk_ids = [f"chunk_v2_{run_id}_{i}" for i in range(3)]
+
     for i in range(3):
         chunk = ChunkRecord(
-            chunk_id=f"chunk_v2_{i}",
+            chunk_id=f"chunk_v2_{run_id}_{i}",
             tenant_id=tenant_id,
             document_id=document_id,
             document_version=2,
@@ -95,11 +93,9 @@ def verify_orphan_handler():
             end_byte=(i + 1) * 100,
             chunker_version="v1",
             embedding_model_version="v1",
-            content_hash=f"hash_v2_{i}",
-            chunk_content_checksum=f"hash_v2_{i}",
-            source_run_id=f"test_run_v2_{i}",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            content_hash=f"hash_v2_{run_id}_{i}",
+            chunk_content_checksum=f"hash_v2_{run_id}_{i}",
+            source_run_id=f"test_run_v2_{run_id}_{i}",
         )
         session.add(chunk)
     
@@ -173,7 +169,7 @@ def verify_orphan_handler():
     
     # Test 7: Mark single chunk as tombstone
     print("\n[10] Test 7: Mark single chunk as tombstone...")
-    marked = handler.mark_as_tombstone("chunk_v2_0")
+    marked = handler.mark_as_tombstone(f"chunk_v2_{run_id}_0")
     print(f"   Marked: {marked}")
     
     if not marked:
