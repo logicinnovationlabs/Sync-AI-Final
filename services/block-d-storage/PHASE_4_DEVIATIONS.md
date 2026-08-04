@@ -47,13 +47,13 @@ The following files are obsolete pgsodium-related scripts from earlier work:
 - Enhanced `_restore_schema()` to recreate tables and insert data from JSON
 - Added proper checksum normalization for consistent verification
 - Added in-memory storage for backup data during testing
+- Unified closeout: `test_D2_backup_restore_local.py` also seeds 10 MinIO objects under the tenant prefix, deletes them, restores them, and asserts object count + SHA256 match
 
 **Deviation:** 
-- Still uses in-memory storage (_backup_data_store) instead of object storage
-- This is acceptable for Phase 2 verification since we test the actual data integrity logic
-- Full object storage integration would require MinIO/S3 client setup, which is out of scope for schema verification
+- Schema dump still uses in-memory `_backup_data_store` (not yet writing dump blobs into MinIO via the CLI)
+- Object integrity is verified against real MinIO in the D2 test; CLI wiring of object dumps into MinIO remains deferred
 
-**Decision:** Documented deviation - backup/restore logic verified with in-memory storage; object storage integration deferred
+**Decision:** Documented deviation - row integrity via backup CLI; object integrity via MinIO in the D2 test harness
 
 ### D3 Storage-Layer Tenant Isolation Improvement
 

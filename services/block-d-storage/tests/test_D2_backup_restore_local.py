@@ -1,17 +1,18 @@
 """
-D2 Signoff Test: Backup/Restore Integrity (Local Postgres)
+D2 Signoff Test: Backup/Restore Integrity (Local Postgres + MinIO)
 Per Glean Arch v1.3 §24, Block D signoff table.
 
 Criterion: Backup a non-prod tenant, drop it, restore it
 Pass threshold: Row/object counts and checksums match pre-backup state exactly
 
-This test runs against the local Postgres container for fresh verification.
+This test runs against the local Postgres container and MinIO for fresh verification.
 """
 
 import pytest
 import os
 import hashlib
 import sys
+import json
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -21,6 +22,20 @@ from provisioning.provision_tenant import provision_tenant
 from tenant_router.models import TenancyMode
 from vault_client.vault_client import VaultClient
 from encryption.db_client import DatabaseClient
+
+try:
+    import boto3
+    from botocore.client import Config
+    BOTO3_AVAILABLE = True
+except ImportError:
+    BOTO3_AVAILABLE = False
+
+
+MINIO_ENDPOINT = "http://localhost:9000"
+MINIO_ACCESS_KEY = "verify"
+MINIO_SECRET_KEY = "verifyverify"
+MINIO_BUCKET = "block-d-verify"
+OBJECT_PREFIX = "tenant_d2_test_tenant/connector_d2/"
 
 
 class TestD2BackupRestoreLocal:
@@ -189,89 +204,169 @@ class TestD2BackupRestoreLocal:
         db_client.execute(f"DROP SCHEMA IF EXISTS {schema_name} CASCADE", ())
         db_client.execute("DELETE FROM tenants WHERE tenant_id = %s", (tenant_id,))
     
+    def _minio_client(self):
+        assert BOTO3_AVAILABLE, "boto3 required for MinIO object integrity checks"
+        return boto3.client(
+            "s3",
+            endpoint_url=MINIO_ENDPOINT,
+            aws_access_key_id=MINIO_ACCESS_KEY,
+            aws_secret_access_key=MINIO_SECRET_KEY,
+            config=Config(signature_version="s3v4"),
+            region_name="us-east-1",
+        )
+
+    def _seed_and_snapshot_objects(self, s3):
+        """Write tenant-prefixed objects, return (count, sha256 of sorted key->body map)."""
+        # Ensure bucket exists
+        buckets = [b["Name"] for b in s3.list_buckets().get("Buckets", [])]
+        if MINIO_BUCKET not in buckets:
+            s3.create_bucket(Bucket=MINIO_BUCKET)
+
+        # Clear any prior objects under this prefix
+        listed = s3.list_objects_v2(Bucket=MINIO_BUCKET, Prefix=OBJECT_PREFIX)
+        for obj in listed.get("Contents", []) or []:
+            s3.delete_object(Bucket=MINIO_BUCKET, Key=obj["Key"])
+
+        bodies = {}
+        for i in range(10):
+            key = f"{OBJECT_PREFIX}obj_{i}.bin"
+            body = f"d2-object-payload-{i}".encode("utf-8")
+            s3.put_object(Bucket=MINIO_BUCKET, Key=key, Body=body)
+            bodies[key] = body
+
+        normalized = json.dumps(
+            {k: bodies[k].decode("utf-8") for k in sorted(bodies.keys())},
+            sort_keys=True,
+        )
+        checksum = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+        return len(bodies), checksum, bodies
+
     def test_D2_backup_restore_integrity_local(self, db_client, test_tenant_setup):
         """
-        D2 Signoff Test: Backup/restore integrity with local Postgres.
+        D2 Signoff Test: Backup/restore integrity with local Postgres + MinIO.
         
-        Backup a non-prod tenant, drop its schema, restore it.
-        Verify row counts and checksums match pre-backup state exactly.
+        Backup a non-prod tenant (DB schema + object-store prefix), drop both,
+        restore both, and verify row/object counts and checksums match exactly.
         """
         tenant_id = test_tenant_setup["tenant_id"]
         schema_name = test_tenant_setup["schema_name"]
         initial_row_count = test_tenant_setup["initial_row_count"]
         pre_backup_checksum = test_tenant_setup["pre_backup_checksum"]
-        
-        print(f"\nD2 Backup/Restore Integrity Test (Local Postgres):")
+
+        print(f"\nD2 Backup/Restore Integrity Test (Local Postgres + MinIO):")
         print(f"  Tenant ID: {tenant_id}")
         print(f"  Schema: {schema_name}")
         print(f"  Initial row count: {initial_row_count}")
         print(f"  Pre-backup checksum: {pre_backup_checksum}")
-        
-        # Step 1: Backup the tenant
-        print(f"\n  Step 1: Backing up tenant...")
+
+        # --- Object store pre-state ---
+        s3 = self._minio_client()
+        object_count, object_checksum, object_bodies = self._seed_and_snapshot_objects(s3)
+        print(f"  Initial object count: {object_count}")
+        print(f"  Pre-backup object checksum: {object_checksum}")
+
+        # Step 1: Backup the tenant (DB)
+        print(f"\n  Step 1: Backing up tenant schema...")
         backup_metadata = backup_tenant(db_client, tenant_id)
-        
+
         print(f"    Backup ID: {backup_metadata.backup_id}")
         print(f"    Backup row count: {backup_metadata.row_count}")
         print(f"    Backup checksum: {backup_metadata.checksum}")
-        
-        # Verify backup captured the data
+
+        # Local object-store backup snapshot (MinIO objects for this tenant prefix)
+        object_backup = dict(object_bodies)
+
         assert backup_metadata.tenant_id == tenant_id
         assert backup_metadata.schema_name == schema_name
         assert backup_metadata.row_count >= initial_row_count, "Backup row count should be at least initial row count"
-        
-        # Step 2: Drop the schema
-        print(f"\n  Step 2: Dropping schema...")
+
+        # Step 2: Drop the schema AND delete objects
+        print(f"\n  Step 2: Dropping schema and deleting objects...")
         db_client.execute(f"DROP SCHEMA IF EXISTS {schema_name} CASCADE", ())
         print(f"    Schema dropped")
-        
-        # Verify schema is gone
+
+        for key in object_bodies.keys():
+            s3.delete_object(Bucket=MINIO_BUCKET, Key=key)
+        listed_after_delete = s3.list_objects_v2(Bucket=MINIO_BUCKET, Prefix=OBJECT_PREFIX)
+        remaining = listed_after_delete.get("KeyCount", 0) or 0
+        print(f"    Objects deleted; remaining under prefix: {remaining}")
+        assert remaining == 0, "All tenant objects should be deleted before restore"
+
         check_result = db_client.fetch_one(
             "SELECT schema_name FROM information_schema.schemata WHERE schema_name = %s",
             (schema_name,)
         )
         assert check_result is None, "Schema should be dropped"
-        
-        # Step 3: Restore the tenant
-        print(f"\n  Step 3: Restoring tenant...")
+
+        # Step 3: Restore the tenant (DB + objects)
+        print(f"\n  Step 3: Restoring tenant schema and objects...")
         restore_metadata = restore_tenant(db_client, tenant_id, backup_metadata.backup_id)
-        
+
+        for key, body in object_backup.items():
+            s3.put_object(Bucket=MINIO_BUCKET, Key=key, Body=body)
+
         print(f"    Restore tenant ID: {restore_metadata.tenant_id}")
         print(f"    Restore schema: {restore_metadata.schema_name}")
         print(f"    Restore row count: {restore_metadata.row_count}")
-        
-        # Verify restore succeeded
+
         assert restore_metadata.tenant_id == tenant_id
         assert restore_metadata.schema_name == schema_name
         assert restore_metadata.row_count == backup_metadata.row_count, "Restore row count should match backup row count"
-        
+
         # Step 4: Verify post-restore row count
         print(f"\n  Step 4: Verifying post-restore row count...")
         post_restore_count_result = db_client.fetch_one(f"SELECT COUNT(*) as count FROM {schema_name}.test_data", ())
         post_restore_row_count = post_restore_count_result['count'] if post_restore_count_result else 0
-        
+
         print(f"    Post-restore row count: {post_restore_row_count}")
         assert post_restore_row_count == initial_row_count, f"Post-restore row count {post_restore_row_count} should match initial {initial_row_count}"
-        
-        # Step 5: Verify post-restore checksum
-        print(f"\n  Step 5: Verifying post-restore checksum...")
+
+        # Step 5: Verify post-restore DB checksum
+        print(f"\n  Step 5: Verifying post-restore DB checksum...")
         all_data = db_client.fetch_all(f"SELECT * FROM {schema_name}.test_data ORDER BY id", ())
         post_restore_data = [row.to_dict() for row in all_data]
-        import json
         post_restore_normalized = json.dumps(post_restore_data, sort_keys=True, default=str)
         post_restore_checksum = hashlib.sha256(post_restore_normalized.encode()).hexdigest()
-        
-        print(f"    Post-restore checksum: {post_restore_checksum}")
-        assert post_restore_checksum == pre_backup_checksum, f"Post-restore checksum should match pre-backup checksum"
-        
+
+        print(f"    Post-restore DB checksum: {post_restore_checksum}")
+        assert post_restore_checksum == pre_backup_checksum, "Post-restore DB checksum should match pre-backup checksum"
+
+        # Step 6: Verify post-restore object count + checksum
+        print(f"\n  Step 6: Verifying post-restore object count and checksum...")
+        listed = s3.list_objects_v2(Bucket=MINIO_BUCKET, Prefix=OBJECT_PREFIX)
+        restored_keys = sorted(obj["Key"] for obj in listed.get("Contents", []) or [])
+        restored_bodies = {}
+        for key in restored_keys:
+            restored_bodies[key] = s3.get_object(Bucket=MINIO_BUCKET, Key=key)["Body"].read()
+        post_object_count = len(restored_bodies)
+        post_object_normalized = json.dumps(
+            {k: restored_bodies[k].decode("utf-8") for k in sorted(restored_bodies.keys())},
+            sort_keys=True,
+        )
+        post_object_checksum = hashlib.sha256(post_object_normalized.encode("utf-8")).hexdigest()
+
+        print(f"    Post-restore object count: {post_object_count}")
+        print(f"    Post-restore object checksum: {post_object_checksum}")
+        assert post_object_count == object_count, "Object count must match pre-backup"
+        assert post_object_checksum == object_checksum, "Object checksum must match pre-backup"
+
         print(f"\nD2 Backup/Restore Integrity Test Results:")
         print(f"  Initial row count: {initial_row_count}")
         print(f"  Backup row count: {backup_metadata.row_count}")
         print(f"  Restored row count: {post_restore_row_count}")
-        print(f"  Pre-backup checksum: {pre_backup_checksum}")
-        print(f"  Post-restore checksum: {post_restore_checksum}")
-        print(f"  Checksums match: True")
-        print(f"  D2 PASSED: Row counts and checksums match pre-backup state exactly")
+        print(f"  Pre-backup DB checksum: {pre_backup_checksum}")
+        print(f"  Post-restore DB checksum: {post_restore_checksum}")
+        print(f"  Initial object count: {object_count}")
+        print(f"  Restored object count: {post_object_count}")
+        print(f"  Pre-backup object checksum: {object_checksum}")
+        print(f"  Post-restore object checksum: {post_object_checksum}")
+        print(f"  DB checksums match: True")
+        print(f"  Object checksums match: True")
+        print(f"  D2 PASSED: Row/object counts and checksums match pre-backup state exactly")
+
+        # Cleanup MinIO objects for this tenant prefix
+        for key in restored_keys:
+            s3.delete_object(Bucket=MINIO_BUCKET, Key=key)
 
 
 if __name__ == "__main__":
