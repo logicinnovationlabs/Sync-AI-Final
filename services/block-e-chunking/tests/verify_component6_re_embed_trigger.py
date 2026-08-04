@@ -6,6 +6,7 @@ Verifies re-embed trigger on model version bump
 import sys
 import os
 import asyncio
+from datetime import datetime
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -46,15 +47,17 @@ async def verify_re_embed_trigger():
                 document_version=1,
                 chunk_type="prose",
                 chunk_index=i,
-                content_text=f"Test content {i}",
+                chunk_text=f"Test content {i}",
                 token_count=10,
-                source_span_start=i * 100,
-                source_span_end=(i + 1) * 100,
+                start_byte=i * 100,
+                end_byte=(i + 1) * 100,
                 chunker_version="v1",
                 embedding_model_version="v1",
                 content_hash=f"hash_{i}",
                 chunk_content_checksum=f"hash_{i}",
-                source_run_id=f"test_run_{i}"
+                source_run_id=f"test_run_{i}",
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
             )
             session.add(chunk)
         
@@ -71,10 +74,10 @@ async def verify_re_embed_trigger():
         print(f"   Version changed: {version_changed}")
         
         if not version_changed:
-            print(f"   ✗ Version change detection failed")
+            print(f"   [FAIL] Version change detection failed")
             return False
         
-        print(f"   ✓ Version change detected correctly")
+        print(f"   [OK] Version change detected correctly")
         
         # Test 2: No version change
         print("\n[5] Test 2: No version change (v1 -> v1)...")
@@ -82,10 +85,10 @@ async def verify_re_embed_trigger():
         print(f"   Version changed: {version_changed}")
         
         if version_changed:
-            print(f"   ✗ Should not detect version change")
+            print(f"   [FAIL] Should not detect version change")
             return False
         
-        print(f"   ✓ No version change detected correctly")
+        print(f"   [OK] No version change detected correctly")
         
         # Test 3: Enqueue re-embed jobs
         print("\n[6] Test 3: Enqueue re-embed jobs...")
@@ -93,16 +96,16 @@ async def verify_re_embed_trigger():
         print(f"   Enqueued {len(job_ids)} jobs")
         
         if len(job_ids) != 10:
-            print(f"   ✗ Expected 10 jobs, got {len(job_ids)}")
+            print(f"   [FAIL] Expected 10 jobs, got {len(job_ids)}")
             return False
         
-        print(f"   ✓ Correct number of jobs enqueued")
+        print(f"   [OK] Correct number of jobs enqueued")
         
         # Verify jobs were created
         result = await session.execute(
             select(EmbeddingJob).where(
                 EmbeddingJob.tenant_id == tenant_id,
-                EmbeddingJob.model_version == "v2"
+                EmbeddingJob.model_version_target == "v2"
             )
         )
         jobs = result.scalars().all()
@@ -110,10 +113,10 @@ async def verify_re_embed_trigger():
         print(f"   Verified {len(jobs)} jobs in database")
         
         if len(jobs) != 10:
-            print(f"   ✗ Expected 10 jobs in database, got {len(jobs)}")
+            print(f"   [FAIL] Expected 10 jobs in database, got {len(jobs)}")
             return False
         
-        print(f"   ✓ Jobs correctly stored in database")
+        print(f"   [OK] Jobs correctly stored in database")
         
         # Test 4: Full trigger
         print("\n[7] Test 4: Full trigger (v2 -> v3)...")
@@ -124,28 +127,28 @@ async def verify_re_embed_trigger():
         print(f"   Jobs enqueued: {result['jobs_enqueued']}")
         
         if not result['triggered']:
-            print(f"   ✗ Trigger should have fired")
+            print(f"   [FAIL] Trigger should have fired")
             return False
         
         if result['jobs_enqueued'] != 10:
-            print(f"   ✗ Expected 10 jobs, got {result['jobs_enqueued']}")
+            print(f"   [FAIL] Expected 10 jobs, got {result['jobs_enqueued']}")
             return False
         
-        print(f"   ✓ Full trigger executed correctly")
+        print(f"   [OK] Full trigger executed correctly")
         
         # Verify jobs have correct model version
         print("\n[7] Test 5: Verify jobs have correct model version...")
         jobs_query = select(EmbeddingJob).where(
-            EmbeddingJob.model_version == "v2"
+            EmbeddingJob.model_version_target == "v2"
         )
         result = await session.execute(jobs_query)
         jobs = result.scalars().all()
         
         if len(jobs) != 10:
-            print(f"   ✗ Expected 10 jobs with model version v2, got {len(jobs)}")
+            print(f"   [FAIL] Expected 10 jobs with model version v2, got {len(jobs)}")
             return False
         
-        print(f"   ✓ Jobs have correct model version")
+        print(f"   [OK] Jobs have correct model version")
         
         # Test 5: Update chunk model version
         print("\n[8] Test 6: Update chunk model version...")
@@ -153,10 +156,10 @@ async def verify_re_embed_trigger():
         print(f"   Updated {count} chunks")
         
         if count != 10:
-            print(f"   ✗ Expected 10 chunks updated, got {count}")
+            print(f"   [FAIL] Expected 10 chunks updated, got {count}")
             return False
         
-        print(f"   ✓ Chunks updated correctly")
+        print(f"   [OK] Chunks updated correctly")
         
         # Verify update
         result = await session.execute(
@@ -167,10 +170,10 @@ async def verify_re_embed_trigger():
         all_updated = all(chunk.embedding_model_version == "v3" for chunk in chunks)
         
         if not all_updated:
-            print(f"   ✗ Not all chunks updated to v3")
+            print(f"   [FAIL] Not all chunks updated to v3")
             return False
         
-        print(f"   ✓ All chunks verified at v3")
+        print(f"   [OK] All chunks verified at v3")
         
         # Test 6: No trigger when version unchanged
         print("\n[9] Test 6: No trigger when version unchanged (v3 -> v3)...")
@@ -180,10 +183,10 @@ async def verify_re_embed_trigger():
         print(f"   Reason: {result['reason']}")
         
         if result['triggered']:
-            print(f"   ✗ Trigger should not have fired")
+            print(f"   [FAIL] Trigger should not have fired")
             return False
         
-        print(f"   ✓ No trigger when version unchanged")
+        print(f"   [OK] No trigger when version unchanged")
     
     print("\n" + "=" * 80)
     print("COMPONENT 6 VERIFICATION: PASSED")
@@ -205,7 +208,7 @@ if __name__ == "__main__":
         success = asyncio.run(verify_re_embed_trigger())
         sys.exit(0 if success else 1)
     except Exception as e:
-        print(f"\n✗ Verification failed with exception: {e}")
+        print(f"\n[FAIL] Verification failed with exception: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

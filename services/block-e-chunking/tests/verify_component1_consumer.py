@@ -147,7 +147,7 @@ async def verify_consumer():
             print(f"     - tenant_id: {job_record.tenant_id}")
             print(f"     - chunk_id: {job_record.chunk_id}")
             print(f"     - status: {job_record.status}")
-            print(f"     - model_version: {job_record.model_version}")
+            print(f"     - model_version_target: {job_record.model_version_target}")
             
             # Verify tenant_id matches
             if job_record.tenant_id == event["tenant_id"]:

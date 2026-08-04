@@ -36,6 +36,7 @@ def verify_tenant_isolation():
             job_id="job_001",
             tenant_id="tenant_001",
             chunk_id="chunk_001",
+            document_id="doc_001",  # Per v7.0 §2.2: required for join-check
             content_text="Test content",
             model_version="v1"
         )
@@ -54,6 +55,7 @@ def verify_tenant_isolation():
             'job_id': f"job_00{i}",
             'tenant_id': 'tenant_001',
             'chunk_id': f"chunk_00{i}",
+            'document_id': f"doc_00{i}",  # Per v7.0 §2.2: required for join-check
             'content_text': f"Test content {i}",
             'model_version': 'v1'
         }
@@ -76,6 +78,7 @@ def verify_tenant_isolation():
             'job_id': "job_005",
             'tenant_id': 'tenant_001',
             'chunk_id': 'chunk_005',
+            'document_id': 'doc_005',  # Per v7.0 §2.2: required for join-check
             'content_text': 'Test content from tenant 001',
             'model_version': 'v1'
         },
@@ -83,6 +86,7 @@ def verify_tenant_isolation():
             'job_id': "job_006",
             'tenant_id': 'tenant_002',
             'chunk_id': 'chunk_006',
+            'document_id': 'doc_006',  # Per v7.0 §2.2: required for join-check
             'content_text': 'Test content from tenant 002',
             'model_version': 'v1'
         }
@@ -109,7 +113,7 @@ def verify_tenant_isolation():
     
     # Set DATABASE_URL to localhost for host-run tests (postgres hostname only resolves inside Docker)
     original_db_url = os.environ.get('DATABASE_URL')
-    os.environ['DATABASE_URL'] = 'postgresql+asyncpg://postgres:postgres@localhost:5432/block_e'
+    os.environ['DATABASE_URL'] = 'postgresql+asyncpg://postgres:verify@localhost:5433/block_e_verify'
     
     # Insert a real chunk_records row for chunk_007 before task invocation
     print("   [Setup] Inserting placeholder chunk_records row for chunk_007...")
@@ -124,7 +128,7 @@ def verify_tenant_isolation():
             conn.execute(text("""
                 INSERT INTO chunk_records (
                     chunk_id, tenant_id, document_id, document_version, chunk_index,
-                    chunk_type, content_text, token_count, source_span_start, source_span_end,
+                    chunk_type, chunk_text, token_count, start_byte, end_byte,
                     embedding_vector, embedding_model_version, embedding_timestamp,
                     chunker_version, content_hash, chunk_content_checksum, source_run_id,
                     created_at

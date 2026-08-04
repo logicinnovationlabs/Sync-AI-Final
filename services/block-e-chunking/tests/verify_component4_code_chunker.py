@@ -45,7 +45,7 @@ def verify_ast_chunking():
     print(f"   Total: {len(python_files) + len(javascript_files) + len(go_files)}")
     
     if len(python_files) + len(javascript_files) + len(go_files) < 30:
-        print(f"   ⚠ Warning: Expected at least 30 code files, found {len(python_files) + len(javascript_files) + len(go_files)}")
+        print(f"   [WARN] Expected at least 30 code files, found {len(python_files) + len(javascript_files) + len(go_files)}")
     
     # Process all files
     all_chunks = []
@@ -68,9 +68,9 @@ def verify_ast_chunking():
                 'chunks': chunks,
                 'source': source
             })
-            print(f"      ✓ Generated {len(chunks)} chunks")
+            print(f"      [OK] Generated {len(chunks)} chunks")
         except Exception as e:
-            print(f"      ✗ Parse failed: {e}")
+            print(f"      [FAIL] Parse failed: {e}")
             parse_failures.append({'path': filepath, 'error': str(e)})
     
     # Process JavaScript files
@@ -89,9 +89,9 @@ def verify_ast_chunking():
                 'chunks': chunks,
                 'source': source
             })
-            print(f"      ✓ Generated {len(chunks)} chunks")
+            print(f"      [OK] Generated {len(chunks)} chunks")
         except Exception as e:
-            print(f"      ✗ Parse failed: {e}")
+            print(f"      [FAIL] Parse failed: {e}")
             parse_failures.append({'path': filepath, 'error': str(e)})
     
     # Process Go files
@@ -110,9 +110,9 @@ def verify_ast_chunking():
                 'chunks': chunks,
                 'source': source
             })
-            print(f"      ✓ Generated {len(chunks)} chunks")
+            print(f"      [OK] Generated {len(chunks)} chunks")
         except Exception as e:
-            print(f"      ✗ Parse failed: {e}")
+            print(f"      [FAIL] Parse failed: {e}")
             parse_failures.append({'path': filepath, 'error': str(e)})
     
     # Summary
@@ -122,7 +122,7 @@ def verify_ast_chunking():
     print(f"   Parse failures: {len(parse_failures)}")
     
     if parse_failures:
-        print(f"   ✗ Parse failures detected:")
+        print(f"   [FAIL] Parse failures detected:")
         for failure in parse_failures:
             print(f"     - {os.path.basename(failure['path'])}: {failure['error']}")
         return False
@@ -177,13 +177,13 @@ def verify_ast_chunking():
                 if chunk.node_type not in expected_types:
                     # Allow file_summary chunks to be exempt (they're not function chunks)
                     if chunk.chunk_type != 'file_summary':
-                        print(f"   ⚠ Function chunk node_type '{chunk.node_type}' not in expected {expected_types} for {language}: {os.path.basename(file_info['path'])}")
+                        print(f"   [WARN] Function chunk node_type '{chunk.node_type}' not in expected {expected_types} for {language}: {os.path.basename(file_info['path'])}")
                         boundary_violations += 1
             elif chunk.chunk_type == 'class_module':
                 # Verify node_type matches expected class or module node types for this language
                 expected_types = class_node_types.get(language, []) + module_node_types.get(language, [])
                 if chunk.node_type not in expected_types:
-                    print(f"   ⚠ Class chunk node_type '{chunk.node_type}' not in expected {expected_types} for {language}: {os.path.basename(file_info['path'])}")
+                    print(f"   [WARN] Class chunk node_type '{chunk.node_type}' not in expected {expected_types} for {language}: {os.path.basename(file_info['path'])}")
                     print(f"      chunk_type='{chunk.chunk_type}', node_type='{chunk.node_type}', token_count={chunk.token_count}")
                     boundary_violations += 1
                 # Special diagnostic for Go package_clause chunks to verify classification
@@ -194,9 +194,9 @@ def verify_ast_chunking():
                     pass
     
     if boundary_violations == 0:
-        print(f"   ✓ No mid-function/class splits detected")
+        print(f"   [OK] No mid-function/class splits detected")
     else:
-        print(f"   ✗ {boundary_violations} boundary violations detected")
+        print(f"   [FAIL] {boundary_violations} boundary violations detected")
         return False
     
     # Detailed offset inspection for sample
@@ -219,9 +219,9 @@ def verify_ast_chunking():
             # Verify offset against source
             extracted_text = sample_file['source'][chunk.start_byte:chunk.end_byte]
             if extracted_text == chunk.text:
-                print(f"     ✓ Offsets verified against source")
+                print(f"     [OK] Offsets verified against source")
             else:
-                print(f"     ✗ Offset mismatch detected")
+                print(f"     [FAIL] Offset mismatch detected")
                 return False
     
     # Verify all six chunk types are produced
@@ -237,10 +237,10 @@ def verify_ast_chunking():
     missing_essential = [t for t in essential_types if t not in found_types]
     
     if missing_essential:
-        print(f"   ⚠ Missing essential types: {missing_essential}")
+        print(f"   [WARN] Missing essential types: {missing_essential}")
         print(f"   (repo_metadata requires repository-level context)")
     else:
-        print(f"   ✓ All essential chunk types produced")
+        print(f"   [OK] All essential chunk types produced")
     
     print("\n" + "=" * 80)
     print("COMPONENT 4 VERIFICATION: PASSED")
@@ -262,7 +262,7 @@ if __name__ == "__main__":
         success = verify_ast_chunking()
         sys.exit(0 if success else 1)
     except Exception as e:
-        print(f"\n✗ Verification failed with exception: {e}")
+        print(f"\n[FAIL] Verification failed with exception: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

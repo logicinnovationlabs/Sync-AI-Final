@@ -83,10 +83,10 @@ class CanonicalConsumer:
                 document_version=document_version,
                 chunk_type=ChunkType.FILE_SUMMARY.value,
                 chunk_index=0,
-                content_text=content,
+                chunk_text=content,
                 token_count=len(content.split()),  # Placeholder
-                source_span_start=0,
-                source_span_end=len(content),
+                start_byte=0,
+                end_byte=len(content),
                 embedding_vector=None,
                 embedding_model_version=None,
                 embedding_timestamp=None,
@@ -94,8 +94,9 @@ class CanonicalConsumer:
                 content_hash=content_hash,
                 chunk_content_checksum=content_hash,  # For idempotency
                 source_run_id=f"canonical_{document_id}_{document_version}",
-                deleted_at=None
-                # created_at and updated_at use DB-level DEFAULT now() per v7.0 §2.3
+                deleted_at=None,
+                created_at=datetime.utcnow(),  # Explicit for SQLite compatibility
+                updated_at=datetime.utcnow()   # Explicit for SQLite compatibility
             )
             
             session.add(chunk_record)
@@ -107,11 +108,13 @@ class CanonicalConsumer:
                 celery_task_id=None,  # Will be set when task is enqueued
                 tenant_id=tenant_id,
                 chunk_id=chunk_id,
+                document_id=document_id,  # Denormalized per v7.0 §2.2
                 status=JobStatus.PENDING,
-                model_version="v1",  # Will come from config
+                model_version_target="v1",  # Will come from config
                 attempt_count=0,
-                last_error=None
-                # created_at and updated_at use DB-level DEFAULT now() per v7.0 §2.3
+                last_error=None,
+                created_at=datetime.utcnow(),  # Explicit for SQLite compatibility
+                updated_at=datetime.utcnow()   # Explicit for SQLite compatibility
             )
             
             session.add(embedding_job)

@@ -5,6 +5,7 @@ Verifies orphan and tombstone handling on re-chunk
 
 import sys
 import os
+from datetime import datetime
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -43,15 +44,17 @@ def verify_orphan_handler():
             document_version=1,
             chunk_type="prose",
             chunk_index=i,
-            content_text=f"Test content v1 {i}",
+            chunk_text=f"Test content v1 {i}",
             token_count=10,
-            source_span_start=i * 100,
-            source_span_end=(i + 1) * 100,
+            start_byte=i * 100,
+            end_byte=(i + 1) * 100,
             chunker_version="v1",
             embedding_model_version="v1",
             content_hash=f"hash_v1_{i}",
             chunk_content_checksum=f"hash_v1_{i}",
-            source_run_id=f"test_run_v1_{i}"
+            source_run_id=f"test_run_v1_{i}",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
         )
         session.add(chunk)
     
@@ -86,15 +89,17 @@ def verify_orphan_handler():
             document_version=2,
             chunk_type="prose",
             chunk_index=i,
-            content_text=f"Test content v2 {i}",
+            chunk_text=f"Test content v2 {i}",
             token_count=10,
-            source_span_start=i * 100,
-            source_span_end=(i + 1) * 100,
+            start_byte=i * 100,
+            end_byte=(i + 1) * 100,
             chunker_version="v1",
             embedding_model_version="v1",
             content_hash=f"hash_v2_{i}",
             chunk_content_checksum=f"hash_v2_{i}",
-            source_run_id=f"test_run_v2_{i}"
+            source_run_id=f"test_run_v2_{i}",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
         )
         session.add(chunk)
     

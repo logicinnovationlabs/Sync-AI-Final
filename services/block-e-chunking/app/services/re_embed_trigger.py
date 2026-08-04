@@ -1,12 +1,13 @@
 """
-Component 6: Re-embed Trigger on Model Version Bump
-Detects embedding_model_version changes and triggers re-embedding for affected tenants.
+Component 6: Re-embed trigger for model version bumps.
 """
+
+import uuid
+from datetime import datetime
 
 from typing import List, Dict, Any
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime
 
 from app.models.chunk_record import ChunkRecord
 from app.models.embedding_job import EmbeddingJob
@@ -103,10 +104,12 @@ class ReEmbedTrigger:
                     job_id=job_id,
                     tenant_id=tenant_id,
                     chunk_id=chunk.chunk_id,
+                    document_id=chunk.document_id,
                     status="pending",
-                    model_version=new_model_version,
-                    chunks_targeted=1,
-                    chunks_completed=0
+                    model_version_target=new_model_version,
+                    attempt_count=0,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
                 )
                 
                 self.db_session.add(job)
@@ -116,7 +119,8 @@ class ReEmbedTrigger:
                     job_id=job_id,
                     tenant_id=tenant_id,
                     chunk_id=chunk.chunk_id,
-                    content_text=chunk.content_text,
+                    document_id=chunk.document_id,
+                    content_text=chunk.chunk_text,
                     model_version=new_model_version
                 )
                 
@@ -133,10 +137,12 @@ class ReEmbedTrigger:
                     job_id=f"reembed_{tenant_id}_{chunk.chunk_id}_{new_model_version}",
                     tenant_id=tenant_id,
                     chunk_id=chunk.chunk_id,
+                    document_id=chunk.document_id,
                     status="pending",
-                    model_version=new_model_version,
-                    chunks_targeted=1,
-                    chunks_completed=0
+                    model_version_target=new_model_version,
+                    attempt_count=0,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
                 )
                 
                 self.db_session.add(job)
