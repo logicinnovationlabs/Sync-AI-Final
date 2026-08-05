@@ -1,0 +1,152 @@
+[
+  {
+    "source_type": "google_drive",
+    "external_id": "drive_user_1",
+    "email": "alice@example.com",
+    "name": "Alice Smith"
+  },
+  {
+    "source_type": "google_gmail",
+    "external_id": "alice@example.com",
+    "email": "alice@example.com",
+    "name": "Alice Smith"
+  },
+  {
+    "source_type": "google_drive",
+    "external_id": "drive_user_2",
+    "email": "bob@example.com",
+    "name": "Bob Jones"
+  },
+  {
+    "source_type": "google_gmail",
+    "external_id": "bob@example.com",
+    "email": "bob@example.com",
+    "name": "Bob Jones"
+  },
+  {
+    "source_type": "google_drive",
+    "external_id": "drive_user_3",
+    "email": "charlie@example.com",
+    "name": "Charlie Brown"
+  },
+  {
+    "source_type": "google_gmail",
+    "external_id": "charlie@example.com",
+    "email": "charlie@example.com",
+    "name": "Charlie Brown"
+  },
+  {
+    "source_type": "google_drive",
+    "external_id": "drive_user_4",
+    "email": "diana@example.com",
+    "name": "Diana Prince"
+  },
+  {
+    "source_type": "google_gmail",
+    "external_id": "diana@example.com",
+    "email": "diana@example.com",
+    "name": "Diana Prince"
+  },
+  {
+    "source_type": "google_drive",
+    "external_id": "drive_user_5",
+    "email": "eve@example.com",
+    "name": "Eve Anderson"
+  },
+  {
+    "source_type": "google_drive",
+    "external_id": "drive_user_6",
+    "email": "frank@example.com",
+    "name": "Frank Miller"
+  },
+  {
+    "source_type": "google_drive",
+    "external_id": "drive_user_7",
+    "email": "grace@example.com",
+    "name": "Grace Hopper"
+  },
+  {
+    "source_type": "google_drive",
+    "external_id": "drive_user_8",
+    "email": "henry@example.com",
+    "name": "Henry Ford"
+  },
+  {
+    "source_type": "google_drive",
+    "external_id": "drive_user_9",
+    "email": "isabel@example.com",
+    "name": "Isabel Allende"
+  },
+  {
+    "source_type": "google_drive",
+    "external_id": "drive_user_10",
+    "email": "jack@example.com",
+    "name": "Jack London"
+  },
+  {
+    "source_type": "google_gmail",
+    "external_id": "eve@example.com",
+    "email": "eve@example.com",
+    "name": "Eve Anderson"
+  },
+  {
+    "source_type": "google_gmail",
+    "external_id": "frank@example.com",
+    "email": "frank@example.com",
+    "name": "Frank Miller"
+  },
+  {
+    "source_type": "google_gmail",
+    "external_id": "grace@example.com",
+    "email": "grace@example.com",
+    "name": "Grace Hopper"
+  },
+  {
+    "source_type": "google_gmail",
+    "external_id": "henry@example.com",
+    "email": "henry@example.com",
+    "name": "Henry Ford"
+  },
+  {
+    "source_type": "google_drive",
+    "external_id": "drive_user_11",
+    "email": "kate@example.com",
+    "name": "Kate Johnson"
+  },
+  {
+    "source_type": "google_drive",
+    "external_id": "drive_user_12",
+    "email": "leo@example.com",
+    "name": "Leo Tolstoy"
+  },
+  {
+    "source_type": "google_drive",
+    "external_id": "drive_user_13",
+    "email": "mary@example.com",
+    "name": "Mary Shelley"
+  },
+  {
+    "source_type": "google_drive",
+    "external_id": "drive_user_14",
+    "email": "nick@example.com",
+    "name": "Nick Adams"
+  },
+  {
+    "source_type": "google_drive",
+    "external_id": "drive_user_15",
+    "email": "olivia@example.com",
+    "name": "Olivia Newton"
+  },
+  {
+    "source_type": "google_drive",
+    "external_id": "drive_user_16",
+    "email": "paul@example.com",
+    "name": "Paul Revere"
+  },
+  {
+    "source_type": "google_drive",
+    "external_id": "drive_user_17",
+    "email": "quinn@example.com",
+    "name": "Quinn Fabray"
+  }
+]

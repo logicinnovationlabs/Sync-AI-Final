@@ -1,0 +1,31 @@
+{
+  "document_1": {
+    "direct": [
+      {"principal_email": "alice@example.com", "permission": "OWNER"}
+    ],
+    "inherited": [
+      {"principal_email": "bob@example.com", "permission": "READ", "from_container": "folder_a"}
+    ],
+    "group_expanded": []
+  },
+  "document_2": {
+    "direct": [
+      {"group_email": "eng@example.com", "permission": "WRITE"}
+    ],
+    "inherited": [],
+    "group_expanded": [
+      {"principal_email": "alice@example.com", "permission": "WRITE"},
+      {"principal_email": "bob@example.com", "permission": "WRITE"},
+      {"principal_email": "charlie@example.com", "permission": "WRITE"}
+    ]
+  },
+  "document_3": {
+    "direct": [
+      {"principal_email": "diana@example.com", "permission": "READ"}
+    ],
+    "inherited": [
+      {"principal_email": "charlie@example.com", "permission": "WRITE", "from_container": "folder_b"}
+    ],
+    "group_expanded": []
+  }
+}

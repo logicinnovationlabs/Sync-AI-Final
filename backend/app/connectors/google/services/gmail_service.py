@@ -334,6 +334,16 @@ class GmailConnector(BaseConnector):
         
         return text
     
+    async def fetch_permission_changes(self, since: datetime) -> List[Dict[str, Any]]:
+        """
+        Fetch permission changes since a given timestamp.
+        
+        Gmail has no sharing model, so no permission changes to report.
+        Stub for Block C ACL revalidation Beat task.
+        """
+        _ = since
+        return []
+    
     def _has_attachments(self, payload: Dict[str, Any]) -> bool:
         """
         Check if message has attachments.

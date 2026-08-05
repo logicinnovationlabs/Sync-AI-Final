@@ -27,6 +27,10 @@ class Settings(BaseSettings):
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/control_plane"
     )
 
+    # Cloud Supabase Postgres (direct DB URL). Prefer this for Phase 0 §1.2 (a).
+    # Never log or print this value — presence + successful query only.
+    supabase_db_url: Optional[str] = Field(default=None)
+
     # Redis
     redis_url: str = Field(default="redis://localhost:6379")
 
@@ -80,6 +84,17 @@ class Settings(BaseSettings):
     # Environment
     environment: str = Field(default="development")
     log_level: str = Field(default="INFO")
+
+    # Block C: text extraction / OCR
+    tesseract_path: str = Field(default="/usr/bin/tesseract")
+    ocr_language: str = Field(default="eng")
+    ocr_timeout_seconds: int = Field(default=30)
+    max_extracted_chars: int = Field(default=500000)
+
+    # Block C: identity / ACL caches
+    identity_cache_ttl: int = Field(default=86400)
+    acl_inheritance_cache_ttl: int = Field(default=600)
+    acl_revalidation_interval_seconds: int = Field(default=900)
 
 
 # Global settings instance
