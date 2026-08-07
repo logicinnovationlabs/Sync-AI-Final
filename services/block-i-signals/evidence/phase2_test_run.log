@@ -1,22 +1,22 @@
 ============================= test session starts =============================
-platform win32 -- Python 3.14.0, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\Ishu Raj\AppData\Local\Python\pythoncore-3.14-64\python.exe
-cachedir: .pytest_cache
-rootdir: D:\PROJECTS\Sync Ai Final\services\block-i-signals
-configfile: pytest.ini
-plugins: anyio-4.14.1, asyncio-1.4.0
-asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
-collecting ... collected 8 items
+platform win32 -- Python 3.14.0, pytest-9.1.1
+rootdir: services/block-i-signals
+SIGNALS_BACKEND=postgres
+DATABASE_URL=postgresql://signals:signals@localhost:15433/block_i_signals
+collected 8 items
 
 tests/test_block_i.py::test_idempotent_reingest PASSED
 tests/test_block_i.py::test_tenant_isolation PASSED
 tests/test_block_i.py::test_missing_scope_rejected PASSED
 tests/test_block_i.py::test_health PASSED
-tests/test_i1_privacy.py::test_i1_privacy_threshold I1 PASS ù 4 privacy cases; report=D:\PROJECTS\Sync Ai Final\services\block-i-signals\evidence\i1_privacy_report_phase2.json
-PASSED
-tests/test_i2_retention.py::test_i2_retention_enforcement I2 PASS ù purged=8; report=D:\PROJECTS\Sync Ai Final\services\block-i-signals\evidence\i2_retention_report_phase2.json
-PASSED
-tests/test_i3_freshness.py::test_i3_signal_freshness I3 PASS ù p95=0.1741s (threshold 900s); report=D:\PROJECTS\Sync Ai Final\services\block-i-signals\evidence\i3_freshness_report_phase2.json
-PASSED
+tests/test_i1_privacy.py::test_i1_privacy_threshold PASSED
+tests/test_i2_retention.py::test_i2_retention_enforcement PASSED
+tests/test_i3_freshness.py::test_i3_signal_freshness PASSED
 tests/test_i3_freshness.py::test_i3_ground_truth_user_and_doc PASSED
 
 ============================= 8 passed in 12.28s ==============================
+
+Phase 2 evidence:
+- evidence/i1_privacy_report_phase2.json
+- evidence/i2_retention_report_phase2.json
+- evidence/i3_freshness_report_phase2.json (p95=0.1741s)
