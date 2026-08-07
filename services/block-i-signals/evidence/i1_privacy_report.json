@@ -1,0 +1,69 @@
+{
+  "passed": true,
+  "cases": [
+    {
+      "case_id": "privacy-1",
+      "distinct_actor_count": 1,
+      "expect_privacy_protected": true,
+      "response": {
+        "document_id": "doc-priv-001",
+        "tenant_id": "tenant-a",
+        "privacy_protected": true,
+        "popularity_score": null,
+        "total_views": null,
+        "distinct_viewers": null,
+        "last_viewed": null,
+        "updated_at": "2026-08-07T22:56:41.465742Z",
+        "window_days": 30
+      }
+    },
+    {
+      "case_id": "privacy-3",
+      "distinct_actor_count": 3,
+      "expect_privacy_protected": true,
+      "response": {
+        "document_id": "doc-priv-003",
+        "tenant_id": "tenant-a",
+        "privacy_protected": true,
+        "popularity_score": null,
+        "total_views": null,
+        "distinct_viewers": null,
+        "last_viewed": null,
+        "updated_at": "2026-08-07T22:56:41.467395Z",
+        "window_days": 30
+      }
+    },
+    {
+      "case_id": "privacy-5",
+      "distinct_actor_count": 5,
+      "expect_privacy_protected": false,
+      "response": {
+        "document_id": "doc-priv-005",
+        "tenant_id": "tenant-a",
+        "privacy_protected": false,
+        "popularity_score": 0.3882,
+        "total_views": 5,
+        "distinct_viewers": 5,
+        "last_viewed": "2026-07-29T12:00:00Z",
+        "updated_at": "2026-08-07T22:56:41.469221Z",
+        "window_days": 30
+      }
+    },
+    {
+      "case_id": "privacy-10",
+      "distinct_actor_count": 10,
+      "expect_privacy_protected": false,
+      "response": {
+        "document_id": "doc-priv-010",
+        "tenant_id": "tenant-a",
+        "privacy_protected": false,
+        "popularity_score": 0.5196,
+        "total_views": 10,
+        "distinct_viewers": 10,
+        "last_viewed": "2026-07-29T12:00:00Z",
+        "updated_at": "2026-08-07T22:56:41.471375Z",
+        "window_days": 30
+      }
+    }
+  ]
+}

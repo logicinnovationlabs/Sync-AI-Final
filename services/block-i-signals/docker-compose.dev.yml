@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  block-i-signals:
+    build: .
+    container_name: block-i-signals-dev
+    ports:
+      - "8089:8089"
+    environment:
+      - ENVIRONMENT=development
+      - SIGNALS_BACKEND=mock
+      - PRIVACY_THRESHOLD=5
+      - ENFORCE_TENANT_ISOLATION=true
+    volumes:
+      - ./app:/app/app
+      - ./fixtures:/app/fixtures

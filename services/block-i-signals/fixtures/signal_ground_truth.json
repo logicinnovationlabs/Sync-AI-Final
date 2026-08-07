@@ -1,0 +1,48 @@
+{
+  "version": "v1",
+  "tenant_id": "tenant-a",
+  "documents": {
+    "doc-a-001": {
+      "min_distinct_viewers": 10,
+      "expect_privacy_protected": false,
+      "min_total_views": 10
+    }
+  },
+  "users": {
+    "p-user-001": {
+      "min_events": 1,
+      "expect_last_active": true,
+      "preferred_sources_includes_any": [
+        "confluence",
+        "github",
+        "slack",
+        "gdrive"
+      ]
+    }
+  },
+  "freshness": {
+    "probe_event": {
+      "event_id": "evt-freshness-probe",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-001",
+      "object_id": "doc-fresh-001",
+      "event_type": "view",
+      "source_system": "confluence",
+      "event_time": "2026-07-29T12:00:00Z",
+      "privacy_level": "public"
+    },
+    "seed_actors": [
+      "p-user-001",
+      "p-user-002",
+      "p-user-003",
+      "p-user-004",
+      "p-user-005",
+      "p-user-006"
+    ],
+    "max_freshness_seconds": 900
+  },
+  "notes": {
+    "alice_event_count": 3,
+    "doc_a_001_distinct_viewers": 10
+  }
+}
