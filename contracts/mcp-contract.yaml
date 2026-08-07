@@ -1,0 +1,23 @@
+openapi: '3.0.0'
+info:
+  title: mcp contract
+  version: '1.0.0'
+paths:
+  /mcp/tools:
+    get:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+  /mcp/call:
+    post:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object

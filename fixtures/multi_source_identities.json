@@ -1,0 +1,49 @@
+{
+  "version": "v1",
+  "identities": [
+    {
+      "principal_id": "principal-alice",
+      "sources": [
+        {
+          "source_type": "google_drive",
+          "external_id": "drive_alice"
+        },
+        {
+          "source_type": "google_gmail",
+          "external_id": "alice@example.com"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-bob",
+      "sources": [
+        {
+          "source_type": "google_drive",
+          "external_id": "drive_bob"
+        },
+        {
+          "source_type": "google_gmail",
+          "external_id": "bob@example.com"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-carol",
+      "sources": [
+        {
+          "source_type": "google_drive",
+          "external_id": "drive_carol"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-diana",
+      "sources": [
+        {
+          "source_type": "google_drive",
+          "external_id": "drive_diana"
+        }
+      ]
+    }
+  ]
+}

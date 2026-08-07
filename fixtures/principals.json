@@ -1,0 +1,47 @@
+{
+  "version": "v1",
+  "principals": [
+    {
+      "id": "principal-alice",
+      "email": "alice@example.com",
+      "tenant_id": "tenant-a",
+      "external_id": "00ualice",
+      "scopes": [
+        "search.read",
+        "document.read",
+        "connectors.read"
+      ]
+    },
+    {
+      "id": "principal-bob",
+      "email": "bob@example.com",
+      "tenant_id": "tenant-a",
+      "external_id": "00ubob",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    },
+    {
+      "id": "principal-carol",
+      "email": "carol@example.com",
+      "tenant_id": "tenant-b",
+      "external_id": "00ucarol",
+      "scopes": [
+        "search.read",
+        "document.read",
+        "admin.audit.read"
+      ]
+    },
+    {
+      "id": "principal-diana",
+      "email": "diana@example.com",
+      "tenant_id": "tenant-c",
+      "external_id": "00udiana",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    }
+  ]
+}

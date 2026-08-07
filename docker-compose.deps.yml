@@ -1,0 +1,72 @@
+services:
+  # MinIO skipped here: block-d-verify-minio already bound to :9000/:9001.
+  # Point OBJECT_STORE_CONNECTION_STRING at that instance for local dev.
+
+  vault:
+    image: hashicorp/vault:1.15.6
+    container_name: snyq_vault_dev
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: root
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    cap_add:
+      - IPC_LOCK
+    command: server -dev
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v23.3.18
+    container_name: snyq_redpanda_dev
+    ports:
+      - "9092:9092"
+      - "9644:9644"
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp
+      - "1"
+      - --memory
+      - 512M
+      - --reserve-memory
+      - 0M
+      - --node-id
+      - "0"
+      - --check=false
+      - --kafka-addr
+      - PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr
+      - PLAINTEXT://localhost:9092
+      - --pandaproxy-addr
+      - 0.0.0.0:8082
+      - --advertise-pandaproxy-addr
+      - localhost:8082
+
+  opensearch:
+    image: opensearchproject/opensearch:2.11.1
+    container_name: snyq_opensearch_dev
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    environment:
+      discovery.type: single-node
+      plugins.security.disabled: "true"
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.96.0
+    container_name: snyq_otel_collector_dev
+    ports:
+      - "4318:4318"
+      - "4317:4317"
+    command: ["--config=/etc/otel-config.yaml"]
+    volumes:
+      - ./otel-config.yaml:/etc/otel-config.yaml:ro

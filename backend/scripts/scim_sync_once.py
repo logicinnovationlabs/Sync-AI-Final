@@ -4,6 +4,10 @@ One-shot SCIM sync process for A3 closeout.
 Run as a separate OS process so each invocation is a genuine service restart
 (new interpreter, new DB engine, no in-memory state).
 
+Represents production sync behavior only: delegates to scim_sync_service.sync_users
+with no tenant-reassignment side effects. Shared-DB collision cleanup belongs in
+the test harness (test_signoff_closeout_local.py), not here.
+
 Usage:
   python scripts/scim_sync_once.py --tenant-id <uuid> --fixture fixtures/okta_scim_users.json
 Prints JSON: {"run":..., "principals": {"idp_subject": "principal_id", ...}}
@@ -55,25 +59,7 @@ async def main() -> int:
     SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with SessionLocal() as session:
         await scim_sync_service.sync_users(scim_users, tenant_id, session)
-        # Query by fixture idp subjects (not tenant alone) so shared-DB leftovers can't hide rows
         subjects = [u.get("id") for u in scim_users if u.get("id")]
-        result = await session.execute(
-            select(User.idp_subject, User.principal_id, User.tenant_id).where(
-                User.idp_subject.in_(subjects)
-            )
-        )
-        rows = result.all()
-        # Ensure rows are bound to this tenant (update path may have preserved an old tenant in shared DB)
-        principals = {}
-        for row in rows:
-            if str(row.tenant_id) != str(tenant_id):
-                user = await session.get(User, row.principal_id)
-                if user:
-                    user.tenant_id = tenant_id
-            principals[row.idp_subject] = str(row.principal_id)
-        await session.commit()
-
-        # Re-query after possible tenant_id repair
         result = await session.execute(
             select(User.idp_subject, User.principal_id).where(
                 User.tenant_id == tenant_id,

@@ -1,0 +1,479 @@
+{
+  "version": "1.0",
+  "cases": [
+    {
+      "case_id": "acl-01-cross-tenant",
+      "description": "Cross-tenant access attempt",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:bob",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:bob"
+      ],
+      "query": "confidential M&A deal sheet",
+      "forbidden_document_ids": [
+        "doc-restricted-cross-tenant",
+        "doc-restricted-cross-tenant",
+        "doc-restricted-no-access",
+        "doc-restricted-group-changed",
+        "doc-restricted-container-inherit",
+        "doc-restricted-deny-override",
+        "doc-restricted-auth-required",
+        "doc-restricted-scope",
+        "doc-restricted-deleted",
+        "doc-restricted-unshared",
+        "doc-restricted-container",
+        "doc-restricted-removed-group",
+        "doc-parent-denied-child",
+        "doc-child-denied-parent"
+      ],
+      "must_return_zero_from_forbidden": true,
+      "expect_empty_or_open_only": true
+    },
+    {
+      "case_id": "acl-02-no-read-access",
+      "description": "User with no read access to document",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:bob",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:bob"
+      ],
+      "query": "executive compensation confidential",
+      "forbidden_document_ids": [
+        "doc-restricted-cross-tenant",
+        "doc-restricted-no-access",
+        "doc-restricted-group-changed",
+        "doc-restricted-container-inherit",
+        "doc-restricted-deny-override",
+        "doc-restricted-auth-required",
+        "doc-restricted-scope",
+        "doc-restricted-deleted",
+        "doc-restricted-unshared",
+        "doc-restricted-container",
+        "doc-restricted-removed-group",
+        "doc-parent-denied-child",
+        "doc-child-denied-parent"
+      ],
+      "must_return_zero_from_forbidden": true
+    },
+    {
+      "case_id": "acl-03-has-read-access",
+      "description": "User with read access to document (should pass)",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "query": "Alice private notebook getUserInfo",
+      "forbidden_document_ids": [
+        "doc-restricted-cross-tenant",
+        "doc-restricted-no-access",
+        "doc-restricted-group-changed",
+        "doc-restricted-container-inherit",
+        "doc-restricted-deny-override",
+        "doc-restricted-auth-required",
+        "doc-restricted-scope",
+        "doc-restricted-deleted",
+        "doc-restricted-unshared",
+        "doc-restricted-container",
+        "doc-restricted-removed-group",
+        "doc-parent-denied-child",
+        "doc-child-denied-parent"
+      ],
+      "must_return_zero_from_forbidden": true,
+      "must_include_document_ids": [
+        "doc-allowed-alice"
+      ]
+    },
+    {
+      "case_id": "acl-04-group-changed",
+      "description": "Group membership changed mid-session",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:bob",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:bob"
+      ],
+      "query": "board minutes restricted",
+      "forbidden_document_ids": [
+        "doc-restricted-cross-tenant",
+        "doc-restricted-no-access",
+        "doc-restricted-group-changed",
+        "doc-restricted-container-inherit",
+        "doc-restricted-deny-override",
+        "doc-restricted-auth-required",
+        "doc-restricted-scope",
+        "doc-restricted-deleted",
+        "doc-restricted-unshared",
+        "doc-restricted-container",
+        "doc-restricted-removed-group",
+        "doc-parent-denied-child",
+        "doc-child-denied-parent"
+      ],
+      "must_return_zero_from_forbidden": true
+    },
+    {
+      "case_id": "acl-05-container-inheritance",
+      "description": "Container inheritance edge cases",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:bob",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:bob"
+      ],
+      "query": "Inherited restricted container secrets",
+      "forbidden_document_ids": [
+        "doc-restricted-cross-tenant",
+        "doc-restricted-no-access",
+        "doc-restricted-group-changed",
+        "doc-restricted-container-inherit",
+        "doc-restricted-deny-override",
+        "doc-restricted-auth-required",
+        "doc-restricted-scope",
+        "doc-restricted-deleted",
+        "doc-restricted-unshared",
+        "doc-restricted-container",
+        "doc-restricted-removed-group",
+        "doc-parent-denied-child",
+        "doc-child-denied-parent"
+      ],
+      "must_return_zero_from_forbidden": true
+    },
+    {
+      "case_id": "acl-06-deny-override",
+      "description": "Deny override (explicit deny beats allow)",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:bob",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:bob"
+      ],
+      "query": "Deny override payroll detail",
+      "forbidden_document_ids": [
+        "doc-restricted-cross-tenant",
+        "doc-restricted-no-access",
+        "doc-restricted-group-changed",
+        "doc-restricted-container-inherit",
+        "doc-restricted-deny-override",
+        "doc-restricted-auth-required",
+        "doc-restricted-scope",
+        "doc-restricted-deleted",
+        "doc-restricted-unshared",
+        "doc-restricted-container",
+        "doc-restricted-removed-group",
+        "doc-parent-denied-child",
+        "doc-child-denied-parent"
+      ],
+      "must_return_zero_from_forbidden": true
+    },
+    {
+      "case_id": "acl-07-unauthenticated",
+      "description": "Unauthenticated request",
+      "tenant_id": "tenant_f_test",
+      "user_id": "anonymous",
+      "acl_filter_terms": [],
+      "query": "Auth required secret blueprint",
+      "forbidden_document_ids": [
+        "doc-restricted-cross-tenant",
+        "doc-restricted-no-access",
+        "doc-restricted-group-changed",
+        "doc-restricted-container-inherit",
+        "doc-restricted-deny-override",
+        "doc-restricted-auth-required",
+        "doc-restricted-scope",
+        "doc-restricted-deleted",
+        "doc-restricted-unshared",
+        "doc-restricted-container",
+        "doc-restricted-removed-group",
+        "doc-parent-denied-child",
+        "doc-child-denied-parent",
+        "doc-public-00",
+        "doc-public-01",
+        "doc-public-02",
+        "doc-public-03",
+        "doc-public-04",
+        "doc-public-05",
+        "doc-public-06",
+        "doc-public-07",
+        "doc-public-08",
+        "doc-public-09",
+        "doc-public-10",
+        "doc-public-11",
+        "doc-public-12",
+        "doc-public-13",
+        "doc-public-14",
+        "doc-public-15",
+        "doc-public-16",
+        "doc-public-17",
+        "doc-public-18",
+        "doc-public-19",
+        "doc-public-20",
+        "doc-public-21",
+        "doc-public-22",
+        "doc-public-23",
+        "doc-public-24",
+        "doc-public-25",
+        "doc-public-26",
+        "doc-public-27",
+        "doc-public-28",
+        "doc-public-29",
+        "doc-distractor-00",
+        "doc-distractor-01",
+        "doc-distractor-02",
+        "doc-distractor-03",
+        "doc-distractor-04",
+        "doc-distractor-05",
+        "doc-distractor-06",
+        "doc-distractor-07",
+        "doc-distractor-08",
+        "doc-distractor-09",
+        "doc-restricted-cross-tenant",
+        "doc-restricted-no-access",
+        "doc-allowed-alice",
+        "doc-restricted-group-changed",
+        "doc-restricted-container-inherit",
+        "doc-restricted-deny-override",
+        "doc-restricted-auth-required",
+        "doc-restricted-scope",
+        "doc-restricted-deleted",
+        "doc-restricted-unshared",
+        "doc-restricted-container",
+        "doc-multi-group-secret",
+        "doc-restricted-removed-group",
+        "doc-parent-denied-child",
+        "doc-child-denied-parent",
+        "doc-pad-00",
+        "doc-pad-01",
+        "doc-pad-02",
+        "doc-pad-03",
+        "doc-pad-04"
+      ],
+      "must_return_zero_from_forbidden": true,
+      "expect_total_zero": true
+    },
+    {
+      "case_id": "acl-08-insufficient-scope",
+      "description": "Token with insufficient scope",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:bob",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:bob"
+      ],
+      "query": "Insufficient scope classified memo",
+      "forbidden_document_ids": [
+        "doc-restricted-cross-tenant",
+        "doc-restricted-no-access",
+        "doc-restricted-group-changed",
+        "doc-restricted-container-inherit",
+        "doc-restricted-deny-override",
+        "doc-restricted-auth-required",
+        "doc-restricted-scope",
+        "doc-restricted-deleted",
+        "doc-restricted-unshared",
+        "doc-restricted-container",
+        "doc-restricted-removed-group",
+        "doc-parent-denied-child",
+        "doc-child-denied-parent"
+      ],
+      "must_return_zero_from_forbidden": true
+    },
+    {
+      "case_id": "acl-09-deleted-document",
+      "description": "Deleted document access attempt",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "query": "Deleted confidential archive",
+      "forbidden_document_ids": [
+        "doc-restricted-deleted",
+        "doc-restricted-cross-tenant",
+        "doc-restricted-no-access",
+        "doc-restricted-group-changed",
+        "doc-restricted-container-inherit",
+        "doc-restricted-deny-override",
+        "doc-restricted-auth-required",
+        "doc-restricted-scope",
+        "doc-restricted-deleted",
+        "doc-restricted-unshared",
+        "doc-restricted-container",
+        "doc-restricted-removed-group",
+        "doc-parent-denied-child",
+        "doc-child-denied-parent"
+      ],
+      "must_return_zero_from_forbidden": true
+    },
+    {
+      "case_id": "acl-10-unshared",
+      "description": "Unshared document access",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:bob",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:bob"
+      ],
+      "query": "Unshared personal draft",
+      "forbidden_document_ids": [
+        "doc-restricted-cross-tenant",
+        "doc-restricted-no-access",
+        "doc-restricted-group-changed",
+        "doc-restricted-container-inherit",
+        "doc-restricted-deny-override",
+        "doc-restricted-auth-required",
+        "doc-restricted-scope",
+        "doc-restricted-deleted",
+        "doc-restricted-unshared",
+        "doc-restricted-container",
+        "doc-restricted-removed-group",
+        "doc-parent-denied-child",
+        "doc-child-denied-parent"
+      ],
+      "must_return_zero_from_forbidden": true
+    },
+    {
+      "case_id": "acl-11-restricted-container",
+      "description": "Document in restricted container",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:bob",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:bob"
+      ],
+      "query": "restricted container path CONFIDENTIAL",
+      "forbidden_document_ids": [
+        "doc-restricted-cross-tenant",
+        "doc-restricted-no-access",
+        "doc-restricted-group-changed",
+        "doc-restricted-container-inherit",
+        "doc-restricted-deny-override",
+        "doc-restricted-auth-required",
+        "doc-restricted-scope",
+        "doc-restricted-deleted",
+        "doc-restricted-unshared",
+        "doc-restricted-container",
+        "doc-restricted-removed-group",
+        "doc-parent-denied-child",
+        "doc-child-denied-parent"
+      ],
+      "must_return_zero_from_forbidden": true
+    },
+    {
+      "case_id": "acl-12-multi-group",
+      "description": "User with access through multiple groups",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "group:platform",
+        "user:alice"
+      ],
+      "query": "Multi group accessible secret",
+      "forbidden_document_ids": [
+        "doc-restricted-cross-tenant",
+        "doc-restricted-no-access",
+        "doc-restricted-group-changed",
+        "doc-restricted-container-inherit",
+        "doc-restricted-deny-override",
+        "doc-restricted-auth-required",
+        "doc-restricted-scope",
+        "doc-restricted-deleted",
+        "doc-restricted-unshared",
+        "doc-restricted-container",
+        "doc-restricted-removed-group",
+        "doc-parent-denied-child",
+        "doc-child-denied-parent"
+      ],
+      "must_return_zero_from_forbidden": true,
+      "must_include_document_ids": [
+        "doc-multi-group-secret"
+      ]
+    },
+    {
+      "case_id": "acl-13-removed-from-group",
+      "description": "User with access removed from group",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:bob",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:bob"
+      ],
+      "query": "Access removed from eng group",
+      "forbidden_document_ids": [
+        "doc-restricted-cross-tenant",
+        "doc-restricted-no-access",
+        "doc-restricted-group-changed",
+        "doc-restricted-container-inherit",
+        "doc-restricted-deny-override",
+        "doc-restricted-auth-required",
+        "doc-restricted-scope",
+        "doc-restricted-deleted",
+        "doc-restricted-unshared",
+        "doc-restricted-container",
+        "doc-restricted-removed-group",
+        "doc-parent-denied-child",
+        "doc-child-denied-parent"
+      ],
+      "must_return_zero_from_forbidden": true
+    },
+    {
+      "case_id": "acl-14-parent-denied",
+      "description": "Parent container denied, child allowed (should deny)",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:bob",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:bob"
+      ],
+      "query": "Parent denied child allowed should deny",
+      "forbidden_document_ids": [
+        "doc-restricted-cross-tenant",
+        "doc-restricted-no-access",
+        "doc-restricted-group-changed",
+        "doc-restricted-container-inherit",
+        "doc-restricted-deny-override",
+        "doc-restricted-auth-required",
+        "doc-restricted-scope",
+        "doc-restricted-deleted",
+        "doc-restricted-unshared",
+        "doc-restricted-container",
+        "doc-restricted-removed-group",
+        "doc-parent-denied-child",
+        "doc-child-denied-parent"
+      ],
+      "must_return_zero_from_forbidden": true
+    },
+    {
+      "case_id": "acl-15-child-denied",
+      "description": "Child container denied, parent allowed (should deny)",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:bob",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:bob"
+      ],
+      "query": "Child denied parent allowed should deny",
+      "forbidden_document_ids": [
+        "doc-restricted-cross-tenant",
+        "doc-restricted-no-access",
+        "doc-restricted-group-changed",
+        "doc-restricted-container-inherit",
+        "doc-restricted-deny-override",
+        "doc-restricted-auth-required",
+        "doc-restricted-scope",
+        "doc-restricted-deleted",
+        "doc-restricted-unshared",
+        "doc-restricted-container",
+        "doc-restricted-removed-group",
+        "doc-parent-denied-child",
+        "doc-child-denied-parent"
+      ],
+      "must_return_zero_from_forbidden": true
+    }
+  ],
+  "fixture_provenance": "block-f-local (Block Z shared package absent; schema matches master prompt)"
+}

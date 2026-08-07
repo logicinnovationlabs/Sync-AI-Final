@@ -95,11 +95,45 @@ GET  /api/v1/scoped/admin/audit                    admin.audit.read
 6. **A5 probe routes:** `search.read` / `document.read` / `admin.audit.read` exposed as `/api/v1/scoped/*` probes because those product routes are not otherwise present in Block A; connectors.* scopes come from the live route table.
 7. **Shared verify DB:** A3 cleans Okta fixture `idp_subject` rows once before the 3 process runs because `users.idp_subject` / `email` are globally unique in the shared `block_a_verify` database (production assumes per-tenant DBs).
 8. **Historical `test_signoff.py`:** Prior A2/A4/A5 tests were in-process simulations; closeout evidence is from `test_signoff_closeout_local.py` only.
+9. **SCIM tenant-reassignment (closeout §2.1 — TEST-ONLY, removed):** Earlier `scim_sync_once.py` reassigned `user.tenant_id` when an `idp_subject` collision existed under a different tenant in the shared verify DB. That is **not** production behavior — a SCIM feed must not silently migrate identities across tenant boundaries (exploitable via misconfigured/malicious IdP feed). Production `scim_sync_service.sync_users` never reassigns `tenant_id`. The reassignment was removed from `scim_sync_once.py`; shared-DB collision handling stays solely in the A3 test cleanup (`delete` by fixture `idp_subject` before the 3 process runs).
+10. **TenantMiddleware soft-fail (closeout §2.2 — intentional, narrowed):** Soft-fail is intentional because route-level auth deps are the real 401/403 gate and this middleware is optional pre-resolve only. Previously bare `except Exception: pass` was silent. Now: expected cases (`TenantNotFoundError`, `VaultError`, `jwt.PyJWTError`, `SQLAlchemyError`, `ValueError`, `KeyError`, `OSError`) log at DEBUG; any other exception still soft-fails (so pool/event-loop glitches cannot 500 the request before auth deps run) but logs at WARNING with exception type — not silent pass-through.
+11. **A5 synthetic scoped probes — ACTION ITEM (closeout §2.3):** `/api/v1/scoped/*` exists only to exercise `search.read` / `document.read` / `admin.audit.read` until Blocks F/J/K ship real routes. **Re-run A5 against real `POST /api/v1/search` and `GET /api/v1/document/{id}` (and admin audit) once those exist; then retire the synthetic probes.** Tracked until Blocks J/K/N land.
+
+---
+
+## Closeout gap closure (2026-08-05)
+
+### A3 re-run after removing tenant-reassignment from `scim_sync_once.py`
+```
+A3 run 1 pid=30568 principals={alice/bob/carol UUIDv5s identical}
+A3 run 2 pid=16352 principals={same}
+A3 run 3 pid=33084 principals={same}
+A3 PASSED: principal_id identical across 3 process restarts, 0 drift; pids={30568, 16352, 33084}
+1 passed in 2.70s
+```
+Principal IDs unchanged from prior closeout:
+```
+00u1okta-subject-alice -> cb0d57f6-1d5c-5835-8975-7c60cfee946d
+00u1okta-subject-bob   -> 8b425e2a-15aa-5d1e-935c-69ddb4cc7b22
+00u1okta-subject-carol -> 5a9dbaff-c3c3-5fea-9aff-ef2f366b875f
+```
+Log: `a3_rerun.log`.
+
+### Full A1–A5 re-run after TenantMiddleware narrowing
+```
+A1 PASSED: 100/100 tokens contain exactly one tenant_id and pass validation
+A2 PASSED: 20/20 trials rejected within <=60s
+A3 PASSED: principal_id identical across 3 process restarts, 0 drift; pids={3520, 22900, 19088}
+A4 PASSED: 50/50 cross-tenant replay attempts rejected, 0 leaks
+A5 PASSED: 7/7 scoped endpoints returned 403 error envelope
+======================= 5 passed, 367 warnings in 8.19s =======================
+```
+Log: `a1_a5_rerun2.log`. Deviations 9–11 recorded above.
 
 ---
 
 ## Sign-Off
 
-**Engineer:** Cursor Agent — 2026-08-04  
+**Engineer:** Cursor Agent — 2026-08-04 (gaps closed 2026-08-05)  
 **Reviewer:** PENDING  
 **Block A (A1–A5) closeout:** **PASS**

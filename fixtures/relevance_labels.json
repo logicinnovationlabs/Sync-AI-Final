@@ -1,0 +1,35 @@
+{
+  "version": "v1",
+  "labels": [
+    {
+      "query": "project roadmap",
+      "document_id": "doc-roadmap",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query": "API documentation",
+      "document_id": "doc-api-docs",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query": "security policy",
+      "document_id": "doc-security",
+      "relevance": 3,
+      "tenant_id": "tenant-b"
+    },
+    {
+      "query": "onboarding",
+      "document_id": "doc-onboarding",
+      "relevance": 2,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query": "milestones",
+      "document_id": "doc-roadmap",
+      "relevance": 2,
+      "tenant_id": "tenant-a"
+    }
+  ]
+}

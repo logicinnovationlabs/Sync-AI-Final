@@ -1,0 +1,22 @@
+{
+  "version": "v1",
+  "groups": [
+    {
+      "id": "group-eng",
+      "name": "Engineering",
+      "tenant_id": "tenant-a",
+      "members": [
+        "principal-alice",
+        "principal-bob"
+      ]
+    },
+    {
+      "id": "group-security",
+      "name": "Security",
+      "tenant_id": "tenant-b",
+      "members": [
+        "principal-carol"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "version": "v1",
+  "baselines": {
+    "lexical_p95_ms": 200,
+    "vector_p95_ms": 150,
+    "graph_p95_ms": 100,
+    "federator_p95_ms": 800,
+    "reader_p95_ms": 300,
+    "assistant_p95_ms": 2000,
+    "auth_revoke_ms": 60000,
+    "provision_ms": 5000
+  }
+}

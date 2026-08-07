@@ -1,0 +1,41 @@
+{
+  "version": "v1",
+  "edges": [
+    {
+      "id": "edge-1",
+      "source": "principal-alice",
+      "target": "doc-roadmap",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-2",
+      "source": "principal-bob",
+      "target": "doc-api-docs",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-3",
+      "source": "doc-roadmap",
+      "target": "doc-api-docs",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-4",
+      "source": "principal-carol",
+      "target": "doc-security",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-5",
+      "source": "principal-diana",
+      "target": "doc-restricted",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-6",
+      "source": "doc-onboarding",
+      "target": "doc-roadmap",
+      "type": "REFERENCES"
+    }
+  ]
+}

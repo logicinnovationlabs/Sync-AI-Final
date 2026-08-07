@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "fixtures": [
+    "documents",
+    "principals",
+    "groups",
+    "acl_matrix",
+    "relevance_labels",
+    "acl_redteam_cases",
+    "graph_edges",
+    "multi_source_identities",
+    "performance_baselines",
+    "crawl_expectations"
+  ]
+}

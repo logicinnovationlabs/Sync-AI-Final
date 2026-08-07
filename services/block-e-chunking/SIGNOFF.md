@@ -771,7 +771,7 @@ All 8 component verification scripts passed with fixes for column name mismatche
 
 **Component 4 (Code Chunker):** PASSED ✓
 - No changes required
-- AST-based chunking with 36 files, 430 chunks verified
+- AST-based chunking with 36 files, 428 chunks verified
 
 **Component 5 (Tenant Isolation):** PASSED ✓
 - Fixed verify_component5_tenant_isolation.py to add document_id parameter
@@ -887,6 +887,18 @@ Log: e2_10min_closeout.log / e2_10min_results.json
 | ID | Result | Evidence |
 |----|--------|----------|
 | E1 | **PASS** | Component 4: 36 files, 428 chunks, 0 mid-function/class splits |
+
+### Chunk-count correction (closeout §2.4 — 2026-08-05)
+Earlier prose in this file (Phase 4 Component 4 bullet) said **430** chunks; the authoritative E1 table and Phase 4 E1 line correctly said **428**. Fresh re-run of `tests/verify_component4_code_chunker.py` this session:
+
+```
+Total files processed: 36
+Total chunks generated: 428
+Parse failures: 0
+COMPONENT 4 VERIFICATION: PASSED
+```
+
+Corrected the stray "430" → **428**. Log: `component4_rerun.log`.
 | E2 | **PASS** | Gap 3 above — 546.3 aggregate, worst sliding window 531.5 |
 | E3 | **PASS** | Component 6 on real Postgres (Gap 2) |
 | E4 | **PASS** | Component 2: identical chunk_id across 5 runs |

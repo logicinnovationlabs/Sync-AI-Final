@@ -1,0 +1,50 @@
+openapi: '3.0.0'
+info:
+  title: connector contract
+  version: '1.0.0'
+paths:
+  /connectors:
+    get:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+  /connectors/google-drive/crawl:
+    post:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+  /crawls/{crawl_id}:
+    get:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+  /ingested-objects:
+    get:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+  /connectors/checkpoint:
+    post:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object

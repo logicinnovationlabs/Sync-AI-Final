@@ -604,9 +604,9 @@ After Block A passes signoff (A1–A7):
 2. **Block C**: Normalization & ACL Compiler — canonical document schema, identity resolution
 3. **Block D**: Storage Substrate — backup/restore, KMS encryption
 4. **Block E**: Chunking & Embedding Pipeline
-5. **Block F**: Lexical Search Service (OpenSearch/Elasticsearch)
-6. **Block G**: Vector Search Service
-7. **Block H**: Knowledge Graph Service
+5. **Block F**: Lexical Search Service (OpenSearch/Elasticsearch) — see `services/block-f-lexical-search/`
+6. **Block G**: Vector Search Service — see `services/block-g-vector-search/`
+7. **Block H**: Knowledge Graph Service — see `services/block-h-graph/`
 8. ... (see architecture doc for full build order)
 
 ---

@@ -1,0 +1,13 @@
+{
+  "version": "1.0",
+  "fixture_provenance": "block-h-local",
+  "cases": [
+    {
+      "case_id": "acl-h-01-cross-tenant",
+      "description": "Cross-tenant graph access must fail binding",
+      "tenant_id": "tenant_h_test",
+      "forbidden_tenant_id": "tenant_other",
+      "node_id": "doc-acl-matrix"
+    }
+  ]
+}

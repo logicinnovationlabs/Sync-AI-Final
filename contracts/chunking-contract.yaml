@@ -1,0 +1,32 @@
+openapi: '3.0.0'
+info:
+  title: chunking contract
+  version: '1.0.0'
+paths:
+  /embed:
+    post:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+  /reembed:
+    post:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+  /chunks/{doc_id}:
+    get:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object

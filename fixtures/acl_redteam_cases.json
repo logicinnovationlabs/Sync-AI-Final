@@ -1,0 +1,36 @@
+{
+  "version": "v1",
+  "cases": [
+    {
+      "case_id": "rt-cross-tenant",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "query": "M&A Deal Sheet",
+      "forbidden_document_ids": [
+        "doc-restricted",
+        "doc-security"
+      ]
+    },
+    {
+      "case_id": "rt-no-access",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-bob",
+      "query": "Security Policy",
+      "forbidden_document_ids": [
+        "doc-security",
+        "doc-restricted"
+      ]
+    },
+    {
+      "case_id": "rt-group-only",
+      "tenant_id": "tenant-b",
+      "principal_id": "principal-carol",
+      "query": "roadmap",
+      "forbidden_document_ids": [
+        "doc-roadmap",
+        "doc-api-docs",
+        "doc-onboarding"
+      ]
+    }
+  ]
+}

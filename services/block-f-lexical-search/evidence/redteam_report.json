@@ -1,0 +1,125 @@
+{
+  "cases": [
+    {
+      "case_id": "acl-01-cross-tenant",
+      "description": "Cross-tenant access attempt",
+      "returned": 47,
+      "total": 47,
+      "leaked": [],
+      "missing_required": []
+    },
+    {
+      "case_id": "acl-02-no-read-access",
+      "description": "User with no read access to document",
+      "returned": 47,
+      "total": 47,
+      "leaked": [],
+      "missing_required": []
+    },
+    {
+      "case_id": "acl-03-has-read-access",
+      "description": "User with read access to document (should pass)",
+      "returned": 47,
+      "total": 47,
+      "leaked": [],
+      "missing_required": []
+    },
+    {
+      "case_id": "acl-04-group-changed",
+      "description": "Group membership changed mid-session",
+      "returned": 47,
+      "total": 47,
+      "leaked": [],
+      "missing_required": []
+    },
+    {
+      "case_id": "acl-05-container-inheritance",
+      "description": "Container inheritance edge cases",
+      "returned": 47,
+      "total": 47,
+      "leaked": [],
+      "missing_required": []
+    },
+    {
+      "case_id": "acl-06-deny-override",
+      "description": "Deny override (explicit deny beats allow)",
+      "returned": 47,
+      "total": 47,
+      "leaked": [],
+      "missing_required": []
+    },
+    {
+      "case_id": "acl-07-unauthenticated",
+      "description": "Unauthenticated request",
+      "returned": 0,
+      "total": 0,
+      "leaked": [],
+      "missing_required": []
+    },
+    {
+      "case_id": "acl-08-insufficient-scope",
+      "description": "Token with insufficient scope",
+      "returned": 47,
+      "total": 47,
+      "leaked": [],
+      "missing_required": []
+    },
+    {
+      "case_id": "acl-09-deleted-document",
+      "description": "Deleted document access attempt",
+      "returned": 47,
+      "total": 47,
+      "leaked": [],
+      "missing_required": []
+    },
+    {
+      "case_id": "acl-10-unshared",
+      "description": "Unshared document access",
+      "returned": 47,
+      "total": 47,
+      "leaked": [],
+      "missing_required": []
+    },
+    {
+      "case_id": "acl-11-restricted-container",
+      "description": "Document in restricted container",
+      "returned": 47,
+      "total": 47,
+      "leaked": [],
+      "missing_required": []
+    },
+    {
+      "case_id": "acl-12-multi-group",
+      "description": "User with access through multiple groups",
+      "returned": 47,
+      "total": 47,
+      "leaked": [],
+      "missing_required": []
+    },
+    {
+      "case_id": "acl-13-removed-from-group",
+      "description": "User with access removed from group",
+      "returned": 47,
+      "total": 47,
+      "leaked": [],
+      "missing_required": []
+    },
+    {
+      "case_id": "acl-14-parent-denied",
+      "description": "Parent container denied, child allowed (should deny)",
+      "returned": 47,
+      "total": 47,
+      "leaked": [],
+      "missing_required": []
+    },
+    {
+      "case_id": "acl-15-child-denied",
+      "description": "Child container denied, parent allowed (should deny)",
+      "returned": 47,
+      "total": 47,
+      "leaked": [],
+      "missing_required": []
+    }
+  ],
+  "leaks": []
+}

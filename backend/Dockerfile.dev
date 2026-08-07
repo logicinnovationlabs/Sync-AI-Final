@@ -7,6 +7,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     build-essential \
     libpq-dev \
+    libmagic1 \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -14,7 +15,9 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt requirements-dev.txt ./
 
 # Install Python dependencies (core + dev)
+# python-magic-bin is Windows-only; use python-magic on Linux
 RUN pip install --upgrade pip && \
+    sed -i 's/python-magic-bin==0.4.14/python-magic==0.4.27/' requirements.txt && \
     pip install -r requirements.txt && \
     pip install -r requirements-dev.txt
 

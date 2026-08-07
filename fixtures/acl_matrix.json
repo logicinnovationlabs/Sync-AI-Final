@@ -1,0 +1,49 @@
+{
+  "version": "v1",
+  "entries": [
+    {
+      "document_id": "doc-roadmap",
+      "principal_id": "principal-alice",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-roadmap",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-api-docs",
+      "principal_id": "principal-bob",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-api-docs",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-security",
+      "principal_id": "principal-carol",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-onboarding",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-onboarding",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-restricted",
+      "principal_id": "principal-diana",
+      "permission": "OWNER"
+    }
+  ]
+}

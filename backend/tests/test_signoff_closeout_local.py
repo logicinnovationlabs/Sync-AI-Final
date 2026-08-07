@@ -220,6 +220,7 @@ def test_A3_scim_idempotency_process_restart_closeout():
                 DB_URL,
             ],
             cwd=str(BACKEND_ROOT),
+            stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
             env={

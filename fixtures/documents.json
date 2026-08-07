@@ -1,0 +1,89 @@
+{
+  "version": "v1",
+  "documents": [
+    {
+      "id": "doc-roadmap",
+      "tenant_id": "tenant-a",
+      "title": "Project Roadmap",
+      "source": "google_drive",
+      "owner_id": "principal-alice",
+      "acl": [
+        "principal-alice",
+        "group-eng"
+      ],
+      "body": "Q3 milestones for Sync AI enterprise search platform.",
+      "checkpoint": "cp-drive-1",
+      "delta_type": "created",
+      "chunks": [
+        "chk-roadmap-1",
+        "chk-roadmap-2"
+      ]
+    },
+    {
+      "id": "doc-api-docs",
+      "tenant_id": "tenant-a",
+      "title": "API Documentation",
+      "source": "google_drive",
+      "owner_id": "principal-bob",
+      "acl": [
+        "principal-bob",
+        "group-eng"
+      ],
+      "body": "REST and MCP API documentation for federated search.",
+      "checkpoint": "cp-drive-2",
+      "delta_type": "updated",
+      "chunks": [
+        "chk-api-1"
+      ]
+    },
+    {
+      "id": "doc-security",
+      "tenant_id": "tenant-b",
+      "title": "Security Policy",
+      "source": "google_drive",
+      "owner_id": "principal-carol",
+      "acl": [
+        "principal-carol",
+        "group-security"
+      ],
+      "body": "Tenant isolation and credential handling requirements.",
+      "checkpoint": "cp-drive-3",
+      "delta_type": "created",
+      "chunks": [
+        "chk-sec-1"
+      ]
+    },
+    {
+      "id": "doc-onboarding",
+      "tenant_id": "tenant-a",
+      "title": "Eng Onboarding",
+      "source": "google_gmail",
+      "owner_id": "principal-alice",
+      "acl": [
+        "group-eng"
+      ],
+      "body": "Welcome guide for engineering onboarding.",
+      "checkpoint": "cp-gmail-1",
+      "delta_type": "created",
+      "chunks": [
+        "chk-onboard-1"
+      ]
+    },
+    {
+      "id": "doc-restricted",
+      "tenant_id": "tenant-c",
+      "title": "M&A Deal Sheet",
+      "source": "google_drive",
+      "owner_id": "principal-diana",
+      "acl": [
+        "principal-diana"
+      ],
+      "body": "Confidential acquisition terms.",
+      "checkpoint": "cp-drive-4",
+      "delta_type": "created",
+      "chunks": [
+        "chk-restr-1"
+      ]
+    }
+  ]
+}

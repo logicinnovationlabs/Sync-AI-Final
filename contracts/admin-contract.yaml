@@ -1,0 +1,23 @@
+openapi: '3.0.0'
+info:
+  title: admin contract
+  version: '1.0.0'
+paths:
+  /admin/audit:
+    get:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+  /admin/config:
+    get:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object

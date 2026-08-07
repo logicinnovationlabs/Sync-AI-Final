@@ -1,0 +1,35 @@
+services:
+  mock-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    command: ["python", "-m", "tests.mocks.contract_mock_server", "--port", "10001"]
+    ports:
+      - "10001:10001"
+    volumes:
+      - ./fixtures:/app/fixtures:ro
+      - ./contracts:/app/contracts:ro
+      - ./tests:/app/tests:ro
+    environment:
+      FIXTURES_PATH: /app/fixtures
+      JWT_TEST_SECRET: test-suite-hs256-secret-32b-min!!
+
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    depends_on:
+      - mock-server
+    environment:
+      TEST_PHASE: provisional
+      USE_INPROCESS_MOCKS: "false"
+      MOCK_BASE_PORT: "10000"
+      TEST_SERVICE_HOST: mock-server
+      FIXTURES_PATH: /app/fixtures
+      CONTRACTS_PATH: /app/contracts
+    volumes:
+      - ./fixtures:/app/fixtures:ro
+      - ./contracts:/app/contracts:ro
+      - ./tests:/app/tests:ro
+      - ./test-results:/app/test-results
+    command: ["python", "-m", "tests.runners.test_runner", "--phase", "provisional", "--format", "json", "--output-dir", "./test-results"]
