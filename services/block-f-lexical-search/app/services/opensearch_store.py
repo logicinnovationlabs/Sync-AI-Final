@@ -35,6 +35,10 @@ INDEX_BODY: Dict[str, Any] = {
                 "code_tokenizer": {
                     "type": "pattern",
                     "pattern": "([A-Z][a-z]+|[a-z]+|_+|[0-9]+)",
+                    # Lucene PatternTokenizer defaults to group=-1 (split-on-match),
+                    # which drops contiguous tokens like uniqueToken0. group=1
+                    # extracts matches, aligning with app.services.tokenizer.
+                    "group": 1,
                 }
             },
         },
@@ -147,7 +151,7 @@ class OpenSearchLexicalStore(LexicalStore):
             "updated_at": fields.get("updated_at"),
             "container_path": fields.get("container_path") or "",
             "language": fields.get("language") or "",
-            "tags": list(fields.get("tags") or []),
+            "tags": list(dict.fromkeys(fields.get("tags") or [])),
             "acl_filter_terms": acl,
             "hidden_fields": list(fields.get("hidden_fields") or []),
             "deleted": bool(deleted or fields.get("deleted")),
@@ -301,9 +305,12 @@ class OpenSearchLexicalStore(LexicalStore):
         facet_out: Dict[str, List[Dict[str, Any]]] = {}
         aggs = res.get("aggregations") or {}
         for field, agg in aggs.items():
+            # Skip empty-string buckets to match mock/ground-truth facet logic
+            # (fixtures omit empty keyword values from expected counts).
             facet_out[field] = [
                 {"value": b["key"], "count": b["doc_count"]}
                 for b in agg.get("buckets", [])
+                if b.get("key") not in ("", None)
             ]
 
         return {"results": results, "facets": facet_out, "total": total_n}

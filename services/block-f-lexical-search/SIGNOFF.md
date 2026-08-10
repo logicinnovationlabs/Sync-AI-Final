@@ -27,12 +27,17 @@
 
 | ID | Criterion | Result | Evidence |
 |----|-----------|--------|----------|
-| F1 | Query Latency (p95 <= 200ms) | PENDING | - |
-| F2 | ACL Enforcement (0 violations) | PENDING | - |
-| F3 | Index Lag (p95 < 30s) | PENDING | - |
-| F4 | Facet Accuracy (100% match) | PENDING | - |
+| F1 | Query Latency (p95 <= 200ms) | **PASS** (p95=52.46ms) | OpenSearch 2.11.1 `:9200`; `SEARCH_BACKEND=opensearch` |
+| F2 | ACL Enforcement (0 violations) | **PASS** (0 leaks / 15) | deny-aware `build_opensearch_acl_filter` + redteam suite |
+| F3 | Index Lag (p95 < 30s) | **PASS** (p95=0.1231s) | [evidence/lag_measurement.csv](evidence/lag_measurement.csv); `code_tokenizer` `group:1` fix |
+| F4 | Facet Accuracy (100% match) | **PASS** | [evidence/facet_comparison.json](evidence/facet_comparison.json); empty-bucket omit + tag dedupe |
 
-**Phase 2 Signoff**: PENDING (run with SEARCH_BACKEND=opensearch after docker compose -f docker-compose.test.yml up -d)
+**Phase 2 Signoff**: **PASS** (technical) — **2026-08-08**
+**Independent Reviewer**: PENDING (re-run required before formal §24 signoff)
+
+### Phase 2 remediation notes (2026-08-08)
+- **F3**: Lucene `PatternTokenizer` defaulted to split mode (`group=-1`), so tokens like `uniqueToken0` indexed empty. Fixed with `"group": 1`; indexes recreated.
+- **F4**: OpenSearch ACL filter ignored `deny:` (over-counted); empty `repository` facet buckets disagreed with mock. Fixed deny `must_not` + skip empty keys. Fixture tag lists deduped so multi-value terms agg matches ground truth.
 
 ---
 

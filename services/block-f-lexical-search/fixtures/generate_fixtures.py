@@ -70,7 +70,7 @@ for i, topic in enumerate(TOPICS):
         "updated_at": _iso(i),
         "container_path": f"/eng/{topic}",
         "language": lang,
-        "tags": [topic, "public", source],
+        "tags": list(dict.fromkeys([topic, "public", source])),
         "acl_filter_terms": ["group:eng", "user:alice", f"group:topic-{topic}"],
         "hidden_fields": [],
         "deleted": False,
@@ -542,8 +542,9 @@ for field in facet_fields:
     for d in visible_docs:
         val = d.get(field)
         if field == "tags":
-            for tag in val or []:
-                counter[tag] += 1
+            for tag in dict.fromkeys(val or []):
+                if tag:
+                    counter[tag] += 1
         elif val:
             counter[str(val)] += 1
     ground[field] = [

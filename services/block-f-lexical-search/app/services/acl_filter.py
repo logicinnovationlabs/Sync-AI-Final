@@ -39,15 +39,23 @@ def acl_allows(doc_acl_terms: List[str], user_acl_terms: List[str]) -> bool:
 
 def build_opensearch_acl_filter(user_acl_terms: List[str]) -> Dict[str, Any]:
     """
-    Build OpenSearch filter clause for ACL overlap.
+    Build OpenSearch filter clause for ACL overlap + deny override.
 
+    Mirrors acl_allows(): require allow-term intersection AND exclude any
+    document that carries deny:<principal> for a caller principal.
     MUST be placed in the filter context of every search query.
     Never rely on post-filtering alone.
     """
     terms = normalize_acl_terms(user_acl_terms)
     if not terms:
         return {"match_none": {}}
-    return {"terms": {"acl_filter_terms": terms}}
+    deny_terms = [f"deny:{t}" for t in terms]
+    return {
+        "bool": {
+            "filter": [{"terms": {"acl_filter_terms": terms}}],
+            "must_not": [{"terms": {"acl_filter_terms": deny_terms}}],
+        }
+    }
 
 
 def filter_results_by_acl(

@@ -27,9 +27,9 @@ def compute_facets(
                 continue
             if field == "tags":
                 tags = value if isinstance(value, list) else [value]
-                for tag in tags:
-                    if tag:
-                        counters[field][str(tag)] += 1
+                # Count each distinct tag once per document (matches OpenSearch terms agg).
+                for tag in dict.fromkeys(str(t) for t in tags if t):
+                    counters[field][tag] += 1
             else:
                 counters[field][str(value)] += 1
 

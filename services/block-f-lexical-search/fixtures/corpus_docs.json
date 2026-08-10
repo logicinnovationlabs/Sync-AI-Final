@@ -14,7 +14,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:alice",
-      "updated_at": "2026-08-05T07:34:44.440514+00:00",
+      "updated_at": "2026-08-08T00:47:18.514730+00:00",
       "container_path": "/eng/kubernetes",
       "language": "en",
       "tags": [
@@ -42,7 +42,7 @@
       "object_type": "code",
       "source": "github",
       "owner": "user:bob",
-      "updated_at": "2026-08-04T07:34:44.440564+00:00",
+      "updated_at": "2026-08-07T00:47:18.514761+00:00",
       "container_path": "/eng/postgres",
       "language": "python",
       "tags": [
@@ -70,7 +70,7 @@
       "object_type": "ticket",
       "source": "drive",
       "owner": "user:carol",
-      "updated_at": "2026-08-03T07:34:44.440581+00:00",
+      "updated_at": "2026-08-06T00:47:18.514772+00:00",
       "container_path": "/eng/oauth",
       "language": "typescript",
       "tags": [
@@ -98,7 +98,7 @@
       "object_type": "email",
       "source": "gmail",
       "owner": "user:dave",
-      "updated_at": "2026-08-02T07:34:44.440591+00:00",
+      "updated_at": "2026-08-05T00:47:18.514784+00:00",
       "container_path": "/eng/vector_search",
       "language": "go",
       "tags": [
@@ -126,7 +126,7 @@
       "object_type": "wiki",
       "source": "jira",
       "owner": "user:alice",
-      "updated_at": "2026-08-01T07:34:44.440600+00:00",
+      "updated_at": "2026-08-04T00:47:18.514793+00:00",
       "container_path": "/eng/acl",
       "language": "markdown",
       "tags": [
@@ -154,7 +154,7 @@
       "object_type": "doc",
       "source": "notion",
       "owner": "user:bob",
-      "updated_at": "2026-07-31T07:34:44.440608+00:00",
+      "updated_at": "2026-08-03T00:47:18.514802+00:00",
       "container_path": "/eng/chunking",
       "language": "en",
       "tags": [
@@ -182,7 +182,7 @@
       "object_type": "code",
       "source": "confluence",
       "owner": "user:carol",
-      "updated_at": "2026-07-30T07:34:44.440618+00:00",
+      "updated_at": "2026-08-02T00:47:18.514809+00:00",
       "container_path": "/eng/embeddings",
       "language": "python",
       "tags": [
@@ -210,7 +210,7 @@
       "object_type": "ticket",
       "source": "github",
       "owner": "user:dave",
-      "updated_at": "2026-07-29T07:34:44.440625+00:00",
+      "updated_at": "2026-08-01T00:47:18.514815+00:00",
       "container_path": "/eng/kafka",
       "language": "typescript",
       "tags": [
@@ -238,7 +238,7 @@
       "object_type": "email",
       "source": "drive",
       "owner": "user:alice",
-      "updated_at": "2026-07-28T07:34:44.440633+00:00",
+      "updated_at": "2026-07-31T00:47:18.514824+00:00",
       "container_path": "/eng/redis",
       "language": "go",
       "tags": [
@@ -266,7 +266,7 @@
       "object_type": "wiki",
       "source": "gmail",
       "owner": "user:bob",
-      "updated_at": "2026-07-27T07:34:44.440639+00:00",
+      "updated_at": "2026-07-30T00:47:18.514831+00:00",
       "container_path": "/eng/fastapi",
       "language": "markdown",
       "tags": [
@@ -294,7 +294,7 @@
       "object_type": "doc",
       "source": "jira",
       "owner": "user:carol",
-      "updated_at": "2026-07-26T07:34:44.440647+00:00",
+      "updated_at": "2026-07-29T00:47:18.514838+00:00",
       "container_path": "/eng/tenancy",
       "language": "en",
       "tags": [
@@ -322,7 +322,7 @@
       "object_type": "code",
       "source": "notion",
       "owner": "user:dave",
-      "updated_at": "2026-07-25T07:34:44.440657+00:00",
+      "updated_at": "2026-07-28T00:47:18.514845+00:00",
       "container_path": "/eng/observability",
       "language": "python",
       "tags": [
@@ -350,7 +350,7 @@
       "object_type": "ticket",
       "source": "confluence",
       "owner": "user:alice",
-      "updated_at": "2026-07-24T07:34:44.440667+00:00",
+      "updated_at": "2026-07-27T00:47:18.514853+00:00",
       "container_path": "/eng/backup",
       "language": "typescript",
       "tags": [
@@ -378,7 +378,7 @@
       "object_type": "email",
       "source": "github",
       "owner": "user:bob",
-      "updated_at": "2026-07-23T07:34:44.440678+00:00",
+      "updated_at": "2026-07-26T00:47:18.514859+00:00",
       "container_path": "/eng/encryption",
       "language": "go",
       "tags": [
@@ -406,7 +406,7 @@
       "object_type": "wiki",
       "source": "drive",
       "owner": "user:carol",
-      "updated_at": "2026-07-22T07:34:44.440691+00:00",
+      "updated_at": "2026-07-25T00:47:18.514866+00:00",
       "container_path": "/eng/scim",
       "language": "markdown",
       "tags": [
@@ -434,13 +434,12 @@
       "object_type": "doc",
       "source": "gmail",
       "owner": "user:dave",
-      "updated_at": "2026-07-21T07:34:44.440702+00:00",
+      "updated_at": "2026-07-24T00:47:18.514873+00:00",
       "container_path": "/eng/gmail",
       "language": "en",
       "tags": [
         "gmail",
-        "public",
-        "gmail"
+        "public"
       ],
       "acl_filter_terms": [
         "group:eng",
@@ -462,7 +461,7 @@
       "object_type": "code",
       "source": "jira",
       "owner": "user:alice",
-      "updated_at": "2026-07-20T07:34:44.440715+00:00",
+      "updated_at": "2026-07-23T00:47:18.514880+00:00",
       "container_path": "/eng/drive",
       "language": "python",
       "tags": [
@@ -490,7 +489,7 @@
       "object_type": "ticket",
       "source": "notion",
       "owner": "user:bob",
-      "updated_at": "2026-07-19T07:34:44.440723+00:00",
+      "updated_at": "2026-07-22T00:47:18.514887+00:00",
       "container_path": "/eng/indexing",
       "language": "typescript",
       "tags": [
@@ -518,7 +517,7 @@
       "object_type": "email",
       "source": "confluence",
       "owner": "user:carol",
-      "updated_at": "2026-07-18T07:34:44.440731+00:00",
+      "updated_at": "2026-07-21T00:47:18.514894+00:00",
       "container_path": "/eng/bm25",
       "language": "go",
       "tags": [
@@ -546,7 +545,7 @@
       "object_type": "wiki",
       "source": "github",
       "owner": "user:dave",
-      "updated_at": "2026-07-17T07:34:44.440738+00:00",
+      "updated_at": "2026-07-20T00:47:18.514904+00:00",
       "container_path": "/eng/latency",
       "language": "markdown",
       "tags": [
@@ -574,7 +573,7 @@
       "object_type": "doc",
       "source": "drive",
       "owner": "user:alice",
-      "updated_at": "2026-07-16T07:34:44.440745+00:00",
+      "updated_at": "2026-07-19T00:47:18.514910+00:00",
       "container_path": "/eng/tokenizer",
       "language": "en",
       "tags": [
@@ -602,7 +601,7 @@
       "object_type": "code",
       "source": "gmail",
       "owner": "user:bob",
-      "updated_at": "2026-07-15T07:34:44.440752+00:00",
+      "updated_at": "2026-07-18T00:47:18.514916+00:00",
       "container_path": "/eng/celery",
       "language": "python",
       "tags": [
@@ -630,7 +629,7 @@
       "object_type": "ticket",
       "source": "jira",
       "owner": "user:carol",
-      "updated_at": "2026-07-14T07:34:44.440758+00:00",
+      "updated_at": "2026-07-17T00:47:18.514922+00:00",
       "container_path": "/eng/alembic",
       "language": "typescript",
       "tags": [
@@ -658,7 +657,7 @@
       "object_type": "email",
       "source": "notion",
       "owner": "user:dave",
-      "updated_at": "2026-07-13T07:34:44.440763+00:00",
+      "updated_at": "2026-07-16T00:47:18.514927+00:00",
       "container_path": "/eng/opensearch",
       "language": "go",
       "tags": [
@@ -686,7 +685,7 @@
       "object_type": "wiki",
       "source": "confluence",
       "owner": "user:alice",
-      "updated_at": "2026-07-12T07:34:44.440769+00:00",
+      "updated_at": "2026-07-15T00:47:18.514933+00:00",
       "container_path": "/eng/jwt",
       "language": "markdown",
       "tags": [
@@ -714,7 +713,7 @@
       "object_type": "doc",
       "source": "github",
       "owner": "user:bob",
-      "updated_at": "2026-07-11T07:34:44.440776+00:00",
+      "updated_at": "2026-07-14T00:47:18.514940+00:00",
       "container_path": "/eng/rbac",
       "language": "en",
       "tags": [
@@ -742,7 +741,7 @@
       "object_type": "code",
       "source": "drive",
       "owner": "user:carol",
-      "updated_at": "2026-07-10T07:34:44.440788+00:00",
+      "updated_at": "2026-07-13T00:47:18.514946+00:00",
       "container_path": "/eng/faceting",
       "language": "python",
       "tags": [
@@ -770,7 +769,7 @@
       "object_type": "ticket",
       "source": "gmail",
       "owner": "user:dave",
-      "updated_at": "2026-07-09T07:34:44.440794+00:00",
+      "updated_at": "2026-07-12T00:47:18.514952+00:00",
       "container_path": "/eng/snippets",
       "language": "typescript",
       "tags": [
@@ -798,7 +797,7 @@
       "object_type": "email",
       "source": "jira",
       "owner": "user:alice",
-      "updated_at": "2026-07-08T07:34:44.440800+00:00",
+      "updated_at": "2026-07-11T00:47:18.514959+00:00",
       "container_path": "/eng/federator",
       "language": "go",
       "tags": [
@@ -826,7 +825,7 @@
       "object_type": "wiki",
       "source": "notion",
       "owner": "user:bob",
-      "updated_at": "2026-07-07T07:34:44.440806+00:00",
+      "updated_at": "2026-07-10T00:47:18.514965+00:00",
       "container_path": "/eng/canonical",
       "language": "markdown",
       "tags": [
@@ -854,7 +853,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:alice",
-      "updated_at": "2026-06-26T07:34:44.440815+00:00",
+      "updated_at": "2026-06-29T00:47:18.514972+00:00",
       "container_path": "/eng/payroll-overview",
       "language": "en",
       "tags": [
@@ -880,7 +879,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:alice",
-      "updated_at": "2026-06-25T07:34:44.440821+00:00",
+      "updated_at": "2026-06-28T00:47:18.514977+00:00",
       "container_path": "/eng/payroll-overview",
       "language": "en",
       "tags": [
@@ -906,7 +905,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:alice",
-      "updated_at": "2026-06-24T07:34:44.440826+00:00",
+      "updated_at": "2026-06-27T00:47:18.514983+00:00",
       "container_path": "/eng/payroll-overview",
       "language": "en",
       "tags": [
@@ -932,7 +931,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:alice",
-      "updated_at": "2026-06-23T07:34:44.440830+00:00",
+      "updated_at": "2026-06-26T00:47:18.514987+00:00",
       "container_path": "/eng/payroll-overview",
       "language": "en",
       "tags": [
@@ -958,7 +957,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:alice",
-      "updated_at": "2026-06-22T07:34:44.440836+00:00",
+      "updated_at": "2026-06-25T00:47:18.514992+00:00",
       "container_path": "/eng/payroll-overview",
       "language": "en",
       "tags": [
@@ -984,7 +983,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:alice",
-      "updated_at": "2026-06-21T07:34:44.440840+00:00",
+      "updated_at": "2026-06-24T00:47:18.514996+00:00",
       "container_path": "/eng/payroll-overview",
       "language": "en",
       "tags": [
@@ -1010,7 +1009,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:alice",
-      "updated_at": "2026-06-20T07:34:44.440845+00:00",
+      "updated_at": "2026-06-23T00:47:18.515000+00:00",
       "container_path": "/eng/payroll-overview",
       "language": "en",
       "tags": [
@@ -1036,7 +1035,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:alice",
-      "updated_at": "2026-06-19T07:34:44.440850+00:00",
+      "updated_at": "2026-06-22T00:47:18.515003+00:00",
       "container_path": "/eng/payroll-overview",
       "language": "en",
       "tags": [
@@ -1062,7 +1061,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:alice",
-      "updated_at": "2026-06-18T07:34:44.440854+00:00",
+      "updated_at": "2026-06-21T00:47:18.515008+00:00",
       "container_path": "/eng/payroll-overview",
       "language": "en",
       "tags": [
@@ -1088,7 +1087,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:alice",
-      "updated_at": "2026-06-17T07:34:44.440857+00:00",
+      "updated_at": "2026-06-20T00:47:18.515011+00:00",
       "container_path": "/eng/payroll-overview",
       "language": "en",
       "tags": [
@@ -1114,7 +1113,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:cfo",
-      "updated_at": "2026-08-04T07:34:44.440872+00:00",
+      "updated_at": "2026-08-07T00:47:18.515023+00:00",
       "container_path": "/legal/ma",
       "language": "en",
       "tags": [
@@ -1142,7 +1141,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:cfo",
-      "updated_at": "2026-08-04T07:34:44.440878+00:00",
+      "updated_at": "2026-08-07T00:47:18.515029+00:00",
       "container_path": "/legal/comp",
       "language": "en",
       "tags": [
@@ -1171,7 +1170,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:cfo",
-      "updated_at": "2026-08-04T07:34:44.440884+00:00",
+      "updated_at": "2026-08-07T00:47:18.515034+00:00",
       "container_path": "/eng/alice",
       "language": "en",
       "tags": [
@@ -1199,7 +1198,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:cfo",
-      "updated_at": "2026-08-04T07:34:44.440888+00:00",
+      "updated_at": "2026-08-07T00:47:18.515038+00:00",
       "container_path": "/legal/board",
       "language": "en",
       "tags": [
@@ -1227,7 +1226,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:cfo",
-      "updated_at": "2026-08-04T07:34:44.440891+00:00",
+      "updated_at": "2026-08-07T00:47:18.515042+00:00",
       "container_path": "/legal/vault/secrets",
       "language": "en",
       "tags": [
@@ -1254,7 +1253,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:cfo",
-      "updated_at": "2026-08-04T07:34:44.440895+00:00",
+      "updated_at": "2026-08-07T00:47:18.515045+00:00",
       "container_path": "/hr/payroll",
       "language": "en",
       "tags": [
@@ -1284,7 +1283,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:cfo",
-      "updated_at": "2026-08-04T07:34:44.440901+00:00",
+      "updated_at": "2026-08-07T00:47:18.515049+00:00",
       "container_path": "/legal/blueprints",
       "language": "en",
       "tags": [
@@ -1312,7 +1311,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:cfo",
-      "updated_at": "2026-08-04T07:34:44.440904+00:00",
+      "updated_at": "2026-08-07T00:47:18.515052+00:00",
       "container_path": "/exec/classified",
       "language": "en",
       "tags": [
@@ -1340,7 +1339,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:cfo",
-      "updated_at": "2026-08-04T07:34:44.440908+00:00",
+      "updated_at": "2026-08-07T00:47:18.515056+00:00",
       "container_path": "/eng/archive",
       "language": "en",
       "tags": [
@@ -1368,7 +1367,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:cfo",
-      "updated_at": "2026-08-04T07:34:44.440911+00:00",
+      "updated_at": "2026-08-07T00:47:18.515060+00:00",
       "container_path": "/users/carol/drafts",
       "language": "en",
       "tags": [
@@ -1395,7 +1394,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:cfo",
-      "updated_at": "2026-08-03T07:34:44.440919+00:00",
+      "updated_at": "2026-08-06T00:47:18.515066+00:00",
       "container_path": "/restricted/container/item",
       "language": "en",
       "tags": [
@@ -1420,7 +1419,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:cfo",
-      "updated_at": "2026-08-03T07:34:44.440924+00:00",
+      "updated_at": "2026-08-06T00:47:18.515071+00:00",
       "container_path": "/eng/shared-secret",
       "language": "en",
       "tags": [
@@ -1447,7 +1446,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:cfo",
-      "updated_at": "2026-08-03T07:34:44.440928+00:00",
+      "updated_at": "2026-08-06T00:47:18.515074+00:00",
       "container_path": "/legal/removed",
       "language": "en",
       "tags": [
@@ -1472,7 +1471,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:cfo",
-      "updated_at": "2026-08-03T07:34:44.440932+00:00",
+      "updated_at": "2026-08-06T00:47:18.515078+00:00",
       "container_path": "/parent-denied/child-allowed",
       "language": "en",
       "tags": [
@@ -1498,7 +1497,7 @@
       "object_type": "doc",
       "source": "confluence",
       "owner": "user:cfo",
-      "updated_at": "2026-08-03T07:34:44.440937+00:00",
+      "updated_at": "2026-08-06T00:47:18.515082+00:00",
       "container_path": "/parent-allowed/child-denied",
       "language": "en",
       "tags": [
@@ -1525,7 +1524,7 @@
       "object_type": "wiki",
       "source": "notion",
       "owner": "user:dave",
-      "updated_at": "2026-08-02T07:34:44.440946+00:00",
+      "updated_at": "2026-08-05T00:47:18.515088+00:00",
       "container_path": "/eng/pad/0",
       "language": "en",
       "tags": [
@@ -1551,7 +1550,7 @@
       "object_type": "wiki",
       "source": "notion",
       "owner": "user:dave",
-      "updated_at": "2026-08-01T07:34:44.440954+00:00",
+      "updated_at": "2026-08-04T00:47:18.515094+00:00",
       "container_path": "/eng/pad/1",
       "language": "en",
       "tags": [
@@ -1577,7 +1576,7 @@
       "object_type": "wiki",
       "source": "notion",
       "owner": "user:dave",
-      "updated_at": "2026-07-31T07:34:44.440958+00:00",
+      "updated_at": "2026-08-03T00:47:18.515098+00:00",
       "container_path": "/eng/pad/2",
       "language": "en",
       "tags": [
@@ -1603,7 +1602,7 @@
       "object_type": "wiki",
       "source": "notion",
       "owner": "user:dave",
-      "updated_at": "2026-07-30T07:34:44.440963+00:00",
+      "updated_at": "2026-08-02T00:47:18.515104+00:00",
       "container_path": "/eng/pad/3",
       "language": "en",
       "tags": [
@@ -1629,7 +1628,7 @@
       "object_type": "wiki",
       "source": "notion",
       "owner": "user:dave",
-      "updated_at": "2026-07-29T07:34:44.440966+00:00",
+      "updated_at": "2026-08-01T00:47:18.515108+00:00",
       "container_path": "/eng/pad/4",
       "language": "en",
       "tags": [
