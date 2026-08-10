@@ -1,4 +1,4 @@
-﻿# Block H: Knowledge Graph Service - Signoff Document
+# Block H: Knowledge Graph Service - Signoff Document
 
 Per Master Prompt Block H (H1-H3) and architecture two-phase signoff.
 
@@ -6,11 +6,20 @@ Per Master Prompt Block H (H1-H3) and architecture two-phase signoff.
 
 | ID | Criterion | Phase 1 (Mock) | Phase 2 (Neo4j) | Date | Engineer | Reviewer | Fixtures | Environment |
 |----|-----------|----------------|-----------------|------|----------|----------|----------|-------------|
-| H1 | Edge fidelity 100% | **PASS** (183/183) | **PASS** (183/183) | 2026-08-06 | Cursor Agent | PENDING | block-h-local (Block Z schema) | Windows + Neo4j CE 5.26 @7688 |
-| H2 | Traversal p95 <= 100 ms | **PASS** (p95=0.10 ms) | **PASS** (p95=15.53 ms) | 2026-08-06 | Cursor Agent | PENDING | 50 depth-2 starts | same |
-| H3 | Merge/split integrity | **PASS** (0 orphans) | **PASS** (0 orphans) | 2026-08-06 | Cursor Agent | PENDING | person-alice / person-alice-gmail | same |
+| H1 | Edge fidelity 100% | **PASS** (183/183) | **PASS** (183/183) | 2026-08-06; **re-verified 2026-08-08** | Cursor Agent | PENDING | block-h-local (Block Z schema) | Windows + Neo4j CE 5.26 @7688 |
+| H2 | Traversal p95 <= 100 ms | **PASS** (p95=0.10 ms) | **PASS** (p95=15.53 ms; **re-run p95=15.75 ms**) | 2026-08-06; **re-verified 2026-08-08** | Cursor Agent | PENDING | 50 depth-2 starts | same |
+| H3 | Merge/split integrity | **PASS** (0 orphans) | **PASS** (0 orphans) | 2026-08-06; **re-verified 2026-08-08** | Cursor Agent | PENDING | person-alice / person-alice-gmail | same |
 
-**Block signoff:** PASS pending independent reviewer signature (all H1-H3 green in Phase 1 and Phase 2).
+**Block signoff:** Technical Phase 1+2 PASS; **formal §24 signoff PENDING** independent reviewer signature.
+
+### Re-verification (2026-08-08)
+Neo4j brought up via `docker compose -f docker-compose.test.yml up -d` (`block-h-test-neo4j`, bolt `localhost:7688`). Installed `neo4j` Python driver in repo `.venv`. Re-ran H1–H3:
+
+```
+H1 Edge fidelity: PASS (183/183)
+H2 Traversal latency: PASS (p95=15.752 ms)
+H3 Merge/split integrity: PASS (orphans=0)
+```
 
 ## Detailed Evidence
 
