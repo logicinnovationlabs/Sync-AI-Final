@@ -1,0 +1,917 @@
+{
+  "version": "v1",
+  "generated_at": "2026-07-29T12:00:00Z",
+  "description": "50+ activity events across 3 tenants for Block I",
+  "events": [
+    {
+      "event_id": "evt-tenant-a-0001",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-001",
+      "object_id": "doc-a-001",
+      "event_type": "view",
+      "source_system": "confluence",
+      "event_time": "2026-07-29T12:00:00Z",
+      "session_id": "sess-tenant-a-0",
+      "context_json": {
+        "path": "/docs/doc-a-001"
+      },
+      "privacy_level": "restricted"
+    },
+    {
+      "event_id": "evt-tenant-a-0002",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-002",
+      "object_id": "doc-a-002",
+      "event_type": "edit",
+      "source_system": "github",
+      "event_time": "2026-07-29T11:55:00Z",
+      "session_id": "sess-tenant-a-0",
+      "context_json": {
+        "path": "/docs/doc-a-002"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-a-0003",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-003",
+      "object_id": "doc-a-003",
+      "event_type": "authored",
+      "source_system": "slack",
+      "event_time": "2026-07-29T11:50:00Z",
+      "session_id": "sess-tenant-a-0",
+      "context_json": {
+        "path": "/docs/doc-a-003"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-a-0004",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-004",
+      "object_id": "doc-a-004",
+      "event_type": "commented_on",
+      "source_system": "gdrive",
+      "event_time": "2026-07-29T11:45:00Z",
+      "session_id": "sess-tenant-a-1",
+      "context_json": {
+        "path": "/docs/doc-a-004"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-a-0005",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-005",
+      "object_id": "doc-a-005",
+      "event_type": "referenced",
+      "source_system": "confluence",
+      "event_time": "2026-07-29T11:40:00Z",
+      "session_id": "sess-tenant-a-1",
+      "context_json": {
+        "path": "/docs/doc-a-005"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-a-0006",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-006",
+      "object_id": "doc-a-006",
+      "event_type": "worked_on",
+      "source_system": "github",
+      "event_time": "2026-07-29T11:35:00Z",
+      "session_id": "sess-tenant-a-1",
+      "context_json": {
+        "path": "/docs/doc-a-006"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-a-0007",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-007",
+      "object_id": "doc-a-007",
+      "event_type": "view",
+      "source_system": "slack",
+      "event_time": "2026-07-29T11:30:00Z",
+      "session_id": "sess-tenant-a-2",
+      "context_json": {
+        "path": "/docs/doc-a-007"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-a-0008",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-008",
+      "object_id": "doc-a-008",
+      "event_type": "edit",
+      "source_system": "gdrive",
+      "event_time": "2026-07-29T11:25:00Z",
+      "session_id": "sess-tenant-a-2",
+      "context_json": {
+        "path": "/docs/doc-a-008"
+      },
+      "privacy_level": "restricted"
+    },
+    {
+      "event_id": "evt-tenant-a-0009",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-009",
+      "object_id": "doc-a-009",
+      "event_type": "authored",
+      "source_system": "confluence",
+      "event_time": "2026-07-29T11:20:00Z",
+      "session_id": "sess-tenant-a-2",
+      "context_json": {
+        "path": "/docs/doc-a-009"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-a-0010",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-010",
+      "object_id": "doc-a-010",
+      "event_type": "commented_on",
+      "source_system": "github",
+      "event_time": "2026-07-29T11:15:00Z",
+      "session_id": "sess-tenant-a-3",
+      "context_json": {
+        "path": "/docs/doc-a-010"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-a-0011",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-011",
+      "object_id": "doc-a-001",
+      "event_type": "referenced",
+      "source_system": "slack",
+      "event_time": "2026-07-29T11:10:00Z",
+      "session_id": "sess-tenant-a-3",
+      "context_json": {
+        "path": "/docs/doc-a-001"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-a-0012",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-012",
+      "object_id": "doc-a-002",
+      "event_type": "worked_on",
+      "source_system": "gdrive",
+      "event_time": "2026-07-29T11:05:00Z",
+      "session_id": "sess-tenant-a-3",
+      "context_json": {
+        "path": "/docs/doc-a-002"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-a-0013",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-013",
+      "object_id": "doc-a-003",
+      "event_type": "view",
+      "source_system": "confluence",
+      "event_time": "2026-07-29T11:00:00Z",
+      "session_id": "sess-tenant-a-4",
+      "context_json": {
+        "path": "/docs/doc-a-003"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-a-0014",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-014",
+      "object_id": "doc-a-004",
+      "event_type": "edit",
+      "source_system": "github",
+      "event_time": "2026-07-29T10:55:00Z",
+      "session_id": "sess-tenant-a-4",
+      "context_json": {
+        "path": "/docs/doc-a-004"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-a-0015",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-015",
+      "object_id": "doc-a-005",
+      "event_type": "authored",
+      "source_system": "slack",
+      "event_time": "2026-07-29T10:50:00Z",
+      "session_id": "sess-tenant-a-4",
+      "context_json": {
+        "path": "/docs/doc-a-005"
+      },
+      "privacy_level": "restricted"
+    },
+    {
+      "event_id": "evt-tenant-a-0016",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-001",
+      "object_id": "doc-a-006",
+      "event_type": "commented_on",
+      "source_system": "gdrive",
+      "event_time": "2026-07-29T10:45:00Z",
+      "session_id": "sess-tenant-a-5",
+      "context_json": {
+        "path": "/docs/doc-a-006"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-a-0017",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-002",
+      "object_id": "doc-a-007",
+      "event_type": "referenced",
+      "source_system": "confluence",
+      "event_time": "2026-07-29T10:40:00Z",
+      "session_id": "sess-tenant-a-5",
+      "context_json": {
+        "path": "/docs/doc-a-007"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-a-0018",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-003",
+      "object_id": "doc-a-008",
+      "event_type": "worked_on",
+      "source_system": "github",
+      "event_time": "2026-07-29T10:35:00Z",
+      "session_id": "sess-tenant-a-5",
+      "context_json": {
+        "path": "/docs/doc-a-008"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-a-0019",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-004",
+      "object_id": "doc-a-009",
+      "event_type": "view",
+      "source_system": "slack",
+      "event_time": "2026-07-29T10:30:00Z",
+      "session_id": "sess-tenant-a-6",
+      "context_json": {
+        "path": "/docs/doc-a-009"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-a-0020",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-005",
+      "object_id": "doc-a-010",
+      "event_type": "edit",
+      "source_system": "gdrive",
+      "event_time": "2026-07-29T10:25:00Z",
+      "session_id": "sess-tenant-a-6",
+      "context_json": {
+        "path": "/docs/doc-a-010"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-a-0021",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-006",
+      "object_id": "doc-a-001",
+      "event_type": "authored",
+      "source_system": "confluence",
+      "event_time": "2026-07-29T10:20:00Z",
+      "session_id": "sess-tenant-a-6",
+      "context_json": {
+        "path": "/docs/doc-a-001"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-a-0022",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-007",
+      "object_id": "doc-a-002",
+      "event_type": "commented_on",
+      "source_system": "github",
+      "event_time": "2026-07-29T10:15:00Z",
+      "session_id": "sess-tenant-a-7",
+      "context_json": {
+        "path": "/docs/doc-a-002"
+      },
+      "privacy_level": "restricted"
+    },
+    {
+      "event_id": "evt-tenant-a-0023",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-008",
+      "object_id": "doc-a-003",
+      "event_type": "referenced",
+      "source_system": "slack",
+      "event_time": "2026-07-29T10:10:00Z",
+      "session_id": "sess-tenant-a-7",
+      "context_json": {
+        "path": "/docs/doc-a-003"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-a-0024",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-009",
+      "object_id": "doc-a-004",
+      "event_type": "worked_on",
+      "source_system": "gdrive",
+      "event_time": "2026-07-29T10:05:00Z",
+      "session_id": "sess-tenant-a-7",
+      "context_json": {
+        "path": "/docs/doc-a-004"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-a-0025",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-010",
+      "object_id": "doc-a-005",
+      "event_type": "view",
+      "source_system": "confluence",
+      "event_time": "2026-07-29T10:00:00Z",
+      "session_id": "sess-tenant-a-8",
+      "context_json": {
+        "path": "/docs/doc-a-005"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-b-0026",
+      "tenant_id": "tenant-b",
+      "actor_principal_id": "p-user-b-001",
+      "object_id": "doc-b-001",
+      "event_type": "view",
+      "source_system": "jira",
+      "event_time": "2026-07-29T12:00:00Z",
+      "session_id": "sess-tenant-b-0",
+      "context_json": {
+        "path": "/docs/doc-b-001"
+      },
+      "privacy_level": "restricted"
+    },
+    {
+      "event_id": "evt-tenant-b-0027",
+      "tenant_id": "tenant-b",
+      "actor_principal_id": "p-user-b-002",
+      "object_id": "doc-b-002",
+      "event_type": "edit",
+      "source_system": "slack",
+      "event_time": "2026-07-29T11:55:00Z",
+      "session_id": "sess-tenant-b-0",
+      "context_json": {
+        "path": "/docs/doc-b-002"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-b-0028",
+      "tenant_id": "tenant-b",
+      "actor_principal_id": "p-user-b-003",
+      "object_id": "doc-b-003",
+      "event_type": "authored",
+      "source_system": "jira",
+      "event_time": "2026-07-29T11:50:00Z",
+      "session_id": "sess-tenant-b-0",
+      "context_json": {
+        "path": "/docs/doc-b-003"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-b-0029",
+      "tenant_id": "tenant-b",
+      "actor_principal_id": "p-user-b-004",
+      "object_id": "doc-b-004",
+      "event_type": "commented_on",
+      "source_system": "slack",
+      "event_time": "2026-07-29T11:45:00Z",
+      "session_id": "sess-tenant-b-1",
+      "context_json": {
+        "path": "/docs/doc-b-004"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-b-0030",
+      "tenant_id": "tenant-b",
+      "actor_principal_id": "p-user-b-005",
+      "object_id": "doc-b-005",
+      "event_type": "referenced",
+      "source_system": "jira",
+      "event_time": "2026-07-29T11:40:00Z",
+      "session_id": "sess-tenant-b-1",
+      "context_json": {
+        "path": "/docs/doc-b-005"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-b-0031",
+      "tenant_id": "tenant-b",
+      "actor_principal_id": "p-user-b-006",
+      "object_id": "doc-b-001",
+      "event_type": "worked_on",
+      "source_system": "slack",
+      "event_time": "2026-07-29T11:35:00Z",
+      "session_id": "sess-tenant-b-1",
+      "context_json": {
+        "path": "/docs/doc-b-001"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-b-0032",
+      "tenant_id": "tenant-b",
+      "actor_principal_id": "p-user-b-007",
+      "object_id": "doc-b-002",
+      "event_type": "view",
+      "source_system": "jira",
+      "event_time": "2026-07-29T11:30:00Z",
+      "session_id": "sess-tenant-b-2",
+      "context_json": {
+        "path": "/docs/doc-b-002"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-b-0033",
+      "tenant_id": "tenant-b",
+      "actor_principal_id": "p-user-b-001",
+      "object_id": "doc-b-003",
+      "event_type": "edit",
+      "source_system": "slack",
+      "event_time": "2026-07-29T11:25:00Z",
+      "session_id": "sess-tenant-b-2",
+      "context_json": {
+        "path": "/docs/doc-b-003"
+      },
+      "privacy_level": "restricted"
+    },
+    {
+      "event_id": "evt-tenant-b-0034",
+      "tenant_id": "tenant-b",
+      "actor_principal_id": "p-user-b-002",
+      "object_id": "doc-b-004",
+      "event_type": "authored",
+      "source_system": "jira",
+      "event_time": "2026-07-29T11:20:00Z",
+      "session_id": "sess-tenant-b-2",
+      "context_json": {
+        "path": "/docs/doc-b-004"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-b-0035",
+      "tenant_id": "tenant-b",
+      "actor_principal_id": "p-user-b-003",
+      "object_id": "doc-b-005",
+      "event_type": "commented_on",
+      "source_system": "slack",
+      "event_time": "2026-07-29T11:15:00Z",
+      "session_id": "sess-tenant-b-3",
+      "context_json": {
+        "path": "/docs/doc-b-005"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-b-0036",
+      "tenant_id": "tenant-b",
+      "actor_principal_id": "p-user-b-004",
+      "object_id": "doc-b-001",
+      "event_type": "referenced",
+      "source_system": "jira",
+      "event_time": "2026-07-29T11:10:00Z",
+      "session_id": "sess-tenant-b-3",
+      "context_json": {
+        "path": "/docs/doc-b-001"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-b-0037",
+      "tenant_id": "tenant-b",
+      "actor_principal_id": "p-user-b-005",
+      "object_id": "doc-b-002",
+      "event_type": "worked_on",
+      "source_system": "slack",
+      "event_time": "2026-07-29T11:05:00Z",
+      "session_id": "sess-tenant-b-3",
+      "context_json": {
+        "path": "/docs/doc-b-002"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-b-0038",
+      "tenant_id": "tenant-b",
+      "actor_principal_id": "p-user-b-006",
+      "object_id": "doc-b-003",
+      "event_type": "view",
+      "source_system": "jira",
+      "event_time": "2026-07-29T11:00:00Z",
+      "session_id": "sess-tenant-b-4",
+      "context_json": {
+        "path": "/docs/doc-b-003"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-b-0039",
+      "tenant_id": "tenant-b",
+      "actor_principal_id": "p-user-b-007",
+      "object_id": "doc-b-004",
+      "event_type": "edit",
+      "source_system": "slack",
+      "event_time": "2026-07-29T10:55:00Z",
+      "session_id": "sess-tenant-b-4",
+      "context_json": {
+        "path": "/docs/doc-b-004"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-b-0040",
+      "tenant_id": "tenant-b",
+      "actor_principal_id": "p-user-b-001",
+      "object_id": "doc-b-005",
+      "event_type": "authored",
+      "source_system": "jira",
+      "event_time": "2026-07-29T10:50:00Z",
+      "session_id": "sess-tenant-b-4",
+      "context_json": {
+        "path": "/docs/doc-b-005"
+      },
+      "privacy_level": "restricted"
+    },
+    {
+      "event_id": "evt-tenant-c-0041",
+      "tenant_id": "tenant-c",
+      "actor_principal_id": "p-user-c-001",
+      "object_id": "doc-c-001",
+      "event_type": "view",
+      "source_system": "notion",
+      "event_time": "2026-07-29T12:00:00Z",
+      "session_id": "sess-tenant-c-0",
+      "context_json": {
+        "path": "/docs/doc-c-001"
+      },
+      "privacy_level": "restricted"
+    },
+    {
+      "event_id": "evt-tenant-c-0042",
+      "tenant_id": "tenant-c",
+      "actor_principal_id": "p-user-c-002",
+      "object_id": "doc-c-002",
+      "event_type": "edit",
+      "source_system": "notion",
+      "event_time": "2026-07-29T11:55:00Z",
+      "session_id": "sess-tenant-c-0",
+      "context_json": {
+        "path": "/docs/doc-c-002"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-c-0043",
+      "tenant_id": "tenant-c",
+      "actor_principal_id": "p-user-c-003",
+      "object_id": "doc-c-003",
+      "event_type": "authored",
+      "source_system": "notion",
+      "event_time": "2026-07-29T11:50:00Z",
+      "session_id": "sess-tenant-c-0",
+      "context_json": {
+        "path": "/docs/doc-c-003"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-c-0044",
+      "tenant_id": "tenant-c",
+      "actor_principal_id": "p-user-c-004",
+      "object_id": "doc-c-001",
+      "event_type": "commented_on",
+      "source_system": "notion",
+      "event_time": "2026-07-29T11:45:00Z",
+      "session_id": "sess-tenant-c-1",
+      "context_json": {
+        "path": "/docs/doc-c-001"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-c-0045",
+      "tenant_id": "tenant-c",
+      "actor_principal_id": "p-user-c-005",
+      "object_id": "doc-c-002",
+      "event_type": "referenced",
+      "source_system": "notion",
+      "event_time": "2026-07-29T11:40:00Z",
+      "session_id": "sess-tenant-c-1",
+      "context_json": {
+        "path": "/docs/doc-c-002"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-c-0046",
+      "tenant_id": "tenant-c",
+      "actor_principal_id": "p-user-c-001",
+      "object_id": "doc-c-003",
+      "event_type": "worked_on",
+      "source_system": "notion",
+      "event_time": "2026-07-29T11:35:00Z",
+      "session_id": "sess-tenant-c-1",
+      "context_json": {
+        "path": "/docs/doc-c-003"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-c-0047",
+      "tenant_id": "tenant-c",
+      "actor_principal_id": "p-user-c-002",
+      "object_id": "doc-c-001",
+      "event_type": "view",
+      "source_system": "notion",
+      "event_time": "2026-07-29T11:30:00Z",
+      "session_id": "sess-tenant-c-2",
+      "context_json": {
+        "path": "/docs/doc-c-001"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-c-0048",
+      "tenant_id": "tenant-c",
+      "actor_principal_id": "p-user-c-003",
+      "object_id": "doc-c-002",
+      "event_type": "edit",
+      "source_system": "notion",
+      "event_time": "2026-07-29T11:25:00Z",
+      "session_id": "sess-tenant-c-2",
+      "context_json": {
+        "path": "/docs/doc-c-002"
+      },
+      "privacy_level": "restricted"
+    },
+    {
+      "event_id": "evt-tenant-c-0049",
+      "tenant_id": "tenant-c",
+      "actor_principal_id": "p-user-c-004",
+      "object_id": "doc-c-003",
+      "event_type": "authored",
+      "source_system": "notion",
+      "event_time": "2026-07-29T11:20:00Z",
+      "session_id": "sess-tenant-c-2",
+      "context_json": {
+        "path": "/docs/doc-c-003"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-c-0050",
+      "tenant_id": "tenant-c",
+      "actor_principal_id": "p-user-c-005",
+      "object_id": "doc-c-001",
+      "event_type": "commented_on",
+      "source_system": "notion",
+      "event_time": "2026-07-29T11:15:00Z",
+      "session_id": "sess-tenant-c-3",
+      "context_json": {
+        "path": "/docs/doc-c-001"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-c-0051",
+      "tenant_id": "tenant-c",
+      "actor_principal_id": "p-user-c-001",
+      "object_id": "doc-c-002",
+      "event_type": "referenced",
+      "source_system": "notion",
+      "event_time": "2026-07-29T11:10:00Z",
+      "session_id": "sess-tenant-c-3",
+      "context_json": {
+        "path": "/docs/doc-c-002"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-c-0052",
+      "tenant_id": "tenant-c",
+      "actor_principal_id": "p-user-c-002",
+      "object_id": "doc-c-003",
+      "event_type": "worked_on",
+      "source_system": "notion",
+      "event_time": "2026-07-29T11:05:00Z",
+      "session_id": "sess-tenant-c-3",
+      "context_json": {
+        "path": "/docs/doc-c-003"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-c-0053",
+      "tenant_id": "tenant-c",
+      "actor_principal_id": "p-user-c-003",
+      "object_id": "doc-c-001",
+      "event_type": "view",
+      "source_system": "notion",
+      "event_time": "2026-07-29T11:00:00Z",
+      "session_id": "sess-tenant-c-4",
+      "context_json": {
+        "path": "/docs/doc-c-001"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-c-0054",
+      "tenant_id": "tenant-c",
+      "actor_principal_id": "p-user-c-004",
+      "object_id": "doc-c-002",
+      "event_type": "edit",
+      "source_system": "notion",
+      "event_time": "2026-07-29T10:55:00Z",
+      "session_id": "sess-tenant-c-4",
+      "context_json": {
+        "path": "/docs/doc-c-002"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-tenant-c-0055",
+      "tenant_id": "tenant-c",
+      "actor_principal_id": "p-user-c-005",
+      "object_id": "doc-c-003",
+      "event_type": "authored",
+      "source_system": "notion",
+      "event_time": "2026-07-29T10:50:00Z",
+      "session_id": "sess-tenant-c-4",
+      "context_json": {
+        "path": "/docs/doc-c-003"
+      },
+      "privacy_level": "restricted"
+    },
+    {
+      "event_id": "evt-popular-0000",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-001",
+      "object_id": "doc-a-001",
+      "event_type": "view",
+      "source_system": "confluence",
+      "event_time": "2026-07-29T12:00:00Z",
+      "session_id": "sess-pop-0",
+      "context_json": {
+        "page": "/docs/deployment"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-popular-0001",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-002",
+      "object_id": "doc-a-001",
+      "event_type": "view",
+      "source_system": "confluence",
+      "event_time": "2026-07-29T11:59:00Z",
+      "session_id": "sess-pop-1",
+      "context_json": {
+        "page": "/docs/deployment"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-popular-0002",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-003",
+      "object_id": "doc-a-001",
+      "event_type": "view",
+      "source_system": "confluence",
+      "event_time": "2026-07-29T11:58:00Z",
+      "session_id": "sess-pop-2",
+      "context_json": {
+        "page": "/docs/deployment"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-popular-0003",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-004",
+      "object_id": "doc-a-001",
+      "event_type": "view",
+      "source_system": "confluence",
+      "event_time": "2026-07-29T11:57:00Z",
+      "session_id": "sess-pop-3",
+      "context_json": {
+        "page": "/docs/deployment"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-popular-0004",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-005",
+      "object_id": "doc-a-001",
+      "event_type": "view",
+      "source_system": "confluence",
+      "event_time": "2026-07-29T11:56:00Z",
+      "session_id": "sess-pop-4",
+      "context_json": {
+        "page": "/docs/deployment"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-popular-0005",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-006",
+      "object_id": "doc-a-001",
+      "event_type": "view",
+      "source_system": "confluence",
+      "event_time": "2026-07-29T11:55:00Z",
+      "session_id": "sess-pop-5",
+      "context_json": {
+        "page": "/docs/deployment"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-popular-0006",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-007",
+      "object_id": "doc-a-001",
+      "event_type": "view",
+      "source_system": "confluence",
+      "event_time": "2026-07-29T11:54:00Z",
+      "session_id": "sess-pop-6",
+      "context_json": {
+        "page": "/docs/deployment"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-popular-0007",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-008",
+      "object_id": "doc-a-001",
+      "event_type": "view",
+      "source_system": "confluence",
+      "event_time": "2026-07-29T11:53:00Z",
+      "session_id": "sess-pop-7",
+      "context_json": {
+        "page": "/docs/deployment"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-popular-0008",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-009",
+      "object_id": "doc-a-001",
+      "event_type": "view",
+      "source_system": "confluence",
+      "event_time": "2026-07-29T11:52:00Z",
+      "session_id": "sess-pop-8",
+      "context_json": {
+        "page": "/docs/deployment"
+      },
+      "privacy_level": "public"
+    },
+    {
+      "event_id": "evt-popular-0009",
+      "tenant_id": "tenant-a",
+      "actor_principal_id": "p-user-010",
+      "object_id": "doc-a-001",
+      "event_type": "view",
+      "source_system": "confluence",
+      "event_time": "2026-07-29T11:51:00Z",
+      "session_id": "sess-pop-9",
+      "context_json": {
+        "page": "/docs/deployment"
+      },
+      "privacy_level": "public"
+    }
+  ]
+}

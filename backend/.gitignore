@@ -30,9 +30,13 @@ htmlcov/
 
 # Environment
 .env
+.env.*
+!.env.example
+!.env.*.example
 .env.local
 .env.*.local
 .tokens*.json
+Dockerfile.signoff
 
 # Database
 *.db
@@ -67,7 +71,8 @@ env/
 ENV/
 .venv/
 
-# Backup files
+# Backup / merge scratch files
 *.bak
+*.bak_*
+*.bak*
 *~
-

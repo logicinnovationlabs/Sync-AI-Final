@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: block-i-postgres-test
+    environment:
+      POSTGRES_USER: signals
+      POSTGRES_PASSWORD: signals
+      POSTGRES_DB: block_i_signals
+    ports:
+      - "15433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U signals -d block_i_signals"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: block-i-redis-test
+    ports:
+      - "6389:6379"

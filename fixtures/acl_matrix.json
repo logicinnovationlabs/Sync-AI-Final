@@ -1,0 +1,3875 @@
+{
+  "version": "v2",
+  "entries": [
+    {
+      "document_id": "doc-roadmap",
+      "principal_id": "principal-alice",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-roadmap",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-roadmap",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-roadmap",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-roadmap",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-roadmap",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-roadmap",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-roadmap",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-roadmap",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-roadmap",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-roadmap",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-roadmap",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-roadmap",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-roadmap",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-api-docs",
+      "principal_id": "principal-bob",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-api-docs",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-api-docs",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-api-docs",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-api-docs",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-api-docs",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-api-docs",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-api-docs",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-api-docs",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-api-docs",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-api-docs",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-api-docs",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-api-docs",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-api-docs",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-security",
+      "principal_id": "principal-carol",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-security",
+      "principal_id": "principal-grace",
+      "permission": "READ",
+      "via_group": "group-security"
+    },
+    {
+      "document_id": "doc-security",
+      "principal_id": "principal-nate",
+      "permission": "READ",
+      "via_group": "group-security"
+    },
+    {
+      "document_id": "doc-security",
+      "principal_id": "principal-maya",
+      "permission": "READ",
+      "via_group": "group-security"
+    },
+    {
+      "document_id": "doc-onboarding",
+      "principal_id": "principal-alice",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-onboarding",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-onboarding",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-onboarding",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-onboarding",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-onboarding",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-onboarding",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-onboarding",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-onboarding",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-onboarding",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-onboarding",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-onboarding",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-onboarding",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-onboarding",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-restricted",
+      "principal_id": "principal-diana",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-00",
+      "principal_id": "principal-alice",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-00",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-00",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-00",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-00",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-00",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-00",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-00",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-00",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-00",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-00",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-00",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-00",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-00",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-01",
+      "principal_id": "principal-bob",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-01",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-01",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-01",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-01",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-01",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-01",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-01",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-01",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-01",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-01",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-01",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-01",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-01",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-02",
+      "principal_id": "principal-erin",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-02",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-02",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-02",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-02",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-02",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-02",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-02",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-02",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-02",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-02",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-02",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-02",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-02",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-03",
+      "principal_id": "principal-frank",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-03",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-03",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-03",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-03",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-03",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-03",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-03",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-03",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-03",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-03",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-03",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-03",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-03",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-04",
+      "principal_id": "principal-hank",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-04",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-04",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-04",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-04",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-04",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-04",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-04",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-04",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-04",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-04",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-04",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-04",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-04",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-05",
+      "principal_id": "principal-ivy",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-05",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-05",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-05",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-05",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-05",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-05",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-05",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-05",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-05",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-05",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-05",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-05",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-05",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-06",
+      "principal_id": "principal-jake",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-06",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-06",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-06",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-06",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-06",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-06",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-06",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-06",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-06",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-06",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-06",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-06",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-06",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-07",
+      "principal_id": "principal-kate",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-07",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-07",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-07",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-07",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-07",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-07",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-07",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-07",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-07",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-07",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-07",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-07",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-07",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-08",
+      "principal_id": "principal-leo",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-08",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-08",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-08",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-08",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-08",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-08",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-08",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-08",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-08",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-08",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-08",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-08",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-08",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-09",
+      "principal_id": "principal-rita",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-09",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-09",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-09",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-09",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-09",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-09",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-09",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-09",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-09",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-09",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-09",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-09",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-09",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-10",
+      "principal_id": "principal-sam",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-10",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-10",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-10",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-10",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-10",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-10",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-10",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-10",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-10",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-10",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-10",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-10",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-10",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-11",
+      "principal_id": "principal-tina",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-11",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-11",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-11",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-11",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-11",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-11",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-11",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-11",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-11",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-11",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-11",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-11",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-11",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-12",
+      "principal_id": "principal-wes",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-12",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-12",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-12",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-12",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-12",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-12",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-12",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-12",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-12",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-12",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-12",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-12",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-12",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-13",
+      "principal_id": "principal-yara",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-13",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-13",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-13",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-13",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-13",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-13",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-13",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-13",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-13",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-13",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-13",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-13",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-13",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-14",
+      "principal_id": "principal-alice",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-14",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-14",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-14",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-14",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-14",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-14",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-14",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-14",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-14",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-14",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-14",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-14",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-14",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-15",
+      "principal_id": "principal-bob",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-15",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-15",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-15",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-15",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-15",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-15",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-15",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-15",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-15",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-15",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-15",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-15",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-15",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-16",
+      "principal_id": "principal-erin",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-16",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-16",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-16",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-16",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-16",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-16",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-16",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-16",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-16",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-16",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-16",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-16",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-16",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-17",
+      "principal_id": "principal-frank",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-17",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-17",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-17",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-17",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-17",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-17",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-17",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-17",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-17",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-17",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-17",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-17",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-17",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-18",
+      "principal_id": "principal-hank",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-18",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-18",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-18",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-18",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-18",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-18",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-18",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-18",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-18",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-18",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-18",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-18",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-18",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-19",
+      "principal_id": "principal-ivy",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-19",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-19",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-19",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-19",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-19",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-19",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-19",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-19",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-19",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-19",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-19",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-19",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-19",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-20",
+      "principal_id": "principal-jake",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-20",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-20",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-20",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-20",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-20",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-20",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-20",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-20",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-20",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-20",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-20",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-20",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-20",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-21",
+      "principal_id": "principal-kate",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-21",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-21",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-21",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-21",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-21",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-21",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-21",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-21",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-21",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-21",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-21",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-21",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-21",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-22",
+      "principal_id": "principal-leo",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-22",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-22",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-22",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-22",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-22",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-22",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-22",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-22",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-22",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-22",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-22",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-22",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-22",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-23",
+      "principal_id": "principal-rita",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-23",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-23",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-23",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-23",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-23",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-23",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-23",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-23",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-23",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-23",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-23",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-23",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-23",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-24",
+      "principal_id": "principal-sam",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-24",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-24",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-24",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-24",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-24",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-24",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-24",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-24",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-24",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-24",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-24",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-24",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-24",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-25",
+      "principal_id": "principal-tina",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-25",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-25",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-25",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-25",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-25",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-25",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-25",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-25",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-25",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-25",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-25",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-25",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-25",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-26",
+      "principal_id": "principal-wes",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-26",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-26",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-26",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-26",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-26",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-26",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-26",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-26",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-26",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-26",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-26",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-26",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-26",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-27",
+      "principal_id": "principal-yara",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-27",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-27",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-27",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-27",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-27",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-27",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-27",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-27",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-27",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-27",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-27",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-27",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-27",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-28",
+      "principal_id": "principal-alice",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-28",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-28",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-28",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-28",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-28",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-28",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-28",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-28",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-28",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-28",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-28",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-28",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-28",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-29",
+      "principal_id": "principal-bob",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-topic-29",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-29",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-29",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-29",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-29",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-29",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-29",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-29",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-29",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-29",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-29",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-29",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-topic-29",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-00",
+      "principal_id": "principal-erin",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-partial-00",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-00",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-00",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-00",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-00",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-00",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-00",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-00",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-00",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-00",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-00",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-00",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-00",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-01",
+      "principal_id": "principal-frank",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-partial-01",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-01",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-01",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-01",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-01",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-01",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-01",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-01",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-01",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-01",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-01",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-01",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-01",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-02",
+      "principal_id": "principal-hank",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-partial-02",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-02",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-02",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-02",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-02",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-02",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-02",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-02",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-02",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-02",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-02",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-02",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-02",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-03",
+      "principal_id": "principal-ivy",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-partial-03",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-03",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-03",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-03",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-03",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-03",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-03",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-03",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-03",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-03",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-03",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-03",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-03",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-04",
+      "principal_id": "principal-jake",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-partial-04",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-04",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-04",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-04",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-04",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-04",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-04",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-04",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-04",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-04",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-04",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-04",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-04",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-05",
+      "principal_id": "principal-kate",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-partial-05",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-05",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-05",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-05",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-05",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-05",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-05",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-05",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-05",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-05",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-05",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-05",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-05",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-06",
+      "principal_id": "principal-leo",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-partial-06",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-06",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-06",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-06",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-06",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-06",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-06",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-06",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-06",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-06",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-06",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-06",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-06",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-07",
+      "principal_id": "principal-rita",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-partial-07",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-07",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-07",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-07",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-07",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-07",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-07",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-07",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-07",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-07",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-07",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-07",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-07",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-08",
+      "principal_id": "principal-sam",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-partial-08",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-08",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-08",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-08",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-08",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-08",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-08",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-08",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-08",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-08",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-08",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-08",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-08",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-09",
+      "principal_id": "principal-tina",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-partial-09",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-09",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-09",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-09",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-09",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-09",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-09",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-09",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-09",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-09",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-09",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-09",
+      "principal_id": "principal-hank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-partial-09",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-cross-tenant",
+      "principal_id": "principal-diana",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-rt-cross-tenant",
+      "principal_id": "principal-quinn",
+      "permission": "READ",
+      "via_group": "group-exec"
+    },
+    {
+      "document_id": "doc-rt-cross-tenant",
+      "principal_id": "principal-paul",
+      "permission": "READ",
+      "via_group": "group-exec"
+    },
+    {
+      "document_id": "doc-rt-no-access",
+      "principal_id": "principal-hank",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-rt-direct-allow",
+      "principal_id": "principal-alice",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-rt-group-allow",
+      "principal_id": "principal-hank",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-rt-group-allow",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-group-allow",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-group-allow",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-group-allow",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-group-allow",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-group-allow",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-group-allow",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-group-allow",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-group-allow",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-group-allow",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-group-allow",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-group-allow",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-group-allow",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-inherited-allow",
+      "principal_id": "principal-hank",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-rt-inherited-allow",
+      "principal_id": "principal-bob",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-inherited-allow",
+      "principal_id": "principal-leo",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-inherited-allow",
+      "principal_id": "principal-yara",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-inherited-allow",
+      "principal_id": "principal-frank",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-inherited-allow",
+      "principal_id": "principal-sam",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-inherited-allow",
+      "principal_id": "principal-jake",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-inherited-allow",
+      "principal_id": "principal-ivy",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-inherited-allow",
+      "principal_id": "principal-kate",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-inherited-allow",
+      "principal_id": "principal-alice",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-inherited-allow",
+      "principal_id": "principal-rita",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-inherited-allow",
+      "principal_id": "principal-wes",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-inherited-allow",
+      "principal_id": "principal-tina",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-inherited-allow",
+      "principal_id": "principal-erin",
+      "permission": "READ",
+      "via_group": "group-eng"
+    },
+    {
+      "document_id": "doc-rt-deny-override",
+      "principal_id": "principal-hank",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-rt-unshare",
+      "principal_id": "principal-erin",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-rt-group-changed",
+      "principal_id": "principal-hank",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-rt-container",
+      "principal_id": "principal-hank",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-rt-removed-group",
+      "principal_id": "principal-erin",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-rt-deleted",
+      "principal_id": "principal-hank",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-rt-scope",
+      "principal_id": "principal-hank",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-rt-auth-required",
+      "principal_id": "principal-carol",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-rt-auth-required",
+      "principal_id": "principal-grace",
+      "permission": "READ",
+      "via_group": "group-security"
+    },
+    {
+      "document_id": "doc-rt-auth-required",
+      "principal_id": "principal-nate",
+      "permission": "READ",
+      "via_group": "group-security"
+    },
+    {
+      "document_id": "doc-rt-auth-required",
+      "principal_id": "principal-maya",
+      "permission": "READ",
+      "via_group": "group-security"
+    },
+    {
+      "document_id": "doc-rt-parent-denied",
+      "principal_id": "principal-hank",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-rt-legal-only",
+      "principal_id": "principal-carol",
+      "permission": "OWNER"
+    },
+    {
+      "document_id": "doc-rt-legal-only",
+      "principal_id": "principal-uma",
+      "permission": "READ",
+      "via_group": "group-legal"
+    },
+    {
+      "document_id": "doc-rt-legal-only",
+      "principal_id": "principal-olivia",
+      "permission": "READ",
+      "via_group": "group-legal"
+    }
+  ]
+}

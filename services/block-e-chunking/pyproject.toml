@@ -1,0 +1,54 @@
+[tool.poetry]
+name = "block-e-chunking"
+version = "0.1.0"
+description = "Block E - Chunking and Embedding Pipeline"
+authors = ["Suhani"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.115.0"
+uvicorn = {extras = ["standard"], version = "^0.32.0"}
+pydantic = "^2.9.0"
+pydantic-settings = "^2.6.0"
+sqlalchemy = {extras = ["asyncio"], version = "^2.0.36"}
+asyncpg = "^0.30.0"
+alembic = "^1.14.0"
+redis = {extras = ["hiredis"], version = "^5.2.0"}
+celery = {extras = ["redis"], version = "^5.4.0"}
+tree-sitter = "^0.21.0"
+spacy = "^3.8.0"
+openai = "^1.51.0"
+anthropic = "^0.39.0"
+confluent-kafka = "^2.5.0"
+httpx = "^0.28.0"
+pyyaml = "^6.0.2"
+nest-asyncio = "^1.6.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.0"
+pytest-asyncio = "^0.24.0"
+pytest-cov = "^6.0.0"
+black = "^24.10.0"
+ruff = "^0.8.0"
+mypy = "^1.13.0"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+
+[tool.black]
+line-length = 100
+target-version = ['py312']
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.system"

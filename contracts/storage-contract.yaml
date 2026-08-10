@@ -1,0 +1,50 @@
+openapi: '3.0.0'
+info:
+  title: storage contract
+  version: '1.0.0'
+paths:
+  /storage/health:
+    get:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+  /tenants/{tenant_id}/provision:
+    post:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+  /tenants/{tenant_id}/backup:
+    post:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+  /tenants/{tenant_id}/restore:
+    post:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+  /keys/rotate:
+    post:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object

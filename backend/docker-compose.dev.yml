@@ -48,9 +48,16 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    env_file:
+      - .env
     environment:
+      # Docker-network service names (override host localhost from .env)
       CONTROL_PLANE_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/control_plane
+      DB_HOST: postgres
       REDIS_URL: redis://redis:6379
+      SESSION_STORE_REDIS_URL: redis://redis:6379
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
       VAULT_URL: ""
       JWT_PRIVATE_KEY_PATH: /app/keys/private.pem
       JWT_PUBLIC_KEY_PATH: /app/keys/public.pem
@@ -65,7 +72,8 @@ services:
       - ./scripts:/app/scripts
       - ./migrations:/app/migrations
       - ./keys:/app/keys
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # --loop asyncio: nest_asyncio in workers/tasks.py cannot patch uvloop
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --loop asyncio
     networks:
       - snyq_network
 

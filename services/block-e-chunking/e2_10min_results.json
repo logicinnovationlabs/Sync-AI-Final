@@ -1,0 +1,1060 @@
+{
+  "test_type": "E2 10-minute sustained throughput",
+  "start_time": "2026-08-05T00:59:23.739559+00:00",
+  "aggregate_metrics": {
+    "overall_docs_per_minute": 548.890209998072,
+    "overall_chunks_per_minute": 548.890209998072,
+    "avg_docs_per_minute": 550.6534516406729,
+    "min_docs_per_minute": 505.21590994366056,
+    "max_docs_per_minute": 616.4090782412932,
+    "total_documents": 5500,
+    "total_chunks": 5500,
+    "actual_duration_seconds": 601.2131278514862
+  },
+  "per_minute_breakdown": [
+    {
+      "minute": 1,
+      "docs_per_minute": 550,
+      "meets_target": true
+    },
+    {
+      "minute": 2,
+      "docs_per_minute": 550,
+      "meets_target": true
+    },
+    {
+      "minute": 3,
+      "docs_per_minute": 550,
+      "meets_target": true
+    },
+    {
+      "minute": 4,
+      "docs_per_minute": 550,
+      "meets_target": true
+    },
+    {
+      "minute": 5,
+      "docs_per_minute": 550,
+      "meets_target": true
+    },
+    {
+      "minute": 6,
+      "docs_per_minute": 550,
+      "meets_target": true
+    },
+    {
+      "minute": 7,
+      "docs_per_minute": 550,
+      "meets_target": true
+    },
+    {
+      "minute": 8,
+      "docs_per_minute": 550,
+      "meets_target": true
+    },
+    {
+      "minute": 9,
+      "docs_per_minute": 550,
+      "meets_target": true
+    },
+    {
+      "minute": 10,
+      "docs_per_minute": 550,
+      "meets_target": true
+    }
+  ],
+  "sliding_60s_windows": [
+    {
+      "batch": 1,
+      "window_end": 1785890967.5960732,
+      "window_seconds": 5.055758237838745,
+      "docs_in_window": 50,
+      "batches_in_window": 1,
+      "docs_per_minute": 593.3828040959592,
+      "meets_400": true
+    },
+    {
+      "batch": 2,
+      "window_end": 1785890972.9645526,
+      "window_seconds": 10.424237728118896,
+      "docs_in_window": 100,
+      "batches_in_window": 2,
+      "docs_per_minute": 575.5816546485005,
+      "meets_400": true
+    },
+    {
+      "batch": 3,
+      "window_end": 1785890978.1002142,
+      "window_seconds": 15.55989933013916,
+      "docs_in_window": 150,
+      "batches_in_window": 3,
+      "docs_per_minute": 578.4099118538132,
+      "meets_400": true
+    },
+    {
+      "batch": 4,
+      "window_end": 1785890983.879615,
+      "window_seconds": 21.33930015563965,
+      "docs_in_window": 200,
+      "batches_in_window": 4,
+      "docs_per_minute": 562.342715669079,
+      "meets_400": true
+    },
+    {
+      "batch": 5,
+      "window_end": 1785890989.5568678,
+      "window_seconds": 27.016552925109863,
+      "docs_in_window": 250,
+      "batches_in_window": 5,
+      "docs_per_minute": 555.2151690698714,
+      "meets_400": true
+    },
+    {
+      "batch": 6,
+      "window_end": 1785890995.4897125,
+      "window_seconds": 32.949397563934326,
+      "docs_in_window": 300,
+      "batches_in_window": 6,
+      "docs_per_minute": 546.2922338738721,
+      "meets_400": true
+    },
+    {
+      "batch": 7,
+      "window_end": 1785891000.371863,
+      "window_seconds": 37.83154797554016,
+      "docs_in_window": 350,
+      "batches_in_window": 7,
+      "docs_per_minute": 555.0922741405525,
+      "meets_400": true
+    },
+    {
+      "batch": 8,
+      "window_end": 1785891005.5786195,
+      "window_seconds": 43.038304567337036,
+      "docs_in_window": 400,
+      "batches_in_window": 8,
+      "docs_per_minute": 557.6427845211697,
+      "meets_400": true
+    },
+    {
+      "batch": 9,
+      "window_end": 1785891011.1511338,
+      "window_seconds": 48.61081886291504,
+      "docs_in_window": 450,
+      "batches_in_window": 9,
+      "docs_per_minute": 555.4319106646066,
+      "meets_400": true
+    },
+    {
+      "batch": 10,
+      "window_end": 1785891016.6556752,
+      "window_seconds": 54.115360260009766,
+      "docs_in_window": 500,
+      "batches_in_window": 10,
+      "docs_per_minute": 554.3712516346202,
+      "meets_400": true
+    },
+    {
+      "batch": 11,
+      "window_end": 1785891022.0474036,
+      "window_seconds": 59.50708866119385,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 554.5557805371208,
+      "meets_400": true
+    },
+    {
+      "batch": 12,
+      "window_end": 1785891027.7286296,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 13,
+      "window_end": 1785891033.4128923,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 14,
+      "window_end": 1785891039.031713,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 15,
+      "window_end": 1785891044.3944407,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 16,
+      "window_end": 1785891049.8400195,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 17,
+      "window_end": 1785891055.737354,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 18,
+      "window_end": 1785891061.1692688,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 19,
+      "window_end": 1785891066.6462066,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 20,
+      "window_end": 1785891072.2534444,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 21,
+      "window_end": 1785891077.6133194,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 22,
+      "window_end": 1785891083.3633678,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 23,
+      "window_end": 1785891088.9775522,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 24,
+      "window_end": 1785891094.43471,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 25,
+      "window_end": 1785891100.0824125,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 26,
+      "window_end": 1785891106.0361462,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 27,
+      "window_end": 1785891111.9350767,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 28,
+      "window_end": 1785891117.4125855,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 29,
+      "window_end": 1785891122.7893407,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 30,
+      "window_end": 1785891128.3370209,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 31,
+      "window_end": 1785891133.6852305,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 32,
+      "window_end": 1785891139.2545002,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 33,
+      "window_end": 1785891144.5171402,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 34,
+      "window_end": 1785891150.0017579,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 35,
+      "window_end": 1785891155.5679457,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 36,
+      "window_end": 1785891161.3064747,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 37,
+      "window_end": 1785891166.6466832,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 38,
+      "window_end": 1785891171.8091142,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 39,
+      "window_end": 1785891176.9208689,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 40,
+      "window_end": 1785891182.4809124,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 41,
+      "window_end": 1785891187.8736062,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 42,
+      "window_end": 1785891193.239382,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 43,
+      "window_end": 1785891198.8139565,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 44,
+      "window_end": 1785891204.0362756,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 45,
+      "window_end": 1785891209.6223762,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 46,
+      "window_end": 1785891214.75298,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 47,
+      "window_end": 1785891220.062341,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 48,
+      "window_end": 1785891225.579589,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 49,
+      "window_end": 1785891231.0140197,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 50,
+      "window_end": 1785891236.623962,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 51,
+      "window_end": 1785891242.1997547,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 52,
+      "window_end": 1785891248.1195168,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 53,
+      "window_end": 1785891253.7592623,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 54,
+      "window_end": 1785891259.533711,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 55,
+      "window_end": 1785891265.1247988,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 56,
+      "window_end": 1785891270.5457284,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 57,
+      "window_end": 1785891276.0130284,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 58,
+      "window_end": 1785891281.4617908,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 59,
+      "window_end": 1785891287.1863768,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 60,
+      "window_end": 1785891292.8951383,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 61,
+      "window_end": 1785891298.563918,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 62,
+      "window_end": 1785891303.5437655,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 63,
+      "window_end": 1785891309.437117,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 64,
+      "window_end": 1785891314.6723208,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 65,
+      "window_end": 1785891320.0542514,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 66,
+      "window_end": 1785891325.4943662,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 67,
+      "window_end": 1785891330.7254603,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 68,
+      "window_end": 1785891336.2603335,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 69,
+      "window_end": 1785891341.3015797,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 70,
+      "window_end": 1785891346.6538935,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 71,
+      "window_end": 1785891352.1732466,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 72,
+      "window_end": 1785891357.4334736,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 73,
+      "window_end": 1785891362.6654158,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 74,
+      "window_end": 1785891367.6584132,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 75,
+      "window_end": 1785891373.316612,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 76,
+      "window_end": 1785891378.8012357,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 77,
+      "window_end": 1785891384.2996871,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 78,
+      "window_end": 1785891389.7031996,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 79,
+      "window_end": 1785891395.2044086,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 80,
+      "window_end": 1785891400.4873486,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 81,
+      "window_end": 1785891405.9915154,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 82,
+      "window_end": 1785891411.129468,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 83,
+      "window_end": 1785891416.3697777,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 84,
+      "window_end": 1785891421.8723667,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 85,
+      "window_end": 1785891427.7321436,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 86,
+      "window_end": 1785891433.2579257,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 87,
+      "window_end": 1785891438.6472328,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 88,
+      "window_end": 1785891443.9730496,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 89,
+      "window_end": 1785891449.0449312,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 90,
+      "window_end": 1785891454.362184,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 91,
+      "window_end": 1785891460.101202,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 92,
+      "window_end": 1785891465.685804,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 93,
+      "window_end": 1785891471.0234897,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 94,
+      "window_end": 1785891476.5627737,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 95,
+      "window_end": 1785891481.9252915,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 96,
+      "window_end": 1785891487.3596141,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 97,
+      "window_end": 1785891492.4319787,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 98,
+      "window_end": 1785891498.045426,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 99,
+      "window_end": 1785891503.567005,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 100,
+      "window_end": 1785891508.7468941,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 101,
+      "window_end": 1785891514.2978704,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 102,
+      "window_end": 1785891519.7495677,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 103,
+      "window_end": 1785891525.114681,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 104,
+      "window_end": 1785891530.5657487,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 105,
+      "window_end": 1785891536.3037345,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 106,
+      "window_end": 1785891541.6542308,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 107,
+      "window_end": 1785891547.284085,
+      "window_seconds": 60.0,
+      "docs_in_window": 600,
+      "batches_in_window": 12,
+      "docs_per_minute": 600.0,
+      "meets_400": true
+    },
+    {
+      "batch": 108,
+      "window_end": 1785891552.9173546,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 109,
+      "window_end": 1785891558.3233001,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    },
+    {
+      "batch": 110,
+      "window_end": 1785891563.7383833,
+      "window_seconds": 60.0,
+      "docs_in_window": 550,
+      "batches_in_window": 11,
+      "docs_per_minute": 550.0,
+      "meets_400": true
+    }
+  ],
+  "worst_sliding_window_docs_per_minute": 546.2922338738721,
+  "meets_target": true
+}

@@ -1,0 +1,768 @@
+{
+  "version": "v2",
+  "queries": [
+    {
+      "query_id": "query-00",
+      "query_text": "project roadmap",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-roadmap": 3,
+        "doc-topic-00": 2,
+        "doc-api-docs": 0
+      },
+      "relevant_document_ids": [
+        "doc-roadmap",
+        "doc-topic-00"
+      ]
+    },
+    {
+      "query_id": "query-01",
+      "query_text": "API documentation",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-api-docs": 3,
+        "doc-topic-01": 2,
+        "doc-roadmap": 0
+      },
+      "relevant_document_ids": [
+        "doc-api-docs",
+        "doc-topic-01"
+      ]
+    },
+    {
+      "query_id": "query-02",
+      "query_text": "kubernetes deployment",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-02": 3,
+        "doc-partial-02": 2,
+        "doc-onboarding": 1,
+        "doc-topic-13": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-02",
+        "doc-partial-02",
+        "doc-onboarding"
+      ]
+    },
+    {
+      "query_id": "query-03",
+      "query_text": "postgres indexing",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-03": 3,
+        "doc-partial-03": 2,
+        "doc-topic-14": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-03",
+        "doc-partial-03"
+      ]
+    },
+    {
+      "query_id": "query-04",
+      "query_text": "oauth token refresh",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-04": 3,
+        "doc-partial-04": 2,
+        "doc-topic-15": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-04",
+        "doc-partial-04"
+      ]
+    },
+    {
+      "query_id": "query-05",
+      "query_text": "vector search embeddings",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-05": 3,
+        "doc-partial-05": 2,
+        "doc-onboarding": 1,
+        "doc-topic-16": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-05",
+        "doc-partial-05",
+        "doc-onboarding"
+      ]
+    },
+    {
+      "query_id": "query-06",
+      "query_text": "acl inheritance rules",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-06": 3,
+        "doc-partial-06": 2,
+        "doc-topic-17": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-06",
+        "doc-partial-06"
+      ]
+    },
+    {
+      "query_id": "query-07",
+      "query_text": "chunking strategies",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-07": 3,
+        "doc-partial-07": 2,
+        "doc-topic-18": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-07",
+        "doc-partial-07"
+      ]
+    },
+    {
+      "query_id": "query-08",
+      "query_text": "kafka consumer lag",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-08": 3,
+        "doc-partial-08": 2,
+        "doc-onboarding": 1,
+        "doc-topic-19": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-08",
+        "doc-partial-08",
+        "doc-onboarding"
+      ]
+    },
+    {
+      "query_id": "query-09",
+      "query_text": "redis caching patterns",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-09": 3,
+        "doc-partial-09": 2,
+        "doc-topic-20": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-09",
+        "doc-partial-09"
+      ]
+    },
+    {
+      "query_id": "query-10",
+      "query_text": "fastapi middleware",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-10": 3,
+        "doc-topic-21": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-10"
+      ]
+    },
+    {
+      "query_id": "query-11",
+      "query_text": "tenant isolation",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-11": 3,
+        "doc-topic-22": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-11"
+      ]
+    },
+    {
+      "query_id": "query-12",
+      "query_text": "observability dashboards",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-12": 3,
+        "doc-onboarding": 1,
+        "doc-topic-23": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-12",
+        "doc-onboarding"
+      ]
+    },
+    {
+      "query_id": "query-13",
+      "query_text": "backup restore drills",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-13": 3,
+        "doc-topic-24": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-13"
+      ]
+    },
+    {
+      "query_id": "query-14",
+      "query_text": "encryption at rest",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-14": 3,
+        "doc-topic-25": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-14"
+      ]
+    },
+    {
+      "query_id": "query-15",
+      "query_text": "scim user provisioning",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-15": 3,
+        "doc-topic-26": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-15"
+      ]
+    },
+    {
+      "query_id": "query-16",
+      "query_text": "gmail connector crawl",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-16": 3,
+        "doc-topic-27": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-16"
+      ]
+    },
+    {
+      "query_id": "query-17",
+      "query_text": "drive delta sync",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-17": 3,
+        "doc-topic-28": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-17"
+      ]
+    },
+    {
+      "query_id": "query-18",
+      "query_text": "bm25 ranking tuning",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-18": 3,
+        "doc-topic-29": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-18"
+      ]
+    },
+    {
+      "query_id": "query-19",
+      "query_text": "query latency budgets",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-19": 3,
+        "doc-topic-00": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-19"
+      ]
+    },
+    {
+      "query_id": "query-20",
+      "query_text": "tokenizer normalization",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-20": 3,
+        "doc-topic-01": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-20"
+      ]
+    },
+    {
+      "query_id": "query-21",
+      "query_text": "celery task retries",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-21": 3,
+        "doc-topic-02": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-21"
+      ]
+    },
+    {
+      "query_id": "query-22",
+      "query_text": "alembic migrations",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-22": 3,
+        "doc-topic-03": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-22"
+      ]
+    },
+    {
+      "query_id": "query-23",
+      "query_text": "opensearch facets",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-23": 3,
+        "doc-topic-04": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-23"
+      ]
+    },
+    {
+      "query_id": "query-24",
+      "query_text": "jwt scope enforcement",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-24": 3,
+        "doc-topic-05": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-24"
+      ]
+    },
+    {
+      "query_id": "query-25",
+      "query_text": "rbac group expansion",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-25": 3,
+        "doc-topic-06": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-25"
+      ]
+    },
+    {
+      "query_id": "query-26",
+      "query_text": "snippet highlighting",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-26": 3,
+        "doc-topic-07": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-26"
+      ]
+    },
+    {
+      "query_id": "query-27",
+      "query_text": "federator hybrid merge",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-27": 3,
+        "doc-topic-08": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-27"
+      ]
+    },
+    {
+      "query_id": "query-28",
+      "query_text": "canonical document hash",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-28": 3,
+        "doc-topic-09": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-28"
+      ]
+    },
+    {
+      "query_id": "query-29",
+      "query_text": "knowledge graph edges",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "relevance_grades": {
+        "doc-topic-29": 3,
+        "doc-topic-10": 0
+      },
+      "relevant_document_ids": [
+        "doc-topic-29"
+      ]
+    }
+  ],
+  "labels": [
+    {
+      "query_id": "query-00",
+      "query": "project roadmap",
+      "document_id": "doc-roadmap",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-00",
+      "query": "project roadmap",
+      "document_id": "doc-topic-00",
+      "relevance": 2,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-01",
+      "query": "API documentation",
+      "document_id": "doc-api-docs",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-01",
+      "query": "API documentation",
+      "document_id": "doc-topic-01",
+      "relevance": 2,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-02",
+      "query": "kubernetes deployment",
+      "document_id": "doc-topic-02",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-02",
+      "query": "kubernetes deployment",
+      "document_id": "doc-partial-02",
+      "relevance": 2,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-02",
+      "query": "kubernetes deployment",
+      "document_id": "doc-onboarding",
+      "relevance": 1,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-03",
+      "query": "postgres indexing",
+      "document_id": "doc-topic-03",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-03",
+      "query": "postgres indexing",
+      "document_id": "doc-partial-03",
+      "relevance": 2,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-04",
+      "query": "oauth token refresh",
+      "document_id": "doc-topic-04",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-04",
+      "query": "oauth token refresh",
+      "document_id": "doc-partial-04",
+      "relevance": 2,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-05",
+      "query": "vector search embeddings",
+      "document_id": "doc-topic-05",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-05",
+      "query": "vector search embeddings",
+      "document_id": "doc-partial-05",
+      "relevance": 2,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-05",
+      "query": "vector search embeddings",
+      "document_id": "doc-onboarding",
+      "relevance": 1,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-06",
+      "query": "acl inheritance rules",
+      "document_id": "doc-topic-06",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-06",
+      "query": "acl inheritance rules",
+      "document_id": "doc-partial-06",
+      "relevance": 2,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-07",
+      "query": "chunking strategies",
+      "document_id": "doc-topic-07",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-07",
+      "query": "chunking strategies",
+      "document_id": "doc-partial-07",
+      "relevance": 2,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-08",
+      "query": "kafka consumer lag",
+      "document_id": "doc-topic-08",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-08",
+      "query": "kafka consumer lag",
+      "document_id": "doc-partial-08",
+      "relevance": 2,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-08",
+      "query": "kafka consumer lag",
+      "document_id": "doc-onboarding",
+      "relevance": 1,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-09",
+      "query": "redis caching patterns",
+      "document_id": "doc-topic-09",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-09",
+      "query": "redis caching patterns",
+      "document_id": "doc-partial-09",
+      "relevance": 2,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-10",
+      "query": "fastapi middleware",
+      "document_id": "doc-topic-10",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-11",
+      "query": "tenant isolation",
+      "document_id": "doc-topic-11",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-12",
+      "query": "observability dashboards",
+      "document_id": "doc-topic-12",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-12",
+      "query": "observability dashboards",
+      "document_id": "doc-onboarding",
+      "relevance": 1,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-13",
+      "query": "backup restore drills",
+      "document_id": "doc-topic-13",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-14",
+      "query": "encryption at rest",
+      "document_id": "doc-topic-14",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-15",
+      "query": "scim user provisioning",
+      "document_id": "doc-topic-15",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-16",
+      "query": "gmail connector crawl",
+      "document_id": "doc-topic-16",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-17",
+      "query": "drive delta sync",
+      "document_id": "doc-topic-17",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-18",
+      "query": "bm25 ranking tuning",
+      "document_id": "doc-topic-18",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-19",
+      "query": "query latency budgets",
+      "document_id": "doc-topic-19",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-20",
+      "query": "tokenizer normalization",
+      "document_id": "doc-topic-20",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-21",
+      "query": "celery task retries",
+      "document_id": "doc-topic-21",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-22",
+      "query": "alembic migrations",
+      "document_id": "doc-topic-22",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-23",
+      "query": "opensearch facets",
+      "document_id": "doc-topic-23",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-24",
+      "query": "jwt scope enforcement",
+      "document_id": "doc-topic-24",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-25",
+      "query": "rbac group expansion",
+      "document_id": "doc-topic-25",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-26",
+      "query": "snippet highlighting",
+      "document_id": "doc-topic-26",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-27",
+      "query": "federator hybrid merge",
+      "document_id": "doc-topic-27",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-28",
+      "query": "canonical document hash",
+      "document_id": "doc-topic-28",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-29",
+      "query": "knowledge graph edges",
+      "document_id": "doc-topic-29",
+      "relevance": 3,
+      "tenant_id": "tenant-a"
+    },
+    {
+      "query_id": "query-00",
+      "query": "project roadmap",
+      "document_id": "doc-security",
+      "relevance": 0,
+      "tenant_id": "tenant-b"
+    },
+    {
+      "query_id": "query-01",
+      "query": "API documentation",
+      "document_id": "doc-security",
+      "relevance": 0,
+      "tenant_id": "tenant-b"
+    },
+    {
+      "query_id": "query-02",
+      "query": "kubernetes deployment",
+      "document_id": "doc-security",
+      "relevance": 0,
+      "tenant_id": "tenant-b"
+    },
+    {
+      "query_id": "query-03",
+      "query": "postgres indexing",
+      "document_id": "doc-security",
+      "relevance": 0,
+      "tenant_id": "tenant-b"
+    },
+    {
+      "query_id": "query-04",
+      "query": "oauth token refresh",
+      "document_id": "doc-security",
+      "relevance": 0,
+      "tenant_id": "tenant-b"
+    }
+  ]
+}

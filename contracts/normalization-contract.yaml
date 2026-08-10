@@ -1,0 +1,23 @@
+openapi: '3.0.0'
+info:
+  title: normalization contract
+  version: '1.0.0'
+paths:
+  /identity/resolve:
+    post:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+  /normalize:
+    post:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object

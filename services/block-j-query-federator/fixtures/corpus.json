@@ -1,0 +1,1850 @@
+{
+  "version": "1.0",
+  "fixture_provenance": "block-j-local (Block Z shared package absent; schema matches master prompt)",
+  "documents": [
+    {
+      "document_id": "doc-public-00",
+      "tenant_id": "tenant_j_test",
+      "title": "Kubernetes guide",
+      "body_text": "How does kubernetes work? This document explains kubernetes in depth. getUserInfo kubernetes reference for engineers. Operational runbook covering kubernetes best practices and failure modes.",
+      "snippet": "How does kubernetes work? This document explains kubernetes in depth. getUserInfo kubernetes reference for engineers. Operational runbook covering kubernetes best practices and failure modes.",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "kubernetes",
+        "eng"
+      ],
+      "lexical_base_score": 12.0,
+      "vector_base_score": 0.92,
+      "graph_boost": 0.15
+    },
+    {
+      "document_id": "doc-public-01",
+      "tenant_id": "tenant_j_test",
+      "title": "Postgres guide",
+      "body_text": "How does postgres work? This document explains postgres in depth. getUserInfo postgres reference for engineers. Operational runbook covering postgres best practices and failure modes.",
+      "snippet": "How does postgres work? This document explains postgres in depth. getUserInfo postgres reference for engineers. Operational runbook covering postgres best practices and failure modes.",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "postgres",
+        "eng"
+      ],
+      "lexical_base_score": 11.7,
+      "vector_base_score": 0.9,
+      "graph_boost": 0.05
+    },
+    {
+      "document_id": "doc-public-02",
+      "tenant_id": "tenant_j_test",
+      "title": "Oauth guide",
+      "body_text": "How does oauth work? This document explains oauth in depth. getUserInfo oauth reference for engineers. Operational runbook covering oauth best practices and failure modes.",
+      "snippet": "How does oauth work? This document explains oauth in depth. getUserInfo oauth reference for engineers. Operational runbook covering oauth best practices and failure modes.",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "oauth",
+        "eng"
+      ],
+      "lexical_base_score": 11.4,
+      "vector_base_score": 0.88,
+      "graph_boost": 0.05
+    },
+    {
+      "document_id": "doc-public-03",
+      "tenant_id": "tenant_j_test",
+      "title": "Kafka guide",
+      "body_text": "How does kafka work? This document explains kafka in depth. getUserInfo kafka reference for engineers. Operational runbook covering kafka best practices and failure modes.",
+      "snippet": "How does kafka work? This document explains kafka in depth. getUserInfo kafka reference for engineers. Operational runbook covering kafka best practices and failure modes.",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "kafka",
+        "eng"
+      ],
+      "lexical_base_score": 11.1,
+      "vector_base_score": 0.8600000000000001,
+      "graph_boost": 0.15
+    },
+    {
+      "document_id": "doc-public-04",
+      "tenant_id": "tenant_j_test",
+      "title": "Redis guide",
+      "body_text": "How does redis work? This document explains redis in depth. getUserInfo redis reference for engineers. Operational runbook covering redis best practices and failure modes.",
+      "snippet": "How does redis work? This document explains redis in depth. getUserInfo redis reference for engineers. Operational runbook covering redis best practices and failure modes.",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "redis",
+        "eng"
+      ],
+      "lexical_base_score": 10.8,
+      "vector_base_score": 0.8400000000000001,
+      "graph_boost": 0.05
+    },
+    {
+      "document_id": "doc-public-05",
+      "tenant_id": "tenant_j_test",
+      "title": "Graphql guide",
+      "body_text": "How does graphql work? This document explains graphql in depth. getUserInfo graphql reference for engineers. Operational runbook covering graphql best practices and failure modes.",
+      "snippet": "How does graphql work? This document explains graphql in depth. getUserInfo graphql reference for engineers. Operational runbook covering graphql best practices and failure modes.",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "graphql",
+        "eng"
+      ],
+      "lexical_base_score": 12.0,
+      "vector_base_score": 0.8200000000000001,
+      "graph_boost": 0.05
+    },
+    {
+      "document_id": "doc-public-06",
+      "tenant_id": "tenant_j_test",
+      "title": "Terraform guide",
+      "body_text": "How does terraform work? This document explains terraform in depth. getUserInfo terraform reference for engineers. Operational runbook covering terraform best practices and failure modes.",
+      "snippet": "How does terraform work? This document explains terraform in depth. getUserInfo terraform reference for engineers. Operational runbook covering terraform best practices and failure modes.",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "terraform",
+        "eng"
+      ],
+      "lexical_base_score": 11.7,
+      "vector_base_score": 0.8,
+      "graph_boost": 0.15
+    },
+    {
+      "document_id": "doc-public-07",
+      "tenant_id": "tenant_j_test",
+      "title": "Prometheus guide",
+      "body_text": "How does prometheus work? This document explains prometheus in depth. getUserInfo prometheus reference for engineers. Operational runbook covering prometheus best practices and failure modes.",
+      "snippet": "How does prometheus work? This document explains prometheus in depth. getUserInfo prometheus reference for engineers. Operational runbook covering prometheus best practices and failure modes.",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "prometheus",
+        "eng"
+      ],
+      "lexical_base_score": 11.4,
+      "vector_base_score": 0.92,
+      "graph_boost": 0.05
+    },
+    {
+      "document_id": "doc-public-08",
+      "tenant_id": "tenant_j_test",
+      "title": "Elasticsearch guide",
+      "body_text": "How does elasticsearch work? This document explains elasticsearch in depth. getUserInfo elasticsearch reference for engineers. Operational runbook covering elasticsearch best practices and failure modes.",
+      "snippet": "How does elasticsearch work? This document explains elasticsearch in depth. getUserInfo elasticsearch reference for engineers. Operational runbook covering elasticsearch best practices and failure mod",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "elasticsearch",
+        "eng"
+      ],
+      "lexical_base_score": 11.1,
+      "vector_base_score": 0.9,
+      "graph_boost": 0.05
+    },
+    {
+      "document_id": "doc-public-09",
+      "tenant_id": "tenant_j_test",
+      "title": "Docker guide",
+      "body_text": "How does docker work? This document explains docker in depth. getUserInfo docker reference for engineers. Operational runbook covering docker best practices and failure modes.",
+      "snippet": "How does docker work? This document explains docker in depth. getUserInfo docker reference for engineers. Operational runbook covering docker best practices and failure modes.",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "docker",
+        "eng"
+      ],
+      "lexical_base_score": 10.8,
+      "vector_base_score": 0.88,
+      "graph_boost": 0.15
+    },
+    {
+      "document_id": "doc-public-10",
+      "tenant_id": "tenant_j_test",
+      "title": "Grpc guide",
+      "body_text": "How does grpc work? This document explains grpc in depth. getUserInfo grpc reference for engineers. Operational runbook covering grpc best practices and failure modes.",
+      "snippet": "How does grpc work? This document explains grpc in depth. getUserInfo grpc reference for engineers. Operational runbook covering grpc best practices and failure modes.",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "grpc",
+        "eng"
+      ],
+      "lexical_base_score": 12.0,
+      "vector_base_score": 0.8600000000000001,
+      "graph_boost": 0.05
+    },
+    {
+      "document_id": "doc-public-11",
+      "tenant_id": "tenant_j_test",
+      "title": "S3 guide",
+      "body_text": "How does s3 work? This document explains s3 in depth. getUserInfo s3 reference for engineers. Operational runbook covering s3 best practices and failure modes.",
+      "snippet": "How does s3 work? This document explains s3 in depth. getUserInfo s3 reference for engineers. Operational runbook covering s3 best practices and failure modes.",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "s3",
+        "eng"
+      ],
+      "lexical_base_score": 11.7,
+      "vector_base_score": 0.8400000000000001,
+      "graph_boost": 0.05
+    },
+    {
+      "document_id": "doc-public-12",
+      "tenant_id": "tenant_j_test",
+      "title": "Iam guide",
+      "body_text": "How does iam work? This document explains iam in depth. getUserInfo iam reference for engineers. Operational runbook covering iam best practices and failure modes.",
+      "snippet": "How does iam work? This document explains iam in depth. getUserInfo iam reference for engineers. Operational runbook covering iam best practices and failure modes.",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "iam",
+        "eng"
+      ],
+      "lexical_base_score": 11.4,
+      "vector_base_score": 0.8200000000000001,
+      "graph_boost": 0.15
+    },
+    {
+      "document_id": "doc-public-13",
+      "tenant_id": "tenant_j_test",
+      "title": "Cicd guide",
+      "body_text": "How does cicd work? This document explains cicd in depth. getUserInfo cicd reference for engineers. Operational runbook covering cicd best practices and failure modes.",
+      "snippet": "How does cicd work? This document explains cicd in depth. getUserInfo cicd reference for engineers. Operational runbook covering cicd best practices and failure modes.",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "cicd",
+        "eng"
+      ],
+      "lexical_base_score": 11.1,
+      "vector_base_score": 0.8,
+      "graph_boost": 0.05
+    },
+    {
+      "document_id": "doc-public-14",
+      "tenant_id": "tenant_j_test",
+      "title": "Feature Flags guide",
+      "body_text": "How does feature flags work? This document explains feature flags in depth. getUserInfo feature flags reference for engineers. Operational runbook covering feature flags best practices and failure modes.",
+      "snippet": "How does feature flags work? This document explains feature flags in depth. getUserInfo feature flags reference for engineers. Operational runbook covering feature flags best practices and failure mod",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "feature",
+        "eng"
+      ],
+      "lexical_base_score": 10.8,
+      "vector_base_score": 0.92,
+      "graph_boost": 0.05
+    },
+    {
+      "document_id": "doc-public-15",
+      "tenant_id": "tenant_j_test",
+      "title": "Rate Limiting guide",
+      "body_text": "How does rate limiting work? This document explains rate limiting in depth. getUserInfo rate limiting reference for engineers. Operational runbook covering rate limiting best practices and failure modes.",
+      "snippet": "How does rate limiting work? This document explains rate limiting in depth. getUserInfo rate limiting reference for engineers. Operational runbook covering rate limiting best practices and failure mod",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "rate",
+        "eng"
+      ],
+      "lexical_base_score": 12.0,
+      "vector_base_score": 0.9,
+      "graph_boost": 0.15
+    },
+    {
+      "document_id": "doc-public-16",
+      "tenant_id": "tenant_j_test",
+      "title": "Circuit Breaker guide",
+      "body_text": "How does circuit breaker work? This document explains circuit breaker in depth. getUserInfo circuit breaker reference for engineers. Operational runbook covering circuit breaker best practices and failure modes.",
+      "snippet": "How does circuit breaker work? This document explains circuit breaker in depth. getUserInfo circuit breaker reference for engineers. Operational runbook covering circuit breaker best practices and fai",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "circuit",
+        "eng"
+      ],
+      "lexical_base_score": 11.7,
+      "vector_base_score": 0.88,
+      "graph_boost": 0.05
+    },
+    {
+      "document_id": "doc-public-17",
+      "tenant_id": "tenant_j_test",
+      "title": "Saga Pattern guide",
+      "body_text": "How does saga pattern work? This document explains saga pattern in depth. getUserInfo saga pattern reference for engineers. Operational runbook covering saga pattern best practices and failure modes.",
+      "snippet": "How does saga pattern work? This document explains saga pattern in depth. getUserInfo saga pattern reference for engineers. Operational runbook covering saga pattern best practices and failure modes.",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "saga",
+        "eng"
+      ],
+      "lexical_base_score": 11.4,
+      "vector_base_score": 0.8600000000000001,
+      "graph_boost": 0.05
+    },
+    {
+      "document_id": "doc-public-18",
+      "tenant_id": "tenant_j_test",
+      "title": "Event Sourcing guide",
+      "body_text": "How does event sourcing work? This document explains event sourcing in depth. getUserInfo event sourcing reference for engineers. Operational runbook covering event sourcing best practices and failure modes.",
+      "snippet": "How does event sourcing work? This document explains event sourcing in depth. getUserInfo event sourcing reference for engineers. Operational runbook covering event sourcing best practices and failure",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "event",
+        "eng"
+      ],
+      "lexical_base_score": 11.1,
+      "vector_base_score": 0.8400000000000001,
+      "graph_boost": 0.15
+    },
+    {
+      "document_id": "doc-public-19",
+      "tenant_id": "tenant_j_test",
+      "title": "Vector Search guide",
+      "body_text": "How does vector search work? This document explains vector search in depth. getUserInfo vector search reference for engineers. Operational runbook covering vector search best practices and failure modes.",
+      "snippet": "How does vector search work? This document explains vector search in depth. getUserInfo vector search reference for engineers. Operational runbook covering vector search best practices and failure mod",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "vector",
+        "eng"
+      ],
+      "lexical_base_score": 10.8,
+      "vector_base_score": 0.8200000000000001,
+      "graph_boost": 0.05
+    },
+    {
+      "document_id": "doc-public-20",
+      "tenant_id": "tenant_j_test",
+      "title": "Bm25 Ranking guide",
+      "body_text": "How does bm25 ranking work? This document explains bm25 ranking in depth. getUserInfo bm25 ranking reference for engineers. Operational runbook covering bm25 ranking best practices and failure modes.",
+      "snippet": "How does bm25 ranking work? This document explains bm25 ranking in depth. getUserInfo bm25 ranking reference for engineers. Operational runbook covering bm25 ranking best practices and failure modes.",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "bm25",
+        "eng"
+      ],
+      "lexical_base_score": 12.0,
+      "vector_base_score": 0.8,
+      "graph_boost": 0.05
+    },
+    {
+      "document_id": "doc-public-21",
+      "tenant_id": "tenant_j_test",
+      "title": "Acl Inheritance guide",
+      "body_text": "How does acl inheritance work? This document explains acl inheritance in depth. getUserInfo acl inheritance reference for engineers. Operational runbook covering acl inheritance best practices and failure modes.",
+      "snippet": "How does acl inheritance work? This document explains acl inheritance in depth. getUserInfo acl inheritance reference for engineers. Operational runbook covering acl inheritance best practices and fai",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "acl",
+        "eng"
+      ],
+      "lexical_base_score": 11.7,
+      "vector_base_score": 0.92,
+      "graph_boost": 0.15
+    },
+    {
+      "document_id": "doc-public-22",
+      "tenant_id": "tenant_j_test",
+      "title": "Tenant Isolation guide",
+      "body_text": "How does tenant isolation work? This document explains tenant isolation in depth. getUserInfo tenant isolation reference for engineers. Operational runbook covering tenant isolation best practices and failure modes.",
+      "snippet": "How does tenant isolation work? This document explains tenant isolation in depth. getUserInfo tenant isolation reference for engineers. Operational runbook covering tenant isolation best practices and",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "tenant",
+        "eng"
+      ],
+      "lexical_base_score": 11.4,
+      "vector_base_score": 0.9,
+      "graph_boost": 0.05
+    },
+    {
+      "document_id": "doc-public-23",
+      "tenant_id": "tenant_j_test",
+      "title": "Jwt Auth guide",
+      "body_text": "How does jwt auth work? This document explains jwt auth in depth. getUserInfo jwt auth reference for engineers. Operational runbook covering jwt auth best practices and failure modes.",
+      "snippet": "How does jwt auth work? This document explains jwt auth in depth. getUserInfo jwt auth reference for engineers. Operational runbook covering jwt auth best practices and failure modes.",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "jwt",
+        "eng"
+      ],
+      "lexical_base_score": 11.1,
+      "vector_base_score": 0.88,
+      "graph_boost": 0.05
+    },
+    {
+      "document_id": "doc-public-24",
+      "tenant_id": "tenant_j_test",
+      "title": "Scim Sync guide",
+      "body_text": "How does scim sync work? This document explains scim sync in depth. getUserInfo scim sync reference for engineers. Operational runbook covering scim sync best practices and failure modes.",
+      "snippet": "How does scim sync work? This document explains scim sync in depth. getUserInfo scim sync reference for engineers. Operational runbook covering scim sync best practices and failure modes.",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "scim",
+        "eng"
+      ],
+      "lexical_base_score": 10.8,
+      "vector_base_score": 0.8600000000000001,
+      "graph_boost": 0.15
+    },
+    {
+      "document_id": "doc-public-25",
+      "tenant_id": "tenant_j_test",
+      "title": "Webhook Delivery guide",
+      "body_text": "How does webhook delivery work? This document explains webhook delivery in depth. getUserInfo webhook delivery reference for engineers. Operational runbook covering webhook delivery best practices and failure modes.",
+      "snippet": "How does webhook delivery work? This document explains webhook delivery in depth. getUserInfo webhook delivery reference for engineers. Operational runbook covering webhook delivery best practices and",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "webhook",
+        "eng"
+      ],
+      "lexical_base_score": 12.0,
+      "vector_base_score": 0.8400000000000001,
+      "graph_boost": 0.05
+    },
+    {
+      "document_id": "doc-public-26",
+      "tenant_id": "tenant_j_test",
+      "title": "Chunk Embeddings guide",
+      "body_text": "How does chunk embeddings work? This document explains chunk embeddings in depth. getUserInfo chunk embeddings reference for engineers. Operational runbook covering chunk embeddings best practices and failure modes.",
+      "snippet": "How does chunk embeddings work? This document explains chunk embeddings in depth. getUserInfo chunk embeddings reference for engineers. Operational runbook covering chunk embeddings best practices and",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "chunk",
+        "eng"
+      ],
+      "lexical_base_score": 11.7,
+      "vector_base_score": 0.8200000000000001,
+      "graph_boost": 0.05
+    },
+    {
+      "document_id": "doc-public-27",
+      "tenant_id": "tenant_j_test",
+      "title": "Knowledge Graph guide",
+      "body_text": "How does knowledge graph work? This document explains knowledge graph in depth. getUserInfo knowledge graph reference for engineers. Operational runbook covering knowledge graph best practices and failure modes.",
+      "snippet": "How does knowledge graph work? This document explains knowledge graph in depth. getUserInfo knowledge graph reference for engineers. Operational runbook covering knowledge graph best practices and fai",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "knowledge",
+        "eng"
+      ],
+      "lexical_base_score": 11.4,
+      "vector_base_score": 0.8,
+      "graph_boost": 0.15
+    },
+    {
+      "document_id": "doc-public-28",
+      "tenant_id": "tenant_j_test",
+      "title": "Snippet Generation guide",
+      "body_text": "How does snippet generation work? This document explains snippet generation in depth. getUserInfo snippet generation reference for engineers. Operational runbook covering snippet generation best practices and failure modes.",
+      "snippet": "How does snippet generation work? This document explains snippet generation in depth. getUserInfo snippet generation reference for engineers. Operational runbook covering snippet generation best pract",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "snippet",
+        "eng"
+      ],
+      "lexical_base_score": 11.1,
+      "vector_base_score": 0.92,
+      "graph_boost": 0.05
+    },
+    {
+      "document_id": "doc-public-29",
+      "tenant_id": "tenant_j_test",
+      "title": "Hybrid Retrieval guide",
+      "body_text": "How does hybrid retrieval work? This document explains hybrid retrieval in depth. getUserInfo hybrid retrieval reference for engineers. Operational runbook covering hybrid retrieval best practices and failure modes.",
+      "snippet": "How does hybrid retrieval work? This document explains hybrid retrieval in depth. getUserInfo hybrid retrieval reference for engineers. Operational runbook covering hybrid retrieval best practices and",
+      "object_type": "doc",
+      "source": "wiki",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "tags": [
+        "hybrid",
+        "eng"
+      ],
+      "lexical_base_score": 10.8,
+      "vector_base_score": 0.9,
+      "graph_boost": 0.05
+    },
+    {
+      "document_id": "doc-restricted-cross-tenant",
+      "tenant_id": "tenant_other",
+      "title": "confidential M&A deal sheet",
+      "body_text": "confidential M&A deal sheet. Restricted content that eng users must never see in search.",
+      "snippet": "confidential M&A deal sheet. Restricted content that eng users must never see in search.",
+      "object_type": "doc",
+      "source": "drive",
+      "owner": "user:exec",
+      "acl_filter_terms": [
+        "group:legal",
+        "group:exec",
+        "user:exec"
+      ],
+      "tags": [
+        "restricted",
+        "confidential"
+      ],
+      "lexical_base_score": 20.0,
+      "vector_base_score": 0.99,
+      "graph_boost": 0.5,
+      "restricted": true
+    },
+    {
+      "document_id": "doc-restricted-no-access",
+      "tenant_id": "tenant_j_test",
+      "title": "executive compensation confidential",
+      "body_text": "executive compensation confidential. Restricted content that eng users must never see in search.",
+      "snippet": "executive compensation confidential. Restricted content that eng users must never see in search.",
+      "object_type": "doc",
+      "source": "drive",
+      "owner": "user:exec",
+      "acl_filter_terms": [
+        "group:legal",
+        "group:exec",
+        "user:exec"
+      ],
+      "tags": [
+        "restricted",
+        "confidential"
+      ],
+      "lexical_base_score": 20.0,
+      "vector_base_score": 0.99,
+      "graph_boost": 0.5,
+      "restricted": true
+    },
+    {
+      "document_id": "doc-restricted-group-changed",
+      "tenant_id": "tenant_j_test",
+      "title": "legal hold privileged memo",
+      "body_text": "legal hold privileged memo. Restricted content that eng users must never see in search.",
+      "snippet": "legal hold privileged memo. Restricted content that eng users must never see in search.",
+      "object_type": "doc",
+      "source": "drive",
+      "owner": "user:exec",
+      "acl_filter_terms": [
+        "group:legal",
+        "group:exec",
+        "user:exec"
+      ],
+      "tags": [
+        "restricted",
+        "confidential"
+      ],
+      "lexical_base_score": 20.0,
+      "vector_base_score": 0.99,
+      "graph_boost": 0.5,
+      "restricted": true
+    },
+    {
+      "document_id": "doc-restricted-container-inherit",
+      "tenant_id": "tenant_j_test",
+      "title": "board minutes confidential",
+      "body_text": "board minutes confidential. Restricted content that eng users must never see in search.",
+      "snippet": "board minutes confidential. Restricted content that eng users must never see in search.",
+      "object_type": "doc",
+      "source": "drive",
+      "owner": "user:exec",
+      "acl_filter_terms": [
+        "group:legal",
+        "group:exec",
+        "user:exec"
+      ],
+      "tags": [
+        "restricted",
+        "confidential"
+      ],
+      "lexical_base_score": 20.0,
+      "vector_base_score": 0.99,
+      "graph_boost": 0.5,
+      "restricted": true
+    },
+    {
+      "document_id": "doc-restricted-deny-override",
+      "tenant_id": "tenant_j_test",
+      "title": "payroll secrets spreadsheet",
+      "body_text": "payroll secrets spreadsheet. Restricted content that eng users must never see in search.",
+      "snippet": "payroll secrets spreadsheet. Restricted content that eng users must never see in search.",
+      "object_type": "doc",
+      "source": "drive",
+      "owner": "user:exec",
+      "acl_filter_terms": [
+        "group:legal",
+        "group:exec",
+        "user:exec"
+      ],
+      "tags": [
+        "restricted",
+        "confidential"
+      ],
+      "lexical_base_score": 20.0,
+      "vector_base_score": 0.99,
+      "graph_boost": 0.5,
+      "restricted": true
+    },
+    {
+      "document_id": "doc-restricted-auth-required",
+      "tenant_id": "tenant_j_test",
+      "title": "SSO breakglass credentials",
+      "body_text": "SSO breakglass credentials. Restricted content that eng users must never see in search.",
+      "snippet": "SSO breakglass credentials. Restricted content that eng users must never see in search.",
+      "object_type": "doc",
+      "source": "drive",
+      "owner": "user:exec",
+      "acl_filter_terms": [
+        "group:legal",
+        "group:exec",
+        "user:exec"
+      ],
+      "tags": [
+        "restricted",
+        "confidential"
+      ],
+      "lexical_base_score": 20.0,
+      "vector_base_score": 0.99,
+      "graph_boost": 0.5,
+      "restricted": true
+    },
+    {
+      "document_id": "doc-restricted-scope",
+      "tenant_id": "tenant_j_test",
+      "title": "security audit findings restricted",
+      "body_text": "security audit findings restricted. Restricted content that eng users must never see in search.",
+      "snippet": "security audit findings restricted. Restricted content that eng users must never see in search.",
+      "object_type": "doc",
+      "source": "drive",
+      "owner": "user:exec",
+      "acl_filter_terms": [
+        "group:legal",
+        "group:exec",
+        "user:exec"
+      ],
+      "tags": [
+        "restricted",
+        "confidential"
+      ],
+      "lexical_base_score": 20.0,
+      "vector_base_score": 0.99,
+      "graph_boost": 0.5,
+      "restricted": true
+    },
+    {
+      "document_id": "doc-restricted-deleted",
+      "tenant_id": "tenant_j_test",
+      "title": "deleted secret incident report",
+      "body_text": "deleted secret incident report. Restricted content that eng users must never see in search.",
+      "snippet": "deleted secret incident report. Restricted content that eng users must never see in search.",
+      "object_type": "doc",
+      "source": "drive",
+      "owner": "user:exec",
+      "acl_filter_terms": [
+        "group:legal",
+        "group:exec",
+        "user:exec"
+      ],
+      "tags": [
+        "restricted",
+        "confidential"
+      ],
+      "lexical_base_score": 20.0,
+      "vector_base_score": 0.99,
+      "graph_boost": 0.5,
+      "restricted": true
+    },
+    {
+      "document_id": "doc-restricted-unshared",
+      "tenant_id": "tenant_j_test",
+      "title": "unshared private notebook",
+      "body_text": "unshared private notebook. Restricted content that eng users must never see in search.",
+      "snippet": "unshared private notebook. Restricted content that eng users must never see in search.",
+      "object_type": "doc",
+      "source": "drive",
+      "owner": "user:exec",
+      "acl_filter_terms": [
+        "group:legal",
+        "group:exec",
+        "user:exec"
+      ],
+      "tags": [
+        "restricted",
+        "confidential"
+      ],
+      "lexical_base_score": 20.0,
+      "vector_base_score": 0.99,
+      "graph_boost": 0.5,
+      "restricted": true
+    },
+    {
+      "document_id": "doc-restricted-container",
+      "tenant_id": "tenant_j_test",
+      "title": "HR folder performance reviews",
+      "body_text": "HR folder performance reviews. Restricted content that eng users must never see in search.",
+      "snippet": "HR folder performance reviews. Restricted content that eng users must never see in search.",
+      "object_type": "doc",
+      "source": "drive",
+      "owner": "user:exec",
+      "acl_filter_terms": [
+        "group:legal",
+        "group:exec",
+        "user:exec"
+      ],
+      "tags": [
+        "restricted",
+        "confidential"
+      ],
+      "lexical_base_score": 20.0,
+      "vector_base_score": 0.99,
+      "graph_boost": 0.5,
+      "restricted": true
+    },
+    {
+      "document_id": "doc-restricted-removed-group",
+      "tenant_id": "tenant_j_test",
+      "title": "former group exclusive notes",
+      "body_text": "former group exclusive notes. Restricted content that eng users must never see in search.",
+      "snippet": "former group exclusive notes. Restricted content that eng users must never see in search.",
+      "object_type": "doc",
+      "source": "drive",
+      "owner": "user:exec",
+      "acl_filter_terms": [
+        "group:legal",
+        "group:exec",
+        "user:exec"
+      ],
+      "tags": [
+        "restricted",
+        "confidential"
+      ],
+      "lexical_base_score": 20.0,
+      "vector_base_score": 0.99,
+      "graph_boost": 0.5,
+      "restricted": true
+    },
+    {
+      "document_id": "doc-parent-denied-child",
+      "tenant_id": "tenant_j_test",
+      "title": "parent denied child visible trap",
+      "body_text": "parent denied child visible trap. Restricted content that eng users must never see in search.",
+      "snippet": "parent denied child visible trap. Restricted content that eng users must never see in search.",
+      "object_type": "doc",
+      "source": "drive",
+      "owner": "user:exec",
+      "acl_filter_terms": [
+        "group:legal",
+        "group:exec",
+        "user:exec"
+      ],
+      "tags": [
+        "restricted",
+        "confidential"
+      ],
+      "lexical_base_score": 20.0,
+      "vector_base_score": 0.99,
+      "graph_boost": 0.5,
+      "restricted": true
+    },
+    {
+      "document_id": "doc-child-denied-parent",
+      "tenant_id": "tenant_j_test",
+      "title": "child denied parent visible trap",
+      "body_text": "child denied parent visible trap. Restricted content that eng users must never see in search.",
+      "snippet": "child denied parent visible trap. Restricted content that eng users must never see in search.",
+      "object_type": "doc",
+      "source": "drive",
+      "owner": "user:exec",
+      "acl_filter_terms": [
+        "group:legal",
+        "group:exec",
+        "user:exec"
+      ],
+      "tags": [
+        "restricted",
+        "confidential"
+      ],
+      "lexical_base_score": 20.0,
+      "vector_base_score": 0.99,
+      "graph_boost": 0.5,
+      "restricted": true
+    },
+    {
+      "document_id": "doc-restricted-exec-only",
+      "tenant_id": "tenant_j_test",
+      "title": "CEO strategy confidential",
+      "body_text": "CEO strategy confidential. Restricted content that eng users must never see in search.",
+      "snippet": "CEO strategy confidential. Restricted content that eng users must never see in search.",
+      "object_type": "doc",
+      "source": "drive",
+      "owner": "user:exec",
+      "acl_filter_terms": [
+        "group:legal",
+        "group:exec",
+        "user:exec"
+      ],
+      "tags": [
+        "restricted",
+        "confidential"
+      ],
+      "lexical_base_score": 20.0,
+      "vector_base_score": 0.99,
+      "graph_boost": 0.5,
+      "restricted": true
+    },
+    {
+      "document_id": "doc-restricted-legal-only",
+      "tenant_id": "tenant_j_test",
+      "title": "attorney client privileged brief",
+      "body_text": "attorney client privileged brief. Restricted content that eng users must never see in search.",
+      "snippet": "attorney client privileged brief. Restricted content that eng users must never see in search.",
+      "object_type": "doc",
+      "source": "drive",
+      "owner": "user:exec",
+      "acl_filter_terms": [
+        "group:legal",
+        "group:exec",
+        "user:exec"
+      ],
+      "tags": [
+        "restricted",
+        "confidential"
+      ],
+      "lexical_base_score": 20.0,
+      "vector_base_score": 0.99,
+      "graph_boost": 0.5,
+      "restricted": true
+    },
+    {
+      "document_id": "doc-alice-private",
+      "tenant_id": "tenant_j_test",
+      "title": "Alice private notebook getUserInfo",
+      "body_text": "Alice private notebook getUserInfo oauth notes.",
+      "snippet": "Alice private notebook getUserInfo oauth notes.",
+      "object_type": "doc",
+      "source": "drive",
+      "owner": "user:alice",
+      "acl_filter_terms": [
+        "user:alice"
+      ],
+      "tags": [
+        "private"
+      ],
+      "lexical_base_score": 15.0,
+      "vector_base_score": 0.88,
+      "graph_boost": 0.2
+    }
+  ],
+  "acl_entries": [
+    {
+      "doc_id": "doc-public-00",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-00",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-01",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-01",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-02",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-02",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-03",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-03",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-04",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-04",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-05",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-05",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-06",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-06",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-07",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-07",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-08",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-08",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-09",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-09",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-10",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-10",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-11",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-11",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-12",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-12",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-13",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-13",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-14",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-14",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-15",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-15",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-16",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-16",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-17",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-17",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-18",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-18",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-19",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-19",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-20",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-20",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-21",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-21",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-22",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-22",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-23",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-23",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-24",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-24",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-25",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-25",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-26",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-26",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-27",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-27",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-28",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-28",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-29",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-public-29",
+      "principal_id": null,
+      "group_id": "group:eng",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-cross-tenant",
+      "principal_id": null,
+      "group_id": "group:legal",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_other"
+    },
+    {
+      "doc_id": "doc-restricted-cross-tenant",
+      "principal_id": null,
+      "group_id": "group:exec",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_other"
+    },
+    {
+      "doc_id": "doc-restricted-cross-tenant",
+      "principal_id": "user:exec",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_other"
+    },
+    {
+      "doc_id": "doc-restricted-no-access",
+      "principal_id": null,
+      "group_id": "group:legal",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-no-access",
+      "principal_id": null,
+      "group_id": "group:exec",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-no-access",
+      "principal_id": "user:exec",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-group-changed",
+      "principal_id": null,
+      "group_id": "group:legal",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-group-changed",
+      "principal_id": null,
+      "group_id": "group:exec",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-group-changed",
+      "principal_id": "user:exec",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-container-inherit",
+      "principal_id": null,
+      "group_id": "group:legal",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-container-inherit",
+      "principal_id": null,
+      "group_id": "group:exec",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-container-inherit",
+      "principal_id": "user:exec",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-deny-override",
+      "principal_id": null,
+      "group_id": "group:legal",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-deny-override",
+      "principal_id": null,
+      "group_id": "group:exec",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-deny-override",
+      "principal_id": "user:exec",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-auth-required",
+      "principal_id": null,
+      "group_id": "group:legal",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-auth-required",
+      "principal_id": null,
+      "group_id": "group:exec",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-auth-required",
+      "principal_id": "user:exec",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-scope",
+      "principal_id": null,
+      "group_id": "group:legal",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-scope",
+      "principal_id": null,
+      "group_id": "group:exec",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-scope",
+      "principal_id": "user:exec",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-deleted",
+      "principal_id": null,
+      "group_id": "group:legal",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-deleted",
+      "principal_id": null,
+      "group_id": "group:exec",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-deleted",
+      "principal_id": "user:exec",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-unshared",
+      "principal_id": null,
+      "group_id": "group:legal",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-unshared",
+      "principal_id": null,
+      "group_id": "group:exec",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-unshared",
+      "principal_id": "user:exec",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-container",
+      "principal_id": null,
+      "group_id": "group:legal",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-container",
+      "principal_id": null,
+      "group_id": "group:exec",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-container",
+      "principal_id": "user:exec",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-removed-group",
+      "principal_id": null,
+      "group_id": "group:legal",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-removed-group",
+      "principal_id": null,
+      "group_id": "group:exec",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-removed-group",
+      "principal_id": "user:exec",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-parent-denied-child",
+      "principal_id": null,
+      "group_id": "group:legal",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-parent-denied-child",
+      "principal_id": null,
+      "group_id": "group:exec",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-parent-denied-child",
+      "principal_id": "user:exec",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-child-denied-parent",
+      "principal_id": null,
+      "group_id": "group:legal",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-child-denied-parent",
+      "principal_id": null,
+      "group_id": "group:exec",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-child-denied-parent",
+      "principal_id": "user:exec",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-exec-only",
+      "principal_id": null,
+      "group_id": "group:legal",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-exec-only",
+      "principal_id": null,
+      "group_id": "group:exec",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-exec-only",
+      "principal_id": "user:exec",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-legal-only",
+      "principal_id": null,
+      "group_id": "group:legal",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-legal-only",
+      "principal_id": null,
+      "group_id": "group:exec",
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-restricted-legal-only",
+      "principal_id": "user:exec",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    },
+    {
+      "doc_id": "doc-alice-private",
+      "principal_id": "user:alice",
+      "group_id": null,
+      "permission_type": "read",
+      "is_deny": false,
+      "tenant_id": "tenant_j_test"
+    }
+  ]
+}

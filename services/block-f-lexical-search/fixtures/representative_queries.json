@@ -1,0 +1,1306 @@
+{
+  "version": "1.0",
+  "queries": [
+    {
+      "query_id": "q-00-a-000",
+      "query": "How does kubernetes work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-00"
+      ]
+    },
+    {
+      "query_id": "q-00-b-001",
+      "query": "getUserInfo kubernetes",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-00"
+      ]
+    },
+    {
+      "query_id": "q-01-a-002",
+      "query": "How does postgres work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-01"
+      ]
+    },
+    {
+      "query_id": "q-01-b-003",
+      "query": "getUserInfo postgres",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-01"
+      ]
+    },
+    {
+      "query_id": "q-02-a-004",
+      "query": "How does oauth work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-02"
+      ]
+    },
+    {
+      "query_id": "q-02-b-005",
+      "query": "getUserInfo oauth",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-02"
+      ]
+    },
+    {
+      "query_id": "q-03-a-006",
+      "query": "How does vector search work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-03"
+      ]
+    },
+    {
+      "query_id": "q-03-b-007",
+      "query": "getUserInfo vector_search",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-03"
+      ]
+    },
+    {
+      "query_id": "q-04-a-008",
+      "query": "How does acl work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-04"
+      ]
+    },
+    {
+      "query_id": "q-04-b-009",
+      "query": "getUserInfo acl",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-04"
+      ]
+    },
+    {
+      "query_id": "q-05-a-010",
+      "query": "How does chunking work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-05"
+      ]
+    },
+    {
+      "query_id": "q-05-b-011",
+      "query": "getUserInfo chunking",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-05"
+      ]
+    },
+    {
+      "query_id": "q-06-a-012",
+      "query": "How does embeddings work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-06"
+      ]
+    },
+    {
+      "query_id": "q-06-b-013",
+      "query": "getUserInfo embeddings",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-06"
+      ]
+    },
+    {
+      "query_id": "q-07-a-014",
+      "query": "How does kafka work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-07"
+      ]
+    },
+    {
+      "query_id": "q-07-b-015",
+      "query": "getUserInfo kafka",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-07"
+      ]
+    },
+    {
+      "query_id": "q-08-a-016",
+      "query": "How does redis work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-08"
+      ]
+    },
+    {
+      "query_id": "q-08-b-017",
+      "query": "getUserInfo redis",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-08"
+      ]
+    },
+    {
+      "query_id": "q-09-a-018",
+      "query": "How does fastapi work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-09"
+      ]
+    },
+    {
+      "query_id": "q-09-b-019",
+      "query": "getUserInfo fastapi",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-09"
+      ]
+    },
+    {
+      "query_id": "q-10-a-020",
+      "query": "How does tenancy work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-10"
+      ]
+    },
+    {
+      "query_id": "q-10-b-021",
+      "query": "getUserInfo tenancy",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-10"
+      ]
+    },
+    {
+      "query_id": "q-11-a-022",
+      "query": "How does observability work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-11"
+      ]
+    },
+    {
+      "query_id": "q-11-b-023",
+      "query": "getUserInfo observability",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-11"
+      ]
+    },
+    {
+      "query_id": "q-12-a-024",
+      "query": "How does backup work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-12"
+      ]
+    },
+    {
+      "query_id": "q-12-b-025",
+      "query": "getUserInfo backup",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-12"
+      ]
+    },
+    {
+      "query_id": "q-13-a-026",
+      "query": "How does encryption work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-13"
+      ]
+    },
+    {
+      "query_id": "q-13-b-027",
+      "query": "getUserInfo encryption",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-13"
+      ]
+    },
+    {
+      "query_id": "q-14-a-028",
+      "query": "How does scim work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-14"
+      ]
+    },
+    {
+      "query_id": "q-14-b-029",
+      "query": "getUserInfo scim",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-14"
+      ]
+    },
+    {
+      "query_id": "q-15-a-030",
+      "query": "How does gmail work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-15"
+      ]
+    },
+    {
+      "query_id": "q-15-b-031",
+      "query": "getUserInfo gmail",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-15"
+      ]
+    },
+    {
+      "query_id": "q-16-a-032",
+      "query": "How does drive work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-16"
+      ]
+    },
+    {
+      "query_id": "q-16-b-033",
+      "query": "getUserInfo drive",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-16"
+      ]
+    },
+    {
+      "query_id": "q-17-a-034",
+      "query": "How does indexing work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-17"
+      ]
+    },
+    {
+      "query_id": "q-17-b-035",
+      "query": "getUserInfo indexing",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-17"
+      ]
+    },
+    {
+      "query_id": "q-18-a-036",
+      "query": "How does bm25 work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-18"
+      ]
+    },
+    {
+      "query_id": "q-18-b-037",
+      "query": "getUserInfo bm25",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-18"
+      ]
+    },
+    {
+      "query_id": "q-19-a-038",
+      "query": "How does latency work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-19"
+      ]
+    },
+    {
+      "query_id": "q-19-b-039",
+      "query": "getUserInfo latency",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-19"
+      ]
+    },
+    {
+      "query_id": "q-20-a-040",
+      "query": "How does tokenizer work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-20"
+      ]
+    },
+    {
+      "query_id": "q-20-b-041",
+      "query": "getUserInfo tokenizer",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-20"
+      ]
+    },
+    {
+      "query_id": "q-21-a-042",
+      "query": "How does celery work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-21"
+      ]
+    },
+    {
+      "query_id": "q-21-b-043",
+      "query": "getUserInfo celery",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-21"
+      ]
+    },
+    {
+      "query_id": "q-22-a-044",
+      "query": "How does alembic work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-22"
+      ]
+    },
+    {
+      "query_id": "q-22-b-045",
+      "query": "getUserInfo alembic",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-22"
+      ]
+    },
+    {
+      "query_id": "q-23-a-046",
+      "query": "How does opensearch work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-23"
+      ]
+    },
+    {
+      "query_id": "q-23-b-047",
+      "query": "getUserInfo opensearch",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-23"
+      ]
+    },
+    {
+      "query_id": "q-24-a-048",
+      "query": "How does jwt work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-24"
+      ]
+    },
+    {
+      "query_id": "q-24-b-049",
+      "query": "getUserInfo jwt",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-24"
+      ]
+    },
+    {
+      "query_id": "q-25-a-050",
+      "query": "How does rbac work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-25"
+      ]
+    },
+    {
+      "query_id": "q-25-b-051",
+      "query": "getUserInfo rbac",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-25"
+      ]
+    },
+    {
+      "query_id": "q-26-a-052",
+      "query": "How does faceting work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-26"
+      ]
+    },
+    {
+      "query_id": "q-26-b-053",
+      "query": "getUserInfo faceting",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-26"
+      ]
+    },
+    {
+      "query_id": "q-27-a-054",
+      "query": "How does snippets work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-27"
+      ]
+    },
+    {
+      "query_id": "q-27-b-055",
+      "query": "getUserInfo snippets",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-27"
+      ]
+    },
+    {
+      "query_id": "q-28-a-056",
+      "query": "How does federator work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-28"
+      ]
+    },
+    {
+      "query_id": "q-28-b-057",
+      "query": "getUserInfo federator",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-28"
+      ]
+    },
+    {
+      "query_id": "q-29-a-058",
+      "query": "How does canonical work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-29"
+      ]
+    },
+    {
+      "query_id": "q-29-b-059",
+      "query": "getUserInfo canonical",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-29"
+      ]
+    },
+    {
+      "query_id": "q-00-a-060",
+      "query": "How does kubernetes work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-00"
+      ]
+    },
+    {
+      "query_id": "q-00-b-061",
+      "query": "getUserInfo kubernetes",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-00"
+      ]
+    },
+    {
+      "query_id": "q-01-a-062",
+      "query": "How does postgres work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-01"
+      ]
+    },
+    {
+      "query_id": "q-01-b-063",
+      "query": "getUserInfo postgres",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-01"
+      ]
+    },
+    {
+      "query_id": "q-02-a-064",
+      "query": "How does oauth work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-02"
+      ]
+    },
+    {
+      "query_id": "q-02-b-065",
+      "query": "getUserInfo oauth",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-02"
+      ]
+    },
+    {
+      "query_id": "q-03-a-066",
+      "query": "How does vector search work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-03"
+      ]
+    },
+    {
+      "query_id": "q-03-b-067",
+      "query": "getUserInfo vector_search",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-03"
+      ]
+    },
+    {
+      "query_id": "q-04-a-068",
+      "query": "How does acl work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-04"
+      ]
+    },
+    {
+      "query_id": "q-04-b-069",
+      "query": "getUserInfo acl",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-04"
+      ]
+    },
+    {
+      "query_id": "q-05-a-070",
+      "query": "How does chunking work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-05"
+      ]
+    },
+    {
+      "query_id": "q-05-b-071",
+      "query": "getUserInfo chunking",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-05"
+      ]
+    },
+    {
+      "query_id": "q-06-a-072",
+      "query": "How does embeddings work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-06"
+      ]
+    },
+    {
+      "query_id": "q-06-b-073",
+      "query": "getUserInfo embeddings",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-06"
+      ]
+    },
+    {
+      "query_id": "q-07-a-074",
+      "query": "How does kafka work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-07"
+      ]
+    },
+    {
+      "query_id": "q-07-b-075",
+      "query": "getUserInfo kafka",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-07"
+      ]
+    },
+    {
+      "query_id": "q-08-a-076",
+      "query": "How does redis work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-08"
+      ]
+    },
+    {
+      "query_id": "q-08-b-077",
+      "query": "getUserInfo redis",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-08"
+      ]
+    },
+    {
+      "query_id": "q-09-a-078",
+      "query": "How does fastapi work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-09"
+      ]
+    },
+    {
+      "query_id": "q-09-b-079",
+      "query": "getUserInfo fastapi",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-09"
+      ]
+    },
+    {
+      "query_id": "q-10-a-080",
+      "query": "How does tenancy work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-10"
+      ]
+    },
+    {
+      "query_id": "q-10-b-081",
+      "query": "getUserInfo tenancy",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-10"
+      ]
+    },
+    {
+      "query_id": "q-11-a-082",
+      "query": "How does observability work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-11"
+      ]
+    },
+    {
+      "query_id": "q-11-b-083",
+      "query": "getUserInfo observability",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-11"
+      ]
+    },
+    {
+      "query_id": "q-12-a-084",
+      "query": "How does backup work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-12"
+      ]
+    },
+    {
+      "query_id": "q-12-b-085",
+      "query": "getUserInfo backup",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-12"
+      ]
+    },
+    {
+      "query_id": "q-13-a-086",
+      "query": "How does encryption work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-13"
+      ]
+    },
+    {
+      "query_id": "q-13-b-087",
+      "query": "getUserInfo encryption",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-13"
+      ]
+    },
+    {
+      "query_id": "q-14-a-088",
+      "query": "How does scim work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-14"
+      ]
+    },
+    {
+      "query_id": "q-14-b-089",
+      "query": "getUserInfo scim",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-14"
+      ]
+    },
+    {
+      "query_id": "q-15-a-090",
+      "query": "How does gmail work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-15"
+      ]
+    },
+    {
+      "query_id": "q-15-b-091",
+      "query": "getUserInfo gmail",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-15"
+      ]
+    },
+    {
+      "query_id": "q-16-a-092",
+      "query": "How does drive work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-16"
+      ]
+    },
+    {
+      "query_id": "q-16-b-093",
+      "query": "getUserInfo drive",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-16"
+      ]
+    },
+    {
+      "query_id": "q-17-a-094",
+      "query": "How does indexing work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-17"
+      ]
+    },
+    {
+      "query_id": "q-17-b-095",
+      "query": "getUserInfo indexing",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-17"
+      ]
+    },
+    {
+      "query_id": "q-18-a-096",
+      "query": "How does bm25 work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-18"
+      ]
+    },
+    {
+      "query_id": "q-18-b-097",
+      "query": "getUserInfo bm25",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-18"
+      ]
+    },
+    {
+      "query_id": "q-19-a-098",
+      "query": "How does latency work?",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-19"
+      ]
+    },
+    {
+      "query_id": "q-19-b-099",
+      "query": "getUserInfo latency",
+      "tenant_id": "tenant_f_test",
+      "user_id": "user:alice",
+      "acl_filter_terms": [
+        "group:eng",
+        "user:alice"
+      ],
+      "relevant_document_ids": [
+        "doc-public-19"
+      ]
+    }
+  ],
+  "fixture_provenance": "block-f-local (Block Z shared package absent; schema matches master prompt)"
+}

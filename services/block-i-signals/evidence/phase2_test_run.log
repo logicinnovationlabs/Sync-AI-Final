@@ -1,0 +1,22 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.0, pytest-9.1.1
+rootdir: services/block-i-signals
+SIGNALS_BACKEND=postgres
+DATABASE_URL=postgresql://signals:signals@localhost:15433/block_i_signals
+collected 8 items
+
+tests/test_block_i.py::test_idempotent_reingest PASSED
+tests/test_block_i.py::test_tenant_isolation PASSED
+tests/test_block_i.py::test_missing_scope_rejected PASSED
+tests/test_block_i.py::test_health PASSED
+tests/test_i1_privacy.py::test_i1_privacy_threshold PASSED
+tests/test_i2_retention.py::test_i2_retention_enforcement PASSED
+tests/test_i3_freshness.py::test_i3_signal_freshness PASSED
+tests/test_i3_freshness.py::test_i3_ground_truth_user_and_doc PASSED
+
+============================= 8 passed in 12.28s ==============================
+
+Phase 2 evidence:
+- evidence/i1_privacy_report_phase2.json
+- evidence/i2_retention_report_phase2.json
+- evidence/i3_freshness_report_phase2.json (p95=0.1741s)

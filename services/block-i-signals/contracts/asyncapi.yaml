@@ -1,0 +1,29 @@
+asyncapi: 2.6.0
+info:
+  title: Block I Activity Event Bus
+  version: 1.0.0
+  description: Consumes activity events published by Block B.
+channels:
+  ingest.activity.v1:
+    publish:
+      operationId: publishActivity
+      message:
+        name: ActivityEvent
+        payload:
+          type: object
+          required: [event_id, tenant_id, actor_principal_id, object_id, event_type, source_system, event_time]
+          properties:
+            event_id: { type: string }
+            tenant_id: { type: string }
+            actor_principal_id: { type: string }
+            object_id: { type: string }
+            event_type: { type: string }
+            source_system: { type: string }
+            event_time: { type: string, format: date-time }
+            session_id: { type: string }
+            context_json: { type: object }
+            privacy_level: { type: string }
+servers:
+  kafka:
+    url: localhost:9092
+    protocol: kafka

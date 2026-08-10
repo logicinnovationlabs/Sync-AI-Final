@@ -1,0 +1,62 @@
+version: "3.8"
+
+services:
+  mock-backends:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: block-j-mock-backends
+    command: ["uvicorn", "mocks.backend_server:mock_app", "--host", "0.0.0.0", "--port", "8090"]
+    ports:
+      - "8090:8090"
+    environment:
+      PYTHONPATH: /app
+      ENVIRONMENT: test
+    volumes:
+      - ./mocks:/app/mocks
+      - ./fixtures:/app/fixtures
+      - ./app:/app/app
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: block-j-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: block_j
+    ports:
+      - "5439:5432"
+    volumes:
+      - block_j_pg_data:/var/lib/postgresql/data
+      - ./fixtures/acl_schema.sql:/docker-entrypoint-initdb.d/01_acl.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d block_j"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  query-federator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: block-j-query-federator
+    ports:
+      - "8089:8089"
+    environment:
+      ENVIRONMENT: development
+      ACL_BACKEND: memory
+      RERANKER_BACKEND: mock
+      EMBEDDING_BACKEND: mock
+      LEXICAL_SEARCH_URL: http://mock-backends:8090
+      VECTOR_SEARCH_URL: http://mock-backends:8090
+      GRAPH_SERVICE_URL: http://mock-backends:8090
+      BACKEND_TIMEOUT_SECONDS: "0.5"
+      ENFORCE_TENANT_ISOLATION: "true"
+    depends_on:
+      - mock-backends
+    volumes:
+      - ./app:/app/app
+      - ./fixtures:/app/fixtures
+
+volumes:
+  block_j_pg_data:

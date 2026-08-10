@@ -311,15 +311,7 @@ class DriveConnector(BaseConnector):
             List of changed items with id and type
         """
         token = await self.get_valid_token()
-        
-        # NOTE: In real implementation, we would:
-        # 1. Get stored ACL pageToken from cursor_store
-        # 2. Call changes.list with that pageToken
-        # 3. Store new pageToken for next run
-        # 4. Filter for permission-related changes
-        
-        # For now, return empty list (Gmail stub does this too)
-        # Real implementation would use drive_client.list_changes() and filter
+        _ = (since, token)
         return []
     
     def _parse_timestamp(self, timestamp_str: Optional[str]) -> datetime:

@@ -1,0 +1,404 @@
+{
+  "version": "1.0",
+  "tenant_id": "tenant_h_test",
+  "people": [
+    {
+      "source_id": "person-alice",
+      "display_name": "Alice Smith",
+      "email": "alice@example.com",
+      "title": "Staff Engineer",
+      "department": "Engineering",
+      "team": "Platform",
+      "aliases": [
+        "asmith"
+      ]
+    },
+    {
+      "source_id": "person-bob",
+      "display_name": "Bob Jones",
+      "email": "bob@example.com",
+      "title": "Senior Engineer",
+      "department": "Engineering",
+      "team": "Search",
+      "aliases": [
+        "bjones"
+      ]
+    },
+    {
+      "source_id": "person-charlie",
+      "display_name": "Charlie Brown",
+      "email": "charlie@example.com",
+      "title": "Engineer",
+      "department": "Engineering",
+      "team": "Platform",
+      "aliases": []
+    },
+    {
+      "source_id": "person-diana",
+      "display_name": "Diana Prince",
+      "email": "diana@example.com",
+      "title": "PM",
+      "department": "Product",
+      "team": "Core",
+      "aliases": [
+        "wonder"
+      ]
+    },
+    {
+      "source_id": "person-eve",
+      "display_name": "Eve Anderson",
+      "email": "eve@example.com",
+      "title": "Designer",
+      "department": "Product",
+      "team": "Design",
+      "aliases": []
+    },
+    {
+      "source_id": "person-frank",
+      "display_name": "Frank Miller",
+      "email": "frank@example.com",
+      "title": "Director",
+      "department": "Engineering",
+      "team": "Leadership",
+      "aliases": [
+        "fm"
+      ]
+    },
+    {
+      "source_id": "person-grace",
+      "display_name": "Grace Hopper",
+      "email": "grace@example.com",
+      "title": "Distinguished Engineer",
+      "department": "Engineering",
+      "team": "Platform",
+      "aliases": [
+        "ghopper"
+      ]
+    },
+    {
+      "source_id": "person-henry",
+      "display_name": "Henry Ford",
+      "email": "henry@example.com",
+      "title": "SRE",
+      "department": "Engineering",
+      "team": "Infra",
+      "aliases": []
+    },
+    {
+      "source_id": "person-isabel",
+      "display_name": "Isabel Allende",
+      "email": "isabel@example.com",
+      "title": "Writer",
+      "department": "Marketing",
+      "team": "Content",
+      "aliases": []
+    },
+    {
+      "source_id": "person-jack",
+      "display_name": "Jack London",
+      "email": "jack@example.com",
+      "title": "Support",
+      "department": "Support",
+      "team": "Tier2",
+      "aliases": []
+    },
+    {
+      "source_id": "person-alice-gmail",
+      "display_name": "Alice Smith",
+      "email": "alice@example.com",
+      "title": "Staff Engineer",
+      "department": "Engineering",
+      "team": "Platform",
+      "aliases": [
+        "alice.smith"
+      ]
+    },
+    {
+      "source_id": "person-extra-01",
+      "display_name": "Extra User 1",
+      "email": "extra1@example.com",
+      "title": "IC",
+      "department": "Product",
+      "team": "Team-1",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-02",
+      "display_name": "Extra User 2",
+      "email": "extra2@example.com",
+      "title": "IC",
+      "department": "Engineering",
+      "team": "Team-2",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-03",
+      "display_name": "Extra User 3",
+      "email": "extra3@example.com",
+      "title": "IC",
+      "department": "Product",
+      "team": "Team-3",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-04",
+      "display_name": "Extra User 4",
+      "email": "extra4@example.com",
+      "title": "IC",
+      "department": "Engineering",
+      "team": "Team-4",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-05",
+      "display_name": "Extra User 5",
+      "email": "extra5@example.com",
+      "title": "IC",
+      "department": "Product",
+      "team": "Team-0",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-06",
+      "display_name": "Extra User 6",
+      "email": "extra6@example.com",
+      "title": "IC",
+      "department": "Engineering",
+      "team": "Team-1",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-07",
+      "display_name": "Extra User 7",
+      "email": "extra7@example.com",
+      "title": "IC",
+      "department": "Product",
+      "team": "Team-2",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-08",
+      "display_name": "Extra User 8",
+      "email": "extra8@example.com",
+      "title": "IC",
+      "department": "Engineering",
+      "team": "Team-3",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-09",
+      "display_name": "Extra User 9",
+      "email": "extra9@example.com",
+      "title": "IC",
+      "department": "Product",
+      "team": "Team-4",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-10",
+      "display_name": "Extra User 10",
+      "email": "extra10@example.com",
+      "title": "IC",
+      "department": "Engineering",
+      "team": "Team-0",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-11",
+      "display_name": "Extra User 11",
+      "email": "extra11@example.com",
+      "title": "IC",
+      "department": "Product",
+      "team": "Team-1",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-12",
+      "display_name": "Extra User 12",
+      "email": "extra12@example.com",
+      "title": "IC",
+      "department": "Engineering",
+      "team": "Team-2",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-13",
+      "display_name": "Extra User 13",
+      "email": "extra13@example.com",
+      "title": "IC",
+      "department": "Product",
+      "team": "Team-3",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-14",
+      "display_name": "Extra User 14",
+      "email": "extra14@example.com",
+      "title": "IC",
+      "department": "Engineering",
+      "team": "Team-4",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-15",
+      "display_name": "Extra User 15",
+      "email": "extra15@example.com",
+      "title": "IC",
+      "department": "Product",
+      "team": "Team-0",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-16",
+      "display_name": "Extra User 16",
+      "email": "extra16@example.com",
+      "title": "IC",
+      "department": "Engineering",
+      "team": "Team-1",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-17",
+      "display_name": "Extra User 17",
+      "email": "extra17@example.com",
+      "title": "IC",
+      "department": "Product",
+      "team": "Team-2",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-18",
+      "display_name": "Extra User 18",
+      "email": "extra18@example.com",
+      "title": "IC",
+      "department": "Engineering",
+      "team": "Team-3",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-19",
+      "display_name": "Extra User 19",
+      "email": "extra19@example.com",
+      "title": "IC",
+      "department": "Product",
+      "team": "Team-4",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-20",
+      "display_name": "Extra User 20",
+      "email": "extra20@example.com",
+      "title": "IC",
+      "department": "Engineering",
+      "team": "Team-0",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-21",
+      "display_name": "Extra User 21",
+      "email": "extra21@example.com",
+      "title": "IC",
+      "department": "Product",
+      "team": "Team-1",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-22",
+      "display_name": "Extra User 22",
+      "email": "extra22@example.com",
+      "title": "IC",
+      "department": "Engineering",
+      "team": "Team-2",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-23",
+      "display_name": "Extra User 23",
+      "email": "extra23@example.com",
+      "title": "IC",
+      "department": "Product",
+      "team": "Team-3",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-24",
+      "display_name": "Extra User 24",
+      "email": "extra24@example.com",
+      "title": "IC",
+      "department": "Engineering",
+      "team": "Team-4",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-25",
+      "display_name": "Extra User 25",
+      "email": "extra25@example.com",
+      "title": "IC",
+      "department": "Product",
+      "team": "Team-0",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-26",
+      "display_name": "Extra User 26",
+      "email": "extra26@example.com",
+      "title": "IC",
+      "department": "Engineering",
+      "team": "Team-1",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-27",
+      "display_name": "Extra User 27",
+      "email": "extra27@example.com",
+      "title": "IC",
+      "department": "Product",
+      "team": "Team-2",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-28",
+      "display_name": "Extra User 28",
+      "email": "extra28@example.com",
+      "title": "IC",
+      "department": "Engineering",
+      "team": "Team-3",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-29",
+      "display_name": "Extra User 29",
+      "email": "extra29@example.com",
+      "title": "IC",
+      "department": "Product",
+      "team": "Team-4",
+      "aliases": []
+    },
+    {
+      "source_id": "person-extra-30",
+      "display_name": "Extra User 30",
+      "email": "extra30@example.com",
+      "title": "IC",
+      "department": "Engineering",
+      "team": "Team-0",
+      "aliases": []
+    }
+  ],
+  "groups": [
+    {
+      "source_id": "group-eng",
+      "display_name": "Engineering Team",
+      "email": "eng@example.com"
+    },
+    {
+      "source_id": "group-product",
+      "display_name": "Product Team",
+      "email": "product@example.com"
+    },
+    {
+      "source_id": "group-allstaff",
+      "display_name": "All Staff",
+      "email": "allstaff@example.com"
+    }
+  ]
+}

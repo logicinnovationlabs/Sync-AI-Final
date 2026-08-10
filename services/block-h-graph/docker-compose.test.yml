@@ -1,0 +1,27 @@
+version: "3.8"
+
+# Test dependencies for Phase 2 signoff.
+# Usage:
+#   docker compose -f docker-compose.test.yml up -d
+#   set GRAPH_BACKEND=neo4j
+#   pytest tests/ -v --tb=short
+
+services:
+  neo4j:
+    image: neo4j:5.26-community
+    container_name: block-h-test-neo4j
+    ports:
+      - "7688:7687"
+      - "7475:7474"
+    environment:
+      NEO4J_AUTH: neo4j/blockh-dev-password
+    volumes:
+      - block_h_test_neo4j_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  block_h_test_neo4j_data:

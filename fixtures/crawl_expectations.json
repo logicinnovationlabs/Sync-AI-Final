@@ -1,0 +1,24 @@
+{
+  "version": "v2",
+  "expected_counts": {
+    "google_drive": 25,
+    "google_gmail": 3,
+    "confluence": 10,
+    "github": 5,
+    "jira": 6,
+    "slack": 6,
+    "notion": 5
+  },
+  "delta_types": [
+    "created",
+    "updated",
+    "deleted"
+  ],
+  "rate_limit_retries": 3,
+  "credentials_forbidden_patterns": [
+    "AIza",
+    "ya29.",
+    "-----BEGIN PRIVATE KEY-----",
+    "sk-"
+  ]
+}

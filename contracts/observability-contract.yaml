@@ -1,0 +1,32 @@
+openapi: '3.0.0'
+info:
+  title: observability contract
+  version: '1.0.0'
+paths:
+  /metrics:
+    get:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+  /health:
+    get:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+  /traces:
+    get:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object

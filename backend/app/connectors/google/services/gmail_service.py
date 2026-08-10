@@ -339,13 +339,13 @@ class GmailConnector(BaseConnector):
         Fetch permission changes since a given timestamp.
         
         Gmail has no sharing model, so no permission changes to report.
-        
         Args:
             since: Changed since this timestamp (ignored)
             
         Returns:
             Empty list (Gmail has no permissions to change)
         """
+        _ = since
         return []
     
     def _has_attachments(self, payload: Dict[str, Any]) -> bool:

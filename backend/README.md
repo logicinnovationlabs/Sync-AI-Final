@@ -666,9 +666,9 @@ After Blocks A, B, and C pass signoff:
 
 1. **Block D**: Storage Substrate — backup/restore, KMS encryption
 2. **Block E**: Chunking & Embedding Pipeline (extended)
-3. **Block F**: Lexical Search Service (OpenSearch/Elasticsearch)
-4. **Block G**: Vector Search Service (query-time ACL filtering)
-5. **Block H**: Knowledge Graph Service
+3. **Block F**: Lexical Search Service (OpenSearch/Elasticsearch) — see `services/block-f-lexical-search/`
+4. **Block G**: Vector Search Service — see `services/block-g-vector-search/`
+5. **Block H**: Knowledge Graph Service — see `services/block-h-graph/`
 6. ... (see architecture doc for full build order)
 
 ---

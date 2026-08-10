@@ -1,0 +1,258 @@
+{
+  "version": "v2",
+  "principals": [
+    {
+      "id": "principal-alice",
+      "email": "alice@example.com",
+      "tenant_id": "tenant-a",
+      "external_id": "00ualice",
+      "scopes": [
+        "search.read",
+        "document.read",
+        "connectors.read"
+      ]
+    },
+    {
+      "id": "principal-bob",
+      "email": "bob@example.com",
+      "tenant_id": "tenant-a",
+      "external_id": "00ubob",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    },
+    {
+      "id": "principal-carol",
+      "email": "carol@example.com",
+      "tenant_id": "tenant-b",
+      "external_id": "00ucarol",
+      "scopes": [
+        "search.read",
+        "document.read",
+        "admin.audit.read"
+      ]
+    },
+    {
+      "id": "principal-diana",
+      "email": "diana@example.com",
+      "tenant_id": "tenant-c",
+      "external_id": "00udiana",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    },
+    {
+      "id": "principal-erin",
+      "email": "erin@example.com",
+      "tenant_id": "tenant-a",
+      "external_id": "00uerin",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    },
+    {
+      "id": "principal-frank",
+      "email": "frank@example.com",
+      "tenant_id": "tenant-a",
+      "external_id": "00ufrank",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    },
+    {
+      "id": "principal-grace",
+      "email": "grace@example.com",
+      "tenant_id": "tenant-b",
+      "external_id": "00ugrace",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    },
+    {
+      "id": "principal-hank",
+      "email": "hank@example.com",
+      "tenant_id": "tenant-a",
+      "external_id": "00uhank",
+      "scopes": [
+        "search.read",
+        "document.read",
+        "admin.audit.read"
+      ]
+    },
+    {
+      "id": "principal-ivy",
+      "email": "ivy@example.com",
+      "tenant_id": "tenant-a",
+      "external_id": "00uivy",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    },
+    {
+      "id": "principal-jake",
+      "email": "jake@example.com",
+      "tenant_id": "tenant-a",
+      "external_id": "00ujake",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    },
+    {
+      "id": "principal-kate",
+      "email": "kate@example.com",
+      "tenant_id": "tenant-a",
+      "external_id": "00ukate",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    },
+    {
+      "id": "principal-leo",
+      "email": "leo@example.com",
+      "tenant_id": "tenant-a",
+      "external_id": "00uleo",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    },
+    {
+      "id": "principal-maya",
+      "email": "maya@example.com",
+      "tenant_id": "tenant-b",
+      "external_id": "00umaya",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    },
+    {
+      "id": "principal-nate",
+      "email": "nate@example.com",
+      "tenant_id": "tenant-b",
+      "external_id": "00unate",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    },
+    {
+      "id": "principal-olivia",
+      "email": "olivia@example.com",
+      "tenant_id": "tenant-b",
+      "external_id": "00uolivia",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    },
+    {
+      "id": "principal-paul",
+      "email": "paul@example.com",
+      "tenant_id": "tenant-c",
+      "external_id": "00upaul",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    },
+    {
+      "id": "principal-quinn",
+      "email": "quinn@example.com",
+      "tenant_id": "tenant-c",
+      "external_id": "00uquinn",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    },
+    {
+      "id": "principal-rita",
+      "email": "rita@example.com",
+      "tenant_id": "tenant-a",
+      "external_id": "00urita",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    },
+    {
+      "id": "principal-sam",
+      "email": "sam@example.com",
+      "tenant_id": "tenant-a",
+      "external_id": "00usam",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    },
+    {
+      "id": "principal-tina",
+      "email": "tina@example.com",
+      "tenant_id": "tenant-a",
+      "external_id": "00utina",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    },
+    {
+      "id": "principal-uma",
+      "email": "uma@example.com",
+      "tenant_id": "tenant-b",
+      "external_id": "00uuma",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    },
+    {
+      "id": "principal-vic",
+      "email": "vic@example.com",
+      "tenant_id": "tenant-c",
+      "external_id": "00uvic",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    },
+    {
+      "id": "principal-wes",
+      "email": "wes@example.com",
+      "tenant_id": "tenant-a",
+      "external_id": "00uwes",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    },
+    {
+      "id": "principal-xena",
+      "email": "xena@example.com",
+      "tenant_id": "tenant-b",
+      "external_id": "00uxena",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    },
+    {
+      "id": "principal-yara",
+      "email": "yara@example.com",
+      "tenant_id": "tenant-a",
+      "external_id": "00uyara",
+      "scopes": [
+        "search.read",
+        "document.read"
+      ]
+    }
+  ]
+}

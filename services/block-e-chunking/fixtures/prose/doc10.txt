@@ -1,0 +1,7 @@
+API Design Fundamentals
+
+Application Programming Interfaces define the methods and data formats that applications use to request and exchange information. Well-designed APIs are essential for building scalable, maintainable software systems that can integrate easily with other services and applications.
+
+RESTful APIs follow the principles of Representational State Transfer architecture, using standard HTTP methods like GET, POST, PUT, and DELETE to perform operations on resources. Resources are identified by URLs, and data is typically exchanged in JSON or XML format. REST APIs are stateless, meaning each request contains all the information needed to understand and process it.
+
+GraphQL is an alternative to REST that allows clients to request exactly the data they need in a single query. This approach can reduce over-fetching and under-fetching of data, common issues with REST APIs. GraphQL uses a strongly typed schema and enables clients to query multiple resources in a single request, making it particularly useful for complex data requirements.

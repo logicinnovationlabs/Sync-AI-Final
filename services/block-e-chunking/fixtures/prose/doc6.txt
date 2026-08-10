@@ -1,0 +1,7 @@
+Microservices Design Patterns
+
+Microservices architecture structures an application as a collection of services that are loosely coupled, independently deployable, and organized around business capabilities. This approach contrasts with monolithic architecture where the entire application is built as a single unit.
+
+Key benefits of microservices include improved scalability, as individual components can be scaled independently based on demand. They also enable faster development cycles since different teams can work on separate services simultaneously. Additionally, microservices can be written in different programming languages and use different data storage technologies, allowing teams to choose the best tools for each service.
+
+Common design patterns for microservices include API Gateway, which acts as a single entry point for clients; Service Discovery, which allows services to find each other; Circuit Breaker, which prevents cascading failures; and Event-Driven Architecture, which enables asynchronous communication between services through events.

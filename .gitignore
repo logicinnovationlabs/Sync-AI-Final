@@ -1,0 +1,97 @@
+# Environment variables with credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+.env.local
+.env.*.local
+
+# Private keys and signing material
+backend/keys/
+**/keys/*.pem
+**/keys/*.key
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Node
+node_modules/
+
+# Testing / local validation scratch
+.pytest_cache/
+.coverage
+htmlcov/
+_validation_run/
+_integration_block_c/
+test-results/
+Dockerfile.signoff
+**/Dockerfile.signoff
+*.err
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backup / merge scratch files
+*.bak
+*.bak2
+*.bak3
+*.bak[0-9]
+*.bak_*
+*.bak*
+
+# Database
+*.db
+*.sqlite3
+
+# Logs
+*.log
+
+# Accidental shell redirects / local junk
+=50
+
+# Local Block E debug / one-off scripts (not part of formal suite)
+services/block-e-chunking/introspect_tables.py
+services/block-e-chunking/test_db_conn.py
+services/block-e-chunking/test_local_db.py
+services/block-e-chunking/test_merge_into_parent.py
+services/block-e-chunking/test_truncation.py
+services/block-e-chunking/test_update_trigger.py
+services/block-e-chunking/test_update_trigger_simple.py
+services/block-e-chunking/tests/diagnose_token_counting.py
+services/block-e-chunking/tests/dump_js_imports.py
+_secret_scan_tmp.py
+_secret_scan_report.txt

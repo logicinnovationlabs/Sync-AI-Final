@@ -1,0 +1,15 @@
+{
+  "tenant_id": "tenant_001",
+  "document_id": "doc_002",
+  "document_version": 1,
+  "content_type": "code",
+  "title": "Data Processing Pipeline",
+  "language": "python",
+  "content": "import pandas as pd\nimport numpy as np\nfrom typing import List, Optional\n\nclass DataProcessor:\n    \"\"\"Processes and transforms data for machine learning pipelines.\"\"\"\n    \n    def __init__(self, config: dict):\n        self.config = config\n        self.data: Optional[pd.DataFrame] = None\n    \n    def load_data(self, filepath: str) -> pd.DataFrame:\n        \"\"\"Load data from a CSV file.\"\"\"\n        self.data = pd.read_csv(filepath)\n        return self.data\n    \n    def normalize(self, columns: List[str]) -> pd.DataFrame:\n        \"\"\"Normalize specified columns using z-score normalization.\"\"\"\n        for col in columns:\n            mean = self.data[col].mean()\n            std = self.data[col].std()\n            self.data[col] = (self.data[col] - mean) / std\n        return self.data\n    \n    def filter_outliers(self, column: str, threshold: float = 3.0) -> pd.DataFrame:\n        \"\"\"Remove outliers beyond threshold standard deviations.\"\"\"\n        mean = self.data[column].mean()\n        std = self.data[column].std()\n        self.data = self.data[\n            (self.data[column] >= mean - threshold * std) &\n            (self.data[column] <= mean + threshold * std)\n        ]\n        return self.data\n\ndef main():\n    processor = DataProcessor({'batch_size': 1000})\n    data = processor.load_data('data.csv')\n    normalized = processor.normalize(['age', 'income'])\n    filtered = processor.filter_outliers('income')\n    print(f\"Processed {len(filtered)} records\")\n\nif __name__ == '__main__':\n    main()\n",
+  "metadata": {
+    "source": "repository",
+    "repository": "ml-pipeline",
+    "file_path": "src/processor.py",
+    "created_at": "2024-01-01T00:00:00Z"
+  }
+}

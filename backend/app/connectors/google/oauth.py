@@ -218,3 +218,45 @@ class GoogleOAuthManager:
     def _get_token_key(self, tenant_id: str) -> str:
         """Generate token storage key for a tenant."""
         return f"google_oauth:{tenant_id}"
+
+
+def seed_token_store_from_env(
+    token_store: TokenStore,
+    tenant_id: str,
+    *,
+    client_id: Optional[str] = None,
+    client_secret: Optional[str] = None,
+    refresh_token: Optional[str] = None,
+) -> bool:
+    """
+    Seed TokenStore with Google OAuth tokens from env/settings when present.
+
+    Block B's connectors read credentials from TokenStore under key
+    ``google_oauth:{tenant_id}`` (see GoogleOAuthManager._get_token_key).
+    Celery tasks historically created an empty DummyTokenStore; this helper
+    fills it from GOOGLE_REFRESH_TOKEN (+ optional client fields) so real
+    Drive/Gmail crawls can authenticate without a separate DB vault row.
+
+    Returns True if a refresh token was seeded; False if nothing to seed.
+    Never logs the refresh token value.
+    """
+    import os
+    from datetime import datetime, timedelta
+
+    rt = refresh_token or os.getenv("GOOGLE_REFRESH_TOKEN") or ""
+    rt = rt.strip()
+    if not rt:
+        return False
+
+    # Expire access immediately so get_valid_token() refreshes on first use.
+    token_store.set_token(
+        f"google_oauth:{tenant_id}",
+        {
+            "access_token": "pending_refresh",
+            "refresh_token": rt,
+            "expires_at": (datetime.utcnow() - timedelta(hours=1)).isoformat(),
+            "token_type": "Bearer",
+        },
+    )
+    return True
+

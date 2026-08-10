@@ -1,0 +1,7 @@
+pytest>=8.0
+requests>=2.31
+PyJWT>=2.8
+PyYAML>=6.0
+fastapi>=0.110
+uvicorn>=0.27
+httpx>=0.27

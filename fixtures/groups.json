@@ -1,0 +1,135 @@
+{
+  "version": "v2",
+  "groups": [
+    {
+      "id": "group-eng",
+      "name": "Engineering",
+      "tenant_id": "tenant-a",
+      "members": [
+        "principal-alice",
+        "principal-bob",
+        "principal-erin",
+        "principal-frank",
+        "principal-hank",
+        "principal-ivy",
+        "principal-jake",
+        "principal-kate",
+        "principal-leo",
+        "principal-rita",
+        "principal-sam",
+        "principal-tina",
+        "principal-wes",
+        "principal-yara"
+      ]
+    },
+    {
+      "id": "group-product",
+      "name": "Product",
+      "tenant_id": "tenant-a",
+      "members": [
+        "principal-alice",
+        "principal-erin",
+        "principal-rita",
+        "principal-tina"
+      ]
+    },
+    {
+      "id": "group-security",
+      "name": "Security",
+      "tenant_id": "tenant-b",
+      "members": [
+        "principal-carol",
+        "principal-grace",
+        "principal-maya",
+        "principal-nate"
+      ]
+    },
+    {
+      "id": "group-legal",
+      "name": "Legal",
+      "tenant_id": "tenant-b",
+      "members": [
+        "principal-carol",
+        "principal-olivia",
+        "principal-uma"
+      ]
+    },
+    {
+      "id": "group-exec",
+      "name": "Executive",
+      "tenant_id": "tenant-c",
+      "members": [
+        "principal-diana",
+        "principal-paul",
+        "principal-quinn"
+      ]
+    },
+    {
+      "id": "group-ops",
+      "name": "Operations",
+      "tenant_id": "tenant-a",
+      "members": [
+        "principal-frank",
+        "principal-hank",
+        "principal-wes",
+        "principal-sam"
+      ]
+    },
+    {
+      "id": "group-support",
+      "name": "Support",
+      "tenant_id": "tenant-b",
+      "members": [
+        "principal-xena",
+        "principal-grace",
+        "principal-nate"
+      ]
+    },
+    {
+      "id": "group-all-tenant-a",
+      "name": "All Tenant A",
+      "tenant_id": "tenant-a",
+      "members": [
+        "principal-alice",
+        "principal-bob",
+        "principal-erin",
+        "principal-frank",
+        "principal-hank",
+        "principal-ivy",
+        "principal-jake",
+        "principal-kate",
+        "principal-leo",
+        "principal-rita",
+        "principal-sam",
+        "principal-tina",
+        "principal-wes",
+        "principal-yara"
+      ]
+    },
+    {
+      "id": "group-all-tenant-b",
+      "name": "All Tenant B",
+      "tenant_id": "tenant-b",
+      "members": [
+        "principal-carol",
+        "principal-grace",
+        "principal-maya",
+        "principal-nate",
+        "principal-olivia",
+        "principal-uma",
+        "principal-xena"
+      ]
+    },
+    {
+      "id": "group-all-tenant-c",
+      "name": "All Tenant C",
+      "tenant_id": "tenant-c",
+      "members": [
+        "principal-diana",
+        "principal-paul",
+        "principal-quinn",
+        "principal-vic"
+      ]
+    }
+  ]
+}
