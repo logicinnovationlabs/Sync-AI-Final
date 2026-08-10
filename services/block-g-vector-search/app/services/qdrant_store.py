@@ -95,6 +95,7 @@ class QdrantVectorStore(VectorStore):
                 match=qm.MatchValue(value=tenant_id),
             )
         ]
+        must_not: List[qm.Condition] = []
         terms = normalize_acl_terms(acl_terms)
         if not terms:
             # Fail-closed: match nothing
@@ -111,6 +112,14 @@ class QdrantVectorStore(VectorStore):
                     match=qm.MatchAny(any=terms),
                 )
             )
+            # Deny-override (Block F parity): exclude chunks that carry
+            # deny:<caller-principal-or-group> for any caller ACL term.
+            must_not.append(
+                qm.FieldCondition(
+                    key="acl_terms",
+                    match=qm.MatchAny(any=[f"deny:{t}" for t in terms]),
+                )
+            )
         if model_version:
             must.append(
                 qm.FieldCondition(
@@ -118,7 +127,7 @@ class QdrantVectorStore(VectorStore):
                     match=qm.MatchValue(value=model_version),
                 )
             )
-        return qm.Filter(must=must)
+        return qm.Filter(must=must, must_not=must_not or None)
 
     async def upsert_chunk(
         self,

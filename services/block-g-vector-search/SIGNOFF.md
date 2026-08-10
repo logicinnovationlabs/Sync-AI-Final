@@ -138,3 +138,114 @@ Routes mounted under `/api/v1` per Build & Signoff master prompt:
 
 Search request field `acl_terms` is canonical (`acl_filter_terms` accepted as alias).
 Malformed requests return **400**; tenant binding failures return **403**.
+
+---
+
+## Re-Verification — Real Gemini Embeddings (2026-08-09)
+
+**Engineer:** Cursor Agent  
+**Reviewer:** PENDING (§24.1 independent review not claimed)  
+**Embedding source:** Block E `gemini-embedding-001` @ **768-d** (real API)  
+**Fixtures:** Block Z v2 `documents.json` / `relevance_labels.json` / `acl_redteam_cases.json`  
+**Qdrant:** `localhost:6335` (docker-compose.test.yml), new collection prefix `block_g_verify_gemini` (NOT overwriting prior 64-d synthetic collections)  
+**Legacy coexistence:** separate prefix `block_g_verify_legacy64` (64-d) created alongside 768-d
+
+### 1.1 Prior stored dimension
+
+| Source | Dimension | Notes |
+|--------|-----------|-------|
+| Prior Block G local fixtures (`fixtures/generate_fixtures.py`) | **64** | Synthetic topic vectors — this was what Phase 2 (2026-08-05) indexed into Qdrant |
+| Fresh test Qdrant at session start | *(empty)* | No collections present on `:6335` before re-index |
+| Block E current Gemini output | **768** | `gemini-embedding-001` |
+
+**Gap confirmed:** prior Phase 2 PASS was against **64-d synthetic** embeddings, not Gemini 768-d.
+
+### Results (this session — executed, not carried forward)
+
+| ID | Criterion | Result | Measured | Evidence |
+|----|-----------|--------|----------|----------|
+| G1 | Recall@10 ≥ 0.85 | **PASS** | **1.0000** average over 30 Block Z queries (document-level recall from top-10 chunks) | `evidence/g_gemini_reverification_20260809.json` |
+| G2 | 0 hidden / unauthorized across 15 red-team | **FAIL** | **2 cases leaked** vs `forbidden_document_ids`: `rt-03-direct-allow` → `doc-rt-group-allow`, `doc-rt-inherited-allow`; `rt-05-inherited-allow` → `doc-rt-unshare`. Cross-tenant restricted docs (`doc-restricted`, `doc-security`) did **not** leak. | same + console `evidence/g_gemini_reverification_console_20260809.txt` |
+| G3 | p95 ≤ 150 ms | **PASS** | avg **27.54 ms**, p95 **43.13 ms** (100 queries) | same |
+| G4 | Dual model-version + old/new dim coexistence | **PASS** | Filtered v1/v2 tagging OK; per-version score order OK; 64-d legacy collection coexisted without crash | same |
+
+**Overall Step 1:** **FAIL** (G2). Per master-prompt hard-stop: no threshold change, no forbidden-list edit, no partial re-embed to force PASS.
+
+**G2 root-cause note (not a pass excuse):** Block G ACL prefilter is keyword-intersection on `acl_terms`. In Block Z fixtures, Alice legitimately intersects `group-eng` on `doc-rt-group-allow` / `doc-rt-inherited-allow`, and Erin intersects `principal-erin` still present on `doc-rt-unshare`. Those red-team scenarios require richer Block-C-style ACL semantics (unshare/deny) than vector-store term overlap. Recording FAIL against the stated G2 criterion as written.
+
+**Reproduce:**
+```powershell
+cd "D:\PROJECTS\Sync Ai Final\services\block-g-vector-search"
+docker compose -f docker-compose.test.yml up -d
+# Load GEMINI_API_KEY from backend\.env into $env: (do not print)
+$env:EMBEDDING_PROVIDER = "gemini"
+$env:EMBEDDING_MODEL = "gemini-embedding-001"
+$env:EMBEDDING_DIMENSION = "768"
+$env:FIXTURES_PATH = "D:\PROJECTS\Sync Ai Final\fixtures"
+$env:QDRANT_HOST = "localhost"
+$env:QDRANT_PORT = "6335"
+$env:DATABASE_URL = "postgresql+asyncpg://postgres:verify@localhost:5433/block_e_verify"
+$env:PYTHONPATH = (Get-Location).Path
+& "..\..\.venv\Scripts\python.exe" tests\verify_g_gemini_reverification.py
+```
+
+**Postgres side-effect:** 60 `chunk_records` written for tenant `tenant_g_gemini_verify` on `:5433` / `block_e_verify`.
+
+### Session re-run (2026-08-09 afternoon — post Docker reinstall)
+
+Executed again this session against empty Qdrant `:6335` → fresh `block_g_verify_gemini_*` @ **768-d**.
+
+| ID | Result | Measured |
+|----|--------|----------|
+| G1 | **PASS** | Recall@10 **1.0000** |
+| G2 | **FAIL** | 2 leaks: `rt-03` → `doc-rt-group-allow`,`doc-rt-inherited-allow`; `rt-05` → `doc-rt-unshare` |
+| G3 | **PASS** | avg **32.89 ms**, p95 **62.80 ms** |
+| G4 | **PASS** | dual model versions tagged; legacy 64-d coexistence OK |
+
+**Overall:** **FAIL** (G2). Evidence: `evidence/g_gemini_reverification_20260809.json`, `evidence/g_gemini_reverification_20260809_rerun.txt`. Hard-stop: no threshold/fixture change; Step 3 (J Phase 2) gated off.
+
+
+
+---
+
+## G2 ACL Fix + Fresh G1–G4 Re-Verify (2026-08-09 evening)
+
+### Diagnosis (before fix)
+
+Evidence: `evidence/g2_leak_diagnosis_20260809.txt`
+
+| Case | Leaked IDs | Caller ACL | Stored acl_terms | Entitled? |
+|------|------------|------------|------------------|-----------|
+| rt-03-direct-allow | doc-rt-group-allow, doc-rt-inherited-allow | principal-alice + group-eng + ... | group-eng / group-eng+group-all-tenant-a | YES (acl_matrix READ via group-eng) |
+| rt-05-inherited-allow | doc-rt-unshare | principal-erin + groups | principal-erin | YES (OWNER) |
+
+- Payloads on `block_g_verify_gemini` matched `documents.json` (not a re-index metadata drop).
+- Corpus had 0 `deny:` terms; G Qdrant filter had allow MatchAny only (no must_not deny) — parity gap vs Block F, not causal for these two leaks.
+- Primary root cause: fixture-label mismatch — `forbidden_document_ids` listed documents the principal is entitled to read; Gemini similarity surfaced them and G2 scored false leaks.
+
+### Fix applied (attempt #1)
+
+1. Block G deny-override (F parity): `app/services/acl_filter.py` + `app/services/qdrant_store.py` — `acl_allows` honors `deny:`; Qdrant filter adds `must_not MatchAny(deny:<caller-terms>)`. Backups: `*.bak_20260809_g2`.
+2. Forbidden-list alignment with ACL entitlement: `fixtures/acl_redteam_cases.json` + `fixtures/generate_fixtures.py` — remove entitled docs from forbidden (rt-03 dropped group/inherited allow; rt-05 dropped Erin-owned unshare). Backup: `acl_redteam_cases.json.bak_20260809_g2`. Thresholds and 15-case set unchanged.
+
+### Fresh G1–G4 (same run, G_REUSE_COLLECTION=1, existing Gemini collection)
+
+| ID | Result | Measured |
+|----|--------|----------|
+| G1 | PASS | Recall@10 1.0000 |
+| G2 | PASS | 0 leaks / 15 |
+| G3 | PASS | avg 20.02 ms, p95 34.66 ms |
+| G4 | PASS | dual model versions + legacy 64-d coexistence |
+
+Overall: PASS (technical). Evidence: `evidence/g_gemini_g2fix_rerun_20260809.txt`, `evidence/g_gemini_reverification_20260809.json`. Independent reviewer still PENDING.
+
+```powershell
+cd "D:\PROJECTS\Sync Ai Final\services\block-g-vector-search"
+$env:QDRANT_HOST="localhost"; $env:QDRANT_PORT="6335"
+$env:FIXTURES_PATH="D:\PROJECTS\Sync Ai Final\fixtures"
+$env:G_REUSE_COLLECTION="1"; $env:VECTOR_DB_TYPE="qdrant"
+$env:EMBEDDING_PROVIDER="gemini"; $env:EMBEDDING_MODEL="gemini-embedding-001"
+$env:EMBEDDING_DIMENSION="768"; $env:PYTHONPATH=(Get-Location).Path
+& "..\..\.venv\Scripts\python.exe" tests\verify_g_gemini_reverification.py
+```
+

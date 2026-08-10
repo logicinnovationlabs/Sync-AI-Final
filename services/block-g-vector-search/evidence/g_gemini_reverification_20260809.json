@@ -1,0 +1,64 @@
+{
+  "date": "2026-08-09T13:28:43.630056+00:00",
+  "prior_fixture_dimensions": 64,
+  "gemini_dimensions": 768,
+  "collection_prefix": "block_g_verify_gemini",
+  "legacy_prefix": "block_g_verify_legacy64",
+  "model_v1": "gemini-embedding-001",
+  "model_v2": "gemini-embedding-001-v2",
+  "docs_indexed": 60,
+  "G1": {
+    "avg_recall_at_10": 1.0,
+    "pass": true,
+    "per_query": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "G2": {
+    "leaks": [],
+    "pass": true
+  },
+  "G3": {
+    "avg_ms": 20.017009998991853,
+    "p95_ms": 34.661499987123534,
+    "pass": true
+  },
+  "G4": {
+    "pass": true,
+    "reasons": [],
+    "versions_seen": [
+      "gemini-embedding-001",
+      "gemini-embedding-001-v2"
+    ]
+  },
+  "overall": "PASS"
+}
