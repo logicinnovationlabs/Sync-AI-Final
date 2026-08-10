@@ -26,13 +26,19 @@ class Settings(BaseSettings):
     kafka_topic_deletions: str = "ingest.chunks.deletions.v1"
     
     # Embedding
-    embedding_provider: str = "openai"
-    embedding_model: str = "text-embedding-3-small"
+    embedding_provider: str = "mock"
+    embedding_model: str = "gemini-embedding-001"
     embedding_model_version: str = "v1"
-    embedding_dimensions: int = 1536
+    embedding_dimensions: int = 768
     embedding_max_tokens: int = 8191
     openai_api_key: Optional[str] = None
     anthropic_api_key: Optional[str] = None
+    gemini_api_key: Optional[str] = None
+    jwt_public_key_path: Optional[str] = None
+    jwt_issuer: str = "snyq-platform"
+    jwt_algorithm: str = "RS256"
+    block_a_token_validate_url: Optional[str] = None
+    fixtures_path: Optional[str] = None
     
     # Chunking
     chunker_version: str = "1.0.0"

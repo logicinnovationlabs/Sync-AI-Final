@@ -137,10 +137,12 @@ async def verify_re_embed_trigger():
         
         print(f"   [OK] Full trigger executed correctly")
         
-        # Verify jobs have correct model version
+        # Verify jobs have correct model version (tenant-scoped — shared verify DB
+        # retains jobs from prior runs, so never query model_version alone).
         print("\n[7] Test 5: Verify jobs have correct model version...")
         jobs_query = select(EmbeddingJob).where(
-            EmbeddingJob.model_version_target == "v2"
+            EmbeddingJob.tenant_id == tenant_id,
+            EmbeddingJob.model_version_target == "v2",
         )
         result = await session.execute(jobs_query)
         jobs = result.scalars().all()

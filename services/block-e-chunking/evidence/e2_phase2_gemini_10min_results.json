@@ -1,0 +1,25 @@
+{
+  "test_type": "E2 Phase2 Gemini 10-minute sustained throughput",
+  "provider": "GeminiEmbeddingProvider",
+  "model": "gemini-embedding-001",
+  "dimension": "768",
+  "fixtures_path": "D:\\PROJECTS\\Sync Ai Final\\fixtures",
+  "concurrency": "4",
+  "batch_size": 50,
+  "duration_minutes": 10,
+  "aggregate_metrics": {
+    "overall_docs_per_minute": 1373.4922588766883,
+    "min_docs_per_minute": 560.9943762851846,
+    "max_docs_per_minute": 1871.5110828648078,
+    "total_documents": 13750,
+    "total_chunks": 13750,
+    "actual_duration_seconds": 600.6586456298828
+  },
+  "provider_stats": {
+    "throttle_events": 0,
+    "total_api_calls": 275
+  },
+  "worst_sliding_window_docs_per_minute": 1249.792610250298,
+  "meets_target": true,
+  "ended_at": "2026-08-08T20:35:25.273925+00:00"
+}

@@ -25,14 +25,17 @@ def verify_ast_chunking():
     print("\n[1] Creating CodeChunker...")
     chunker = CodeChunker()
     
-    # Load code fixtures
-    print("\n[2] Loading Block Z code fixtures...")
-    fixtures_dir = os.path.join(
-        os.path.dirname(__file__),
-        "..",
-        "fixtures",
-        "code"
-    )
+    # Load code fixtures — prefer shared Block Z code_corpus when FIXTURES_PATH set
+    print("\n[2] Loading code fixtures (shared Block Z code_corpus preferred)...")
+    fixtures_path = os.environ.get("FIXTURES_PATH")
+    shared = None
+    if fixtures_path:
+        shared = os.path.join(fixtures_path, "code_corpus")
+        if not os.path.isdir(shared):
+            shared = None
+    private = os.path.join(os.path.dirname(__file__), "..", "fixtures", "code")
+    fixtures_dir = shared if shared else private
+    print(f"   Using fixtures_dir={os.path.abspath(fixtures_dir)} (shared={bool(shared)})")
     
     # Count files per language
     python_files = glob.glob(os.path.join(fixtures_dir, "python", "*.py"))

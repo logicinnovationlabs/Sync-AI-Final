@@ -1,4 +1,4 @@
-"""
+﻿"""
 Component 8 Verification Script
 Verifies throughput harness (E2: ≥500 docs/min/worker sustained 10 min)
 """
@@ -44,10 +44,10 @@ async def verify_throughput_harness():
     print(f"   Sample code document line count: {len(code_docs[0].splitlines())} lines")
     
     if len(prose_docs) != 10 or len(code_docs) != 10:
-        print(f"   ✗ Document generation failed")
+        print(f"   [FAIL] Document generation failed")
         return False
     
-    print(f"   ✓ Document generation works")
+    print(f"   [OK] Document generation works")
     
     # Test 2: Measure end-to-end throughput (prose)
     print("\n[3] Test 2: Measure end-to-end chunk+embed throughput (prose)...")
@@ -62,14 +62,14 @@ async def verify_throughput_harness():
     print(f"   Avg chunk time: {prose_result['avg_chunk_time_ms']:.1f}ms")
     
     if prose_result['document_count'] != 10:
-        print(f"   ✗ Wrong document count")
+        print(f"   [FAIL] Wrong document count")
         return False
     
     if prose_result['total_chunks'] == 0:
-        print(f"   ✗ No chunks generated")
+        print(f"   [FAIL] No chunks generated")
         return False
     
-    print(f"   ✓ Prose chunking throughput measured")
+    print(f"   [OK] Prose chunking throughput measured")
     
     # Test 3: Measure end-to-end throughput (code)
     print("\n[4] Test 3: Measure end-to-end chunk+embed throughput (code)...")
@@ -83,14 +83,14 @@ async def verify_throughput_harness():
     print(f"   Docs/chunk: {code_result['docs_per_chunk']:.1f}")
     
     if code_result['document_count'] != 10:
-        print(f"   ✗ Wrong document count")
+        print(f"   [FAIL] Wrong document count")
         return False
     
     if code_result['total_chunks'] == 0:
-        print(f"   ✗ No chunks generated")
+        print(f"   [FAIL] No chunks generated")
         return False
     
-    print(f"   ✓ Code chunking throughput measured")
+    print(f"   [OK] Code chunking throughput measured")
     
     # Test 4: Short sustained test (60 seconds instead of 10 min for verification)
     print("\n[5] Test 4: Short sustained test (60 seconds)...")
@@ -116,32 +116,32 @@ async def verify_throughput_harness():
     print(f"   Docs/chunk: {sustained_result['docs_per_chunk']:.1f}")
     
     if sustained_result['batch_count'] == 0:
-        print(f"   ✗ No batches processed")
+        print(f"   [FAIL] No batches processed")
         return False
     
     if sustained_result['total_documents_processed'] == 0:
-        print(f"   ✗ No documents processed")
+        print(f"   [FAIL] No documents processed")
         return False
     
-    print(f"   ✓ Sustained test harness works")
+    print(f"   [OK] Sustained test harness works")
     
     # Test 5: Verify metrics calculation
     print("\n[6] Test 5: Verify metrics calculation...")
     
     # Check that metrics are reasonable
     if sustained_result['overall_docs_per_minute'] <= 0:
-        print(f"   ✗ Invalid overall docs/min")
+        print(f"   [FAIL] Invalid overall docs/min")
         return False
     
     if sustained_result['avg_docs_per_minute'] <= 0:
-        print(f"   ✗ Invalid avg docs/min")
+        print(f"   [FAIL] Invalid avg docs/min")
         return False
     
     if sustained_result['min_docs_per_minute'] > sustained_result['max_docs_per_minute']:
-        print(f"   ✗ Min > Max (invalid)")
+        print(f"   [FAIL] Min > Max (invalid)")
         return False
     
-    print(f"   ✓ Metrics calculation correct")
+    print(f"   [OK] Metrics calculation correct")
     
     print("\n" + "=" * 80)
     print("COMPONENT 8 VERIFICATION: PASSED")
@@ -170,7 +170,7 @@ if __name__ == "__main__":
         success = asyncio.run(verify_throughput_harness())
         sys.exit(0 if success else 1)
     except Exception as e:
-        print(f"\n✗ Verification failed with exception: {e}")
+        print(f"\n[FAIL] Verification failed with exception: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

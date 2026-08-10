@@ -5,6 +5,8 @@ Per Master Build Prompt v1.0, §8 (E2 redefined)
 """
 
 import time
+import asyncio
+import os
 import statistics
 from typing import List, Dict, Any
 from datetime import datetime
@@ -62,6 +64,22 @@ class ThroughputHarness:
         documents = []
         
         if doc_type == "prose":
+            # Prefer shared Block Z fixtures when FIXTURES_PATH is set
+            fixtures_path = os.environ.get("FIXTURES_PATH")
+            if fixtures_path:
+                import json
+                docs_json = Path(fixtures_path) / "documents.json"
+                if docs_json.exists():
+                    payload = json.loads(docs_json.read_text(encoding="utf-8"))
+                    bodies = []
+                    for d in payload.get("documents", []):
+                        body = d.get("body") or d.get("title") or ""
+                        title = d.get("title") or ""
+                        bodies.append(f"{title}\n\n{body}".strip())
+                    if bodies:
+                        while len(bodies) < count:
+                            bodies.extend(list(bodies))
+                        return bodies[:count]
             # Use prose fixtures if available, otherwise fall back to synthetic
             prose_dir = Path(__file__).parent.parent.parent / "fixtures" / "prose"
             if prose_dir.exists():
@@ -185,41 +203,66 @@ async def async_function_{i}(data):
         total_chunks = 0
         chunk_times = []
         
+        # Chunk all docs, then embed in large same-tenant batches (throughput tuning).
+        doc_chunks = []
         for i, doc in enumerate(documents):
-            doc_start = time.time()
-            
-            # Step 1: Chunk the document
+            t0 = time.time()
             if doc_type == "prose":
                 chunks = chunker.chunk(doc)
             else:
                 chunks = chunker.chunk(doc, language)
-            
-            # Step 2: Extract chunk texts for embedding
-            chunk_texts = [chunk.text for chunk in chunks]
-            
-            # Step 3: Embed the chunks (includes provider latency)
-            embedding_results = await self.embedding_provider.embed_batch(
-                texts=chunk_texts,
-                tenant_id=tenant_id,
-                model_version=model_version,
-            )
-            
-            # Step 4: Generate chunk IDs (simulates record write overhead)
-            for chunk, embedding_result in zip(chunks, embedding_results):
-                # Prose chunks don't have chunk_type, use default
-                chunk_type = getattr(chunk, 'chunk_type', 'prose')
-                chunk_id = self.chunk_id_generator.generate(
+            texts = [c.text for c in chunks] or [doc[:1000] or "empty"]
+            chunk_times.append(time.time() - t0)
+            doc_chunks.append((i, chunks, texts))
+            total_chunks += len(texts)
+
+        all_texts = []
+        owners = []  # (doc_idx, local_chunk_idx)
+        for i, chunks, texts in doc_chunks:
+            for j, t in enumerate(texts):
+                all_texts.append(t)
+                owners.append((i, j))
+
+        max_batch = max(1, int(os.environ.get("GEMINI_MAX_BATCH_SIZE", os.environ.get("E2_EMBED_BATCH", "50"))))
+        concurrency = max(1, int(os.environ.get("E2_DOC_CONCURRENCY", "4")))
+        sem = asyncio.Semaphore(concurrency)
+
+        async def _embed_slice(start: int, end: int):
+            async with sem:
+                slice_texts = all_texts[start:end]
+                return start, await self.embedding_provider.embed_batch(
+                    texts=slice_texts,
                     tenant_id=tenant_id,
-                    document_id=f"doc_{i}",
-                    document_version=1,
-                    chunk_type=chunk_type,
-                    chunk_index=chunk.chunk_index,
-                    content_hash=chunk.chunk_id if hasattr(chunk, 'chunk_id') else str(hash(chunk.text))
+                    model_version=model_version,
                 )
-            
-            doc_end = time.time()
-            chunk_times.append(doc_end - doc_start)
-            total_chunks += len(chunks)
+
+        slices = [(s, min(s + max_batch, len(all_texts))) for s in range(0, len(all_texts), max_batch)]
+        embedded = await asyncio.gather(*[_embed_slice(s, e) for s, e in slices])
+        # Map embeddings back and generate chunk IDs
+        flat_results = [None] * len(all_texts)
+        for start, results in embedded:
+            for offset, res in enumerate(results):
+                flat_results[start + offset] = res
+
+        for (doc_i, local_j), emb in zip(owners, flat_results):
+            i, chunks, texts = doc_chunks[doc_i]
+            if chunks and local_j < len(chunks):
+                chunk = chunks[local_j]
+                chunk_type = getattr(chunk, "chunk_type", "prose")
+                content_hash = chunk.chunk_id if hasattr(chunk, "chunk_id") else str(hash(chunk.text))
+                chunk_index = chunk.chunk_index
+            else:
+                chunk_type = "prose"
+                content_hash = str(hash(texts[local_j]))
+                chunk_index = local_j
+            self.chunk_id_generator.generate(
+                tenant_id=tenant_id,
+                document_id=f"doc_{doc_i}",
+                document_version=1,
+                chunk_type=chunk_type,
+                chunk_index=chunk_index,
+                content_hash=content_hash,
+            )
         
         end_time = time.time()
         total_time = end_time - start_time

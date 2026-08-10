@@ -1,4 +1,4 @@
-version: '3.8'
+﻿version: '3.8'
 
 services:
   redis:
@@ -18,7 +18,7 @@ services:
     container_name: block_e_postgres
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: verify
       POSTGRES_DB: block_e
     ports:
       - "5433:5432"
@@ -39,12 +39,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: celery -A app.workers.embedding_worker worker --loglevel=info --concurrency=1
+    command: celery -A app.workers.embedding_worker worker --loglevel=info --concurrency=8
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
       - REDIS_URL=redis://redis:6379/0
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/block_e
+      - DATABASE_URL=postgresql+asyncpg://postgres:verify@postgres:5432/block_e_verify
     depends_on:
       redis:
         condition: service_healthy

@@ -26,12 +26,16 @@ def _run_verify_script(script_name: str) -> None:
     script = TESTS_DIR / script_name
     env = os.environ.copy()
     env["PYTHONPATH"] = str(SERVICE_ROOT)
+    # Windows consoles default to cp1252; force UTF-8 for verify script stdout.
+    env.setdefault("PYTHONIOENCODING", "utf-8")
     result = subprocess.run(
         [sys.executable, str(script)],
         cwd=str(SERVICE_ROOT),
         env=env,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     assert result.returncode == 0, result.stdout + result.stderr
 

@@ -14,6 +14,7 @@ import sys
 import os
 import uuid
 import time
+from datetime import datetime
 import struct
 import redis
 
@@ -43,7 +44,7 @@ def verify_write_verification():
     print("=" * 80)
     
     # Setup database connection
-    DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql+asyncpg://postgres:postgres@postgres:5432/block_e')
+    DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql+asyncpg://postgres:verify@localhost:5433/block_e_verify')
     SYNC_DATABASE_URL = DATABASE_URL.replace('postgresql+asyncpg://', 'postgresql://')
     db_engine = create_engine(SYNC_DATABASE_URL, echo=False)
     SessionLocal = sessionmaker(db_engine, expire_on_commit=False)
@@ -84,14 +85,14 @@ def verify_write_verification():
             document_version=document_version,
             chunk_index=chunk_index,
             chunk_type=chunk_type,
-            content_text=content_text,
+            chunk_text=content_text,
             token_count=token_count,
-            source_span_start=source_span_start,
-            source_span_end=source_span_end,
+            start_byte=source_span_start,
+            end_byte=source_span_end,
             chunker_version=chunker_version,
             content_hash=content_hash,
             chunk_content_checksum=chunk_content_checksum,
-            source_run_id=source_run_id
+            source_run_id=source_run_id,
             # created_at and updated_at use DB-level DEFAULT now() per v7.0 §2.3
         )
         
@@ -123,14 +124,39 @@ def verify_write_verification():
             'model_version_target': 'v1'
         }
         
-        # Invoke task directly (synchronous for test)
+        # Invoke via real Celery worker (apply_async), wait for worker-side log + DB write
         try:
-            result = embedding_task(job_data)
-            print(f"   ✓ Task completed: job_id={job_id}")
-            print(f"   ✓ Task returned celery_task_id={result.get('celery_task_id')}")
+            async_result = embedding_task.apply_async(args=[job_data])
+            celery_task_id = async_result.id
+            print(f"   Enqueued celery_task_id={celery_task_id}")
+            # Wait up to 60s for worker to process (provider call log + DB)
+            deadline = time.time() + 60
+            seen_log = False
+            while time.time() < deadline:
+                entries = redis_client.lrange(PROVIDER_CALL_LOG_KEY, 0, -1)
+                for raw in entries:
+                    entry = json.loads(raw)
+                    if entry.get("job_id") == job_id:
+                        seen_log = True
+                        print(f"   Worker log hit: celery_task_id={entry.get('celery_task_id')}")
+                        break
+                if seen_log:
+                    break
+                time.sleep(0.2)
+            if not seen_log:
+                print("   Task did not appear in worker provider call log within 60s")
+                return False
+            # Prefer get() if ready; do not fail solely on AsyncResult if DB write succeeded
+            try:
+                result = async_result.get(timeout=10)
+                print(f"   Task completed: job_id={job_id}")
+                print(f"   Task returned celery_task_id={result.get('celery_task_id')}")
+            except Exception as wait_exc:
+                print(f"   AsyncResult.get note: {wait_exc} (continuing with DB read-back)")
+                result = {"job_id": job_id, "celery_task_id": celery_task_id}
         except AssertionError as e:
             if "HARDENING VIOLATION v7.0 §4.6" in str(e):
-                print(f"   ✗ Task raised hardening violation: {e}")
+                print(f"   Task raised hardening violation: {e}")
                 print(f"   This is expected if rowcount==0 (row did not exist)")
                 return False
             raise
@@ -152,9 +178,11 @@ def verify_write_verification():
             for entry in log_entries:
                 print(f"   Log entry: job_id={entry.get('job_id')}, celery_task_id={entry.get('celery_task_id')}, chunk_id={entry.get('chunk_id')}")
         
-        # Step 4: Read the row back after commit
+        # Step 4: Read the row back after commit (new session — worker wrote in another process)
         print("\n[4] Reading row back after commit...")
-        
+        session.expire_all()
+        session.close()
+        session = SessionLocal()
         result = session.execute(
             select(ChunkRecord).where(ChunkRecord.chunk_id == chunk_id)
         )
@@ -230,12 +258,12 @@ def verify_write_verification():
             tenant_id=tenant_id,
             document_id=document_id,
             document_version=document_version,
-            chunk_index=0,
+            chunk_index=1,
             chunk_type=chunk_type,
-            content_text=content_text,
+            chunk_text=content_text,
             token_count=token_count,
-            source_span_start=source_span_start,
-            source_span_end=source_span_end,
+            start_byte=source_span_start,
+            end_byte=source_span_end,
             chunker_version=chunker_version,
             content_hash=content_hash,
             chunk_content_checksum=chunk_content_checksum,

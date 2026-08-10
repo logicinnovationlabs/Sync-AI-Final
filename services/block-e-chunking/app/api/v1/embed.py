@@ -9,7 +9,6 @@ Authentication: Uses Block A's JWT-based scope enforcement middleware.
 """
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
@@ -19,10 +18,10 @@ import hashlib
 from app.models.embedding_job import EmbeddingJob, JobStatus
 from app.models.chunk_record import ChunkRecord
 from app.config import settings
+from app.auth.jwt_auth import get_current_user, get_tenant, require_scope
 
 
 router = APIRouter()
-security = HTTPBearer()
 
 
 # Request/Response Models
@@ -76,105 +75,6 @@ class EmbedResponse(BaseModel):
     status: str
     chunks_targeted: int
     message: str
-
-
-# Block A-style JWT authentication dependencies
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> Dict[str, Any]:
-    """
-    Dependency to get the current authenticated user from JWT.
-    
-    CRITICAL SECURITY WARNING: This implementation does NOT verify JWT signatures.
-    It only decodes the JWT payload without cryptographic verification.
-    This means anyone can construct a fake JWT with arbitrary tenant_id claims.
-    
-    This is a STUB for development only. Before production use, this MUST be replaced
-    with Block A's actual token_service.validate_token() which performs signature
-    verification against Block A's signing key/JWKS.
-    
-    Returns:
-        Dict with token payload (contains tenant_id, principal_id, scopes, etc.).
-        
-    Raises:
-        HTTPException 401 if token is invalid.
-    """
-    token = credentials.credentials
-    
-    # SECURITY: This does NOT verify signatures - DO NOT USE IN PRODUCTION
-    # TODO: Replace with Block A's actual token_service.validate_token()
-    if not token or len(token) < 10:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    
-    # Stub: decode JWT payload WITHOUT signature verification
-    # This is insecure - anyone can forge a JWT with arbitrary claims
-    try:
-        import base64
-        import json
-        
-        try:
-            # Decode JWT payload (NO SIGNATURE VERIFICATION)
-            parts = token.split('.')
-            if len(parts) == 3:
-                payload = parts[1]
-                payload += '=' * (4 - len(payload) % 4)
-                decoded = base64.urlsafe_b64decode(payload)
-                token_data = json.loads(decoded)
-                return token_data
-        except:
-            pass
-        
-        # Fallback: mock payload for development
-        return {
-            "tenant_id": "default_tenant",
-            "principal_id": "user_001",
-            "scopes": ["embed.write", "embed.read"],
-            "exp": 9999999999
-        }
-    except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
-
-
-async def get_tenant(
-    current_user: Dict[str, Any] = Depends(get_current_user),
-) -> str:
-    """
-    Dependency to extract tenant_id from the current user's JWT.
-    
-    Returns:
-        Tenant ID string.
-        
-    Raises:
-        HTTPException 401 if tenant_id is missing.
-    """
-    tenant_id = current_user.get("tenant_id")
-    if not tenant_id:
-        raise HTTPException(status_code=401, detail="Token missing tenant_id claim")
-    return tenant_id
-
-
-def require_scope(required_scope: str):
-    """
-    Factory function to create a scope-checking dependency.
-    
-    This mirrors Block A's require_scope dependency pattern.
-    
-    Args:
-        required_scope: Scope name (e.g., 'embed.write')
-        
-    Returns:
-        FastAPI dependency function.
-    """
-    async def scope_checker(current_user: Dict[str, Any] = Depends(get_current_user)):
-        scopes = current_user.get("scopes", [])
-        if required_scope not in scopes:
-            raise HTTPException(
-                status_code=403,
-                detail=f"Missing required scope: {required_scope}",
-            )
-        return current_user
-    
-    return scope_checker
 
 
 @router.post("/embed", response_model=EmbedResponse, dependencies=[Depends(require_scope("embed.write"))])

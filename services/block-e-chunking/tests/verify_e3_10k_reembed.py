@@ -20,11 +20,12 @@ from app.models.chunk_record import ChunkRecord, Base
 from app.models.embedding_job import EmbeddingJob
 
 # Configuration
-DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/block_e"
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:verify@localhost:5433/block_e_verify")
 TENANT_ID = "tenant_e3_test_10k"
 OLD_MODEL_VERSION = "v1"
 NEW_MODEL_VERSION = "v2"
 TARGET_CHUNK_COUNT = 10000
+CONTROL_TENANT_ID = "tenant_e3_control_untouched"
 
 
 async def generate_10k_chunks():
@@ -66,11 +67,11 @@ async def generate_10k_chunks():
                     document_id=f"doc_{batch_num}_{i}",
                     document_version=1,
                     chunk_index=i,
-                    chunk_type="prose",
-                    content_text=chunk_content,
+                    chunk_type="prose_paragraph",
+                    chunk_text=chunk_content,
                     token_count=50,
-                    source_span_start=0,
-                    source_span_end=len(chunk_content),
+                    start_byte=0,
+                    end_byte=len(chunk_content),
                     embedding_vector=b'\x00' * 6144,  # Mock embedding (1536 floats * 4 bytes)
                     embedding_model_version=OLD_MODEL_VERSION,
                     embedding_timestamp=datetime.utcnow(),
@@ -90,6 +91,33 @@ async def generate_10k_chunks():
         
         print(f"   ✓ Generated {chunks_generated} chunks")
     
+
+    # Seed control-tenant chunks that must remain at OLD_MODEL_VERSION
+    async with AsyncSessionLocal() as session:
+        await session.execute(text("DELETE FROM chunk_records WHERE tenant_id = :t"), {"t": CONTROL_TENANT_ID})
+        for i in range(5):
+            session.add(ChunkRecord(
+                chunk_id=uuid.uuid4().hex,
+                tenant_id=CONTROL_TENANT_ID,
+                document_id=f"ctrl_doc_{i}",
+                document_version=1,
+                chunk_index=i,
+                chunk_type="prose_paragraph",
+                chunk_text="control chunk must not be re-embedded",
+                token_count=10,
+                start_byte=0,
+                end_byte=40,
+                embedding_vector=b"\x00" * 6144,
+                embedding_model_version=OLD_MODEL_VERSION,
+                embedding_timestamp=datetime.utcnow(),
+                chunker_version="1.0.0",
+                content_hash=uuid.uuid4().hex,
+                chunk_content_checksum=uuid.uuid4().hex,
+                source_run_id="e3_control",
+            ))
+        await session.commit()
+        print(f"   Seeded control tenant {CONTROL_TENANT_ID} with 5 chunks at {OLD_MODEL_VERSION}")
+
     return chunks_generated
 
 
@@ -204,6 +232,20 @@ async def verify_e3():
     print(f"   Requirement: 100% of affected chunks re-embedded within 1 hour")
     print(f"   Result: {completed_chunks}/{chunks_generated} ({(completed_chunks/chunks_generated)*100:.1f}%) in {completion_time/60:.1f} minutes")
     
+
+    # Verify control tenant untouched
+    engine = create_async_engine(DATABASE_URL, echo=False)
+    AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with AsyncSessionLocal() as session:
+        ctrl = await session.execute(
+            select(ChunkRecord).where(ChunkRecord.tenant_id == CONTROL_TENANT_ID)
+        )
+        ctrl_chunks = ctrl.scalars().all()
+        touched = [c.chunk_id for c in ctrl_chunks if c.embedding_model_version != OLD_MODEL_VERSION]
+        print(f"\n[CONTROL TENANT] {CONTROL_TENANT_ID}: {len(ctrl_chunks)} chunks, touched={len(touched)}")
+        if touched:
+            print("E3 FAIL: control tenant chunks were modified")
+            return False
     if success and completion_time <= 3600:
         print(f"   Status: PASS (100% completion within 1 hour)")
         print("\n" + "=" * 80)
