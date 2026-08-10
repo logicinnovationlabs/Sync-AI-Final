@@ -373,7 +373,9 @@ D4 PASSED: Zero downtime, zero data loss, all pre-rotation data decrypts correct
 
 ## Deviations from spec
 
-1. **Encryption mechanism: pgcrypto instead of pgsodium/Vault.** Intentional. `EncryptionClient` uses `pgp_sym_encrypt`/`pgp_sym_decrypt`; passphrases stored as JSON envelopes in the `secrets` table via `VaultClient(use_pgsodium=False)`. Chosen for universal availability without special role grants. Obsolete pgsodium helper scripts remain in the tree as untracked/pre-refactor artifacts.
+1. **Encryption mechanism: pgcrypto instead of KMS envelope encryption / pgsodium/Vault.** Acceptable for POC. `EncryptionClient` uses `pgp_sym_encrypt`/`pgp_sym_decrypt`; passphrases stored as JSON envelopes in the `secrets` table via `VaultClient(use_pgsodium=False)`. Chosen for universal availability without special role grants. Obsolete pgsodium helper scripts remain in the tree as untracked/pre-refactor artifacts.
+
+   **Production migration (Phase 5 — Enterprise Hardening):** replace pgcrypto app-managed keys with Azure Key Vault envelope encryption (DEK wrapped by Key Vault CMK), rotate existing tenants, and update D4 key-rotation evidence against Key Vault. Do not ship production tenants on pgcrypto alone.
 2. **Migrations are raw SQL, not Alembic.** Block D has `migrations/001_create_tenants_table.sql` only. Drop/re-apply round-trip performed manually this session.
 3. **D2 object-store path:** Schema backup/restore goes through `backup_tenant`/`restore_tenant` (in-memory dump store, not yet writing dump blobs into MinIO). Object count/checksum integrity is verified in `test_D2_backup_restore_local.py` against real MinIO under the tenant prefix (put → delete → restore → compare). Full CLI wiring of object dumps into MinIO remains deferred.
 4. **D3 isolation boundary:** Criterion text mentions `StorageClient`/IAM-prefix denial. This session verifies the relational storage boundary via Postgres schema GRANT/REVOKE (`InsufficientPrivilege` on all 20 cross-tenant attempts). `ObjectStorageClient` prefix enforcement remains application-layer; MinIO IAM policies are not yet configured.
