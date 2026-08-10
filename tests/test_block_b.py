@@ -62,7 +62,8 @@ class TestBlockB:
                     matches += 1
         assert_pass("B4", matches == 0, f"{matches} forbidden credential patterns")
         assert matches == 0
-    # B5 - checkpoint resume succeeds for fixture checkpoint
+    # B5 - checkpoint resume (contract mock smoke). Authoritative kill/restart
+    # proof lives in backend/tests/test_signoff_block_b.py::test_b5_checkpoint_resume
     def test_b5_checkpoint_resume(self, block_client, fixture_loader):
         docs = fixture_loader.get_documents()
         cp = docs[0].get("checkpoint", "cp-drive-1")
