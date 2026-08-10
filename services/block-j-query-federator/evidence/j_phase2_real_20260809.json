@@ -1,0 +1,22 @@
+{
+  "date": "2026-08-09T13:35:07.757117+00:00",
+  "J1": {
+    "p95_ms": 1378.6106999905314,
+    "avg_ms": 1157.989998999401,
+    "pass": false
+  },
+  "J2": {
+    "leaks": [],
+    "pass": true
+  },
+  "J3": {
+    "ndcg_at_10": 1.0,
+    "pass": true
+  },
+  "J4": {
+    "pass": true,
+    "kill_g_total": 3,
+    "kill_h_total": 3
+  },
+  "overall": "FAIL"
+}
