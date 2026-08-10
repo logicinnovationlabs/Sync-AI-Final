@@ -21,7 +21,7 @@ from app.services.sync import sync_orchestrator
 from app.services.indexer import indexer
 from app.services.cursor_store import cursor_store
 from app.services.registry import connector_registry
-from app.connectors.google.oauth import GoogleOAuthManager
+from app.connectors.google.oauth import GoogleOAuthManager, seed_token_store_from_env
 from app.connectors.google.watch_manager import WatchManager
 from app.connectors.google.services.drive_service import DriveConnector
 from app.connectors.google.services.gmail_service import GmailConnector
@@ -172,13 +172,20 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str) -> dict:
         # Create OAuth manager for Google services
         oauth_manager = None
         if source_type.startswith("google_"):
-            client_id = getattr(settings, "GOOGLE_CLIENT_ID", "")
-            client_secret = getattr(settings, "GOOGLE_CLIENT_SECRET", "")
+            client_id = getattr(settings, "google_client_id", None) or getattr(settings, "GOOGLE_CLIENT_ID", "") or ""
+            client_secret = getattr(settings, "google_client_secret", None) or getattr(settings, "GOOGLE_CLIENT_SECRET", "") or ""
             scopes = [
                 "https://www.googleapis.com/auth/drive.readonly",
                 "https://www.googleapis.com/auth/gmail.readonly",
             ]
             oauth_manager = GoogleOAuthManager(token_store, client_id, client_secret, scopes)
+        seed_token_store_from_env(
+            token_store,
+            tenant_id,
+            client_id=client_id,
+            client_secret=client_secret,
+            refresh_token=getattr(settings, "google_refresh_token", None),
+        )
         
         # Get connector instance
         connector = connector_registry.get_connector(source_type, config, token_store)
@@ -187,26 +194,43 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str) -> dict:
         if hasattr(connector, "oauth_manager"):
             connector.oauth_manager = oauth_manager
         
-        # Run sync orchestrator (two-pass: deletions then delta)
+        # Resume from last mid-crawl checkpoint when present (Architecture B5)
+        resume_cursor = _run_async(cursor_store.get_cursor(tenant_id, source_type))
+        if resume_cursor:
+            logger.info(
+                f"Resuming backfill for tenant {tenant_id}, source {source_type} "
+                f"from checkpoint cursor={resume_cursor!r}"
+            )
+
+        def _persist_checkpoint(next_cursor: str) -> None:
+            """Persist page cursor after each successful batch (mid-crawl checkpoint)."""
+            _run_async(cursor_store.update_cursor(tenant_id, source_type, next_cursor))
+            logger.debug(
+                f"Checkpoint saved tenant={tenant_id} source={source_type} cursor={next_cursor!r}"
+            )
+
+        # Run sync orchestrator (two-pass: deletions then delta, paginated + checkpointed)
         since = datetime.utcnow() - timedelta(days=365)  # Look back 1 year
         result = sync_orchestrator.run_two_pass_sync(
             connector=connector,
             tenant_id=tenant_id,
             since=since,
+            cursor=resume_cursor,
+            on_cursor_update=_persist_checkpoint,
         )
         
-        # Store final cursor
+        # Store final cursor (may already match last per-page checkpoint)
         final_cursor = result.get("final_cursor")
         if final_cursor:
             _run_async(cursor_store.update_cursor(tenant_id, source_type, final_cursor))
         
-        # Register watch channel/subscription
+        # Register watch channel/subscription only after a completed crawl
         webhook_base_url = getattr(settings, "WEBHOOK_BASE_URL", "http://localhost:8000/api/v1")
         watch_manager = WatchManager(oauth_manager, cursor_store, webhook_base_url)
         
-        if source_type == "google_drive":
+        if source_type == "google_drive" and final_cursor:
             _run_async(watch_manager.register_drive_watch(tenant_id, final_cursor))
-        elif source_type == "google_gmail":
+        elif source_type == "google_gmail" and final_cursor:
             pubsub_topic = getattr(settings, "GOOGLE_PUBSUB_TOPIC", "")
             if pubsub_topic:
                 full_topic = f"projects/{getattr(settings, 'GOOGLE_PUBSUB_PROJECT_ID', '')}/topics/{pubsub_topic}"
@@ -214,7 +238,8 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str) -> dict:
         
         logger.info(
             f"Backfill completed for tenant {tenant_id}, source {source_type}: "
-            f"{result.get('indexed_count', 0)} indexed, {result.get('deleted_count', 0)} deleted"
+            f"{result.get('indexed_count', 0)} indexed, {result.get('deleted_count', 0)} deleted, "
+            f"{result.get('pages_processed', 0)} pages"
         )
         
         return result
@@ -260,13 +285,21 @@ def process_drive_notification(self, tenant_id: str) -> dict:
         token_store = DummyTokenStore()
         
         # Create OAuth manager
-        client_id = getattr(settings, "GOOGLE_CLIENT_ID", "")
-        client_secret = getattr(settings, "GOOGLE_CLIENT_SECRET", "")
+        client_id = getattr(settings, "google_client_id", None) or getattr(settings, "GOOGLE_CLIENT_ID", "") or ""
+        client_secret = getattr(settings, "google_client_secret", None) or getattr(settings, "GOOGLE_CLIENT_SECRET", "") or ""
         scopes = [
             "https://www.googleapis.com/auth/drive.readonly",
             "https://www.googleapis.com/auth/gmail.readonly",
         ]
         oauth_manager = GoogleOAuthManager(token_store, client_id, client_secret, scopes)
+        # Seed refresh token from env into TokenStore (key google_oauth:{tenant_id})
+        seed_token_store_from_env(
+            token_store,
+            tenant_id,
+            client_id=client_id,
+            client_secret=client_secret,
+            refresh_token=getattr(settings, "google_refresh_token", None),
+        )
         
         # Create Drive connector
         connector = DriveConnector(config, token_store, oauth_manager)
@@ -370,13 +403,20 @@ def process_gmail_notification(self, tenant_id: str) -> dict:
         token_store = DummyTokenStore()
         
         # Create OAuth manager
-        client_id = getattr(settings, "GOOGLE_CLIENT_ID", "")
-        client_secret = getattr(settings, "GOOGLE_CLIENT_SECRET", "")
+        client_id = getattr(settings, "google_client_id", None) or getattr(settings, "GOOGLE_CLIENT_ID", "") or ""
+        client_secret = getattr(settings, "google_client_secret", None) or getattr(settings, "GOOGLE_CLIENT_SECRET", "") or ""
         scopes = [
             "https://www.googleapis.com/auth/drive.readonly",
             "https://www.googleapis.com/auth/gmail.readonly",
         ]
         oauth_manager = GoogleOAuthManager(token_store, client_id, client_secret, scopes)
+        seed_token_store_from_env(
+            token_store,
+            tenant_id,
+            client_id=client_id,
+            client_secret=client_secret,
+            refresh_token=getattr(settings, "google_refresh_token", None),
+        )
         
         # Create Gmail connector
         connector = GmailConnector(config, token_store, oauth_manager)
@@ -524,13 +564,20 @@ def revalidate_acls_for_tenant(self, tenant_id: str, source_type: str) -> dict:
         # Create OAuth manager for Google services
         oauth_manager = None
         if source_type.startswith("google_"):
-            client_id = getattr(settings, "GOOGLE_CLIENT_ID", "")
-            client_secret = getattr(settings, "GOOGLE_CLIENT_SECRET", "")
+            client_id = getattr(settings, "google_client_id", None) or getattr(settings, "GOOGLE_CLIENT_ID", "") or ""
+            client_secret = getattr(settings, "google_client_secret", None) or getattr(settings, "GOOGLE_CLIENT_SECRET", "") or ""
             scopes = [
                 "https://www.googleapis.com/auth/drive.readonly",
                 "https://www.googleapis.com/auth/gmail.readonly",
             ]
             oauth_manager = GoogleOAuthManager(token_store, client_id, client_secret, scopes)
+        seed_token_store_from_env(
+            token_store,
+            tenant_id,
+            client_id=client_id,
+            client_secret=client_secret,
+            refresh_token=getattr(settings, "google_refresh_token", None),
+        )
         
         connector = connector_registry.get_connector(source_type, config, token_store)
         

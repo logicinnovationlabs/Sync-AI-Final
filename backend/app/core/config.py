@@ -197,6 +197,12 @@ class Settings(BaseSettings):
     google_client_id: Optional[str] = Field(default=None)
     google_client_secret: Optional[str] = Field(default=None)
     google_redirect_uri: Optional[str] = Field(default=None)
+    # Optional env-seeded refresh token for local/real-source verification (7-day Testing apps).
+    # Production path still expects tokens in TokenStore after OAuth exchange.
+    google_refresh_token: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("GOOGLE_REFRESH_TOKEN", "google_refresh_token"),
+    )
 
     qdrant_api_key: Optional[str] = Field(default=None)
     gemini_api_key: Optional[str] = Field(default=None)

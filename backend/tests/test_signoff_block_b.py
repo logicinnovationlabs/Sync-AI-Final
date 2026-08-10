@@ -1,5 +1,5 @@
 """
-Block B Signoff Tests - B1 through B7.
+Block B Signoff Tests - B1 through B7 (+ master architecture B5 checkpoint resume).
 
 Block signoff: PASS only if B1–B7 all PASS for both the Drive and Gmail services.
 
@@ -8,14 +8,17 @@ All tests use:
 - Mocked Google API responses (no real API calls)
 - Test fixtures from tests/fixtures/google/
 
-Criteria:
+Criteria (local suite IDs):
 B1. Backfill completeness
 B2. Webhook-triggered incremental correctness
 B3. Webhook authenticity rejection
 B4. Rate-limit resilience
-B5. Credential leakage
+B5. Credential leakage          ← local B5 (not master B5)
 B6. Metadata allowlist enforcement
 B7. Watch channel renewal
+
+Master architecture criterion B5 (checkpoint resume) is covered by
+``test_b5_checkpoint_resume`` — see SIGNOFF_BLOCK_B.md ID mapping.
 """
 
 import pytest
@@ -41,8 +44,8 @@ from app.workers.tasks import (
 from app.services.cursor_store import cursor_store
 from app.storage.qdrant_client import qdrant_client
 from app.connectors.google.webhooks import router as webhook_router
-from fastapi.testclient import TestClient
 from fastapi import FastAPI
+import httpx
 
 
 # Load fixtures
@@ -366,43 +369,46 @@ async def test_B3_webhook_authenticity_rejection(mock_cursor_store):
     
     POST forged notifications, assert 403 returned and Celery task never called.
     """
-    # Create test app with webhook router
+    # Create test app with webhook router.
+    # Prefer httpx ASGITransport over Starlette TestClient: on Python 3.14
+    # + nest_asyncio, TestClient raises AttributeError on task.set_name.
     app = FastAPI()
     app.include_router(webhook_router)
-    client = TestClient(app)
-    
-    # Test 1: Drive webhook with invalid channel token
-    with patch("app.workers.tasks.process_drive_notification.delay") as mock_task:
-        response = client.post(
-            "/webhooks/google/drive",
-            headers={
-                "X-Goog-Channel-Id": "drive-tenant123-abc12345",
-                "X-Goog-Channel-Token": "WRONG_TOKEN",
-                "X-Goog-Resource-Id": "resource_xyz789",
-                "X-Goog-Resource-State": "update",
-            }
-        )
-        
-        assert response.status_code == 403
-        assert not mock_task.called, "Task should not be called for invalid token"
-        print("✓ B3 PASS (Drive): Forged webhook rejected, task not enqueued")
-    
-    # Test 2: Gmail webhook with missing verification token
-    with patch("app.workers.tasks.process_gmail_notification.delay") as mock_task:
-        response = client.post(
-            "/webhooks/google/gmail",
-            json={
-                "message": {
-                    "data": "aW52YWxpZF9kYXRh",  # Invalid base64
-                    "messageId": "12345",
-                }
-            }
-        )
-        
-        # Should fail on decoding or validation
-        assert response.status_code in [400, 403]
-        assert not mock_task.called
-        print("✓ B3 PASS (Gmail): Forged webhook rejected, task not enqueued")
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        # Test 1: Drive webhook with invalid channel token
+        with patch("app.workers.tasks.process_drive_notification.delay") as mock_task:
+            response = await client.post(
+                "/webhooks/google/drive",
+                headers={
+                    "X-Goog-Channel-Id": "drive-tenant123-abc12345",
+                    "X-Goog-Channel-Token": "WRONG_TOKEN",
+                    "X-Goog-Resource-Id": "resource_xyz789",
+                    "X-Goog-Resource-State": "update",
+                },
+            )
+
+            assert response.status_code == 403
+            assert not mock_task.called, "Task should not be called for invalid token"
+            print("✓ B3 PASS (Drive): Forged webhook rejected, task not enqueued")
+
+        # Test 2: Gmail webhook with missing verification token
+        with patch("app.workers.tasks.process_gmail_notification.delay") as mock_task:
+            response = await client.post(
+                "/webhooks/google/gmail",
+                json={
+                    "message": {
+                        "data": "aW52YWxpZF9kYXRh",  # Invalid base64
+                        "messageId": "12345",
+                    }
+                },
+            )
+
+            # Should fail on decoding or validation
+            assert response.status_code in [400, 403]
+            assert not mock_task.called
+            print("✓ B3 PASS (Gmail): Forged webhook rejected, task not enqueued")
 
 
 # ============================================================
@@ -446,13 +452,14 @@ async def test_B4_rate_limit_resilience(mock_oauth_manager, mock_qdrant, mock_cu
 
 
 # ============================================================
-# B5: Credential Leakage
+# B5 (local suite): Credential Leakage
+# Master architecture B5 = checkpoint resume → test_b5_checkpoint_resume below.
 # ============================================================
 
 @pytest.mark.asyncio
 async def test_B5_credential_leakage(drive_fixtures, mock_oauth_manager, mock_qdrant, mock_cursor_store, caplog):
     """
-    B5: Credential leakage.
+    Local B5: Credential leakage (not master architecture B5).
     
     Grep all logs/exception output for OAuth token and secrets.
     Assert: 0 matches.
@@ -480,7 +487,188 @@ async def test_B5_credential_leakage(drive_fixtures, mock_oauth_manager, mock_qd
         # Check all log output
         log_text = caplog.text
         assert fake_token not in log_text, "OAuth token leaked in logs!"
-        print(f"✓ B5 PASS: 0 credential leaks in logs (checked {len(log_text)} chars)")
+        print(f"✓ B5 (local/credential) PASS: 0 credential leaks in logs (checked {len(log_text)} chars)")
+
+
+# ============================================================
+# Master B5: Checkpoint Resume (kill mid-crawl → restart → complete)
+# Local ID mapping: master B5 ≠ local test_B5_credential_leakage
+# ============================================================
+
+class _KillAfterCheckpoint(Exception):
+    """Simulates process kill after a mid-crawl checkpoint was persisted."""
+
+
+def _make_paginated_connector(total_objects: int = 16, page_size: int = 4):
+    """Build an in-memory BaseConnector that pages a fixed object set."""
+    from app.core.base_connector import (
+        BaseConnector,
+        DeltaResult,
+        DeletionResult,
+        UnifiedDocument,
+    )
+
+    assert total_objects % page_size == 0
+    pages = total_objects // page_size
+
+    class PaginatedMockConnector(BaseConnector):
+        def get_source_type(self) -> str:
+            return "mock_checkpoint_source"
+
+        async def get_valid_token(self) -> str:
+            return "mock-token"
+
+        async def fetch_deleted_ids(self, since, cursor=None):
+            return DeletionResult(deleted_ids=[], next_cursor=None, has_more=False)
+
+        async def fetch_delta(self, since, cursor=None):
+            page_idx = int(cursor) if cursor else 0
+            if page_idx < 0 or page_idx >= pages:
+                return DeltaResult(documents=[], next_cursor=None, has_more=False)
+            start = page_idx * page_size
+            docs = [
+                {
+                    "id": f"obj-{i:02d}",
+                    "title": f"Object {i}",
+                    "content": f"Content for object {i}",
+                }
+                for i in range(start, start + page_size)
+            ]
+            next_page = page_idx + 1
+            has_more = next_page < pages
+            return DeltaResult(
+                documents=docs,
+                next_cursor=str(next_page) if has_more else None,
+                has_more=has_more,
+            )
+
+        async def transform(self, raw_documents):
+            now = datetime.utcnow()
+            return [
+                UnifiedDocument(
+                    id=d["id"],
+                    title=d["title"],
+                    content=d["content"],
+                    source_type="mock_checkpoint_source",
+                    url=f"https://example.com/{d['id']}",
+                    permissions=["user:test@example.com"],
+                    created_at=now,
+                    updated_at=now,
+                    source_updated_at=now,
+                    structured_metadata={},
+                )
+                for d in raw_documents
+            ]
+
+    return PaginatedMockConnector({}, MagicMock()), pages, page_size, total_objects
+
+
+def test_b5_checkpoint_resume():
+    """
+    Master architecture B5: Checkpoint resume.
+
+    1. Uninterrupted crawl establishes baseline object set.
+    2. Crawl is killed after ~50% (checkpoint persisted).
+    3. Restart resumes from cursor; final set matches baseline
+       (same count, no duplicates, no missing objects).
+    """
+    from app.services.sync import sync_orchestrator
+
+    connector, pages, page_size, total = _make_paginated_connector(
+        total_objects=16, page_size=4
+    )
+    tenant_id = "tenant-b5-checkpoint"
+    kill_after_pages = pages // 2  # 50%
+    assert kill_after_pages >= 1
+
+    indexed_store = {}
+
+    async def fake_bulk_index(docs, tenant_id_arg):
+        for d in docs:
+            indexed_store[d.id] = d
+
+    async def fake_delete_by_ids(ids, tenant_id_arg, source_type):
+        for i in ids:
+            indexed_store.pop(i, None)
+
+    checkpoint = {"cursor": None, "updates": []}
+
+    def persist_cursor(next_cursor: str):
+        checkpoint["cursor"] = next_cursor
+        checkpoint["updates"].append(next_cursor)
+
+    with patch("app.services.sync.indexer") as mock_indexer:
+        mock_indexer.bulk_index = fake_bulk_index
+        mock_indexer.delete_by_ids = fake_delete_by_ids
+
+        # --- Baseline: uninterrupted crawl ---
+        baseline = sync_orchestrator.run_two_pass_sync(
+            connector=connector,
+            tenant_id=tenant_id,
+            since=datetime.utcnow() - timedelta(days=30),
+            cursor=None,
+            on_cursor_update=persist_cursor,
+        )
+        baseline_ids = set(baseline["indexed_ids"])
+        assert baseline["indexed_count"] == total
+        assert len(baseline_ids) == total
+        assert baseline["pages_processed"] == pages
+
+        # Reset for kill/resume run
+        indexed_store.clear()
+        checkpoint["cursor"] = None
+        checkpoint["updates"].clear()
+        pages_seen = {"n": 0}
+
+        def persist_and_maybe_kill(next_cursor: str):
+            checkpoint["cursor"] = next_cursor
+            checkpoint["updates"].append(next_cursor)
+            pages_seen["n"] += 1
+            if pages_seen["n"] >= kill_after_pages:
+                raise _KillAfterCheckpoint(
+                    f"simulated kill after page {pages_seen['n']} cursor={next_cursor}"
+                )
+
+        # --- Partial crawl + kill ---
+        with pytest.raises(_KillAfterCheckpoint):
+            sync_orchestrator.run_two_pass_sync(
+                connector=connector,
+                tenant_id=tenant_id,
+                since=datetime.utcnow() - timedelta(days=30),
+                cursor=None,
+                on_cursor_update=persist_and_maybe_kill,
+            )
+
+        partial_ids = set(indexed_store.keys())
+        resume_cursor = checkpoint["cursor"]
+        assert resume_cursor is not None, "checkpoint cursor must be persisted before kill"
+        assert len(partial_ids) == kill_after_pages * page_size
+        assert partial_ids == {f"obj-{i:02d}" for i in range(kill_after_pages * page_size)}
+
+        # --- Resume from checkpoint ---
+        resumed = sync_orchestrator.run_two_pass_sync(
+            connector=connector,
+            tenant_id=tenant_id,
+            since=datetime.utcnow() - timedelta(days=30),
+            cursor=resume_cursor,
+            on_cursor_update=persist_cursor,
+        )
+
+        final_ids = set(indexed_store.keys())
+        # Upsert-safe: resume must not leave duplicates; set equality vs baseline
+        assert len(final_ids) == total
+        assert final_ids == baseline_ids
+        assert resumed["indexed_count"] == total - len(partial_ids)
+        # No overlap between first segment and resumed segment
+        resumed_ids = set(resumed["indexed_ids"])
+        assert partial_ids.isdisjoint(resumed_ids)
+        assert partial_ids | resumed_ids == baseline_ids
+
+        print(
+            f"[PASS] Master B5: kill after {kill_after_pages}/{pages} pages "
+            f"(cursor={resume_cursor!r}); resume completed; "
+            f"final={len(final_ids)} matches baseline={len(baseline_ids)}, 0 dupes/missing"
+        )
 
 
 # ============================================================
@@ -604,7 +792,8 @@ def test_block_b_signoff_summary():
     print("B2: Webhook incremental correctness ......... [RUN TEST]")
     print("B3: Webhook authenticity rejection .......... [RUN TEST]")
     print("B4: Rate-limit resilience ................... [RUN TEST]")
-    print("B5: Credential leakage ...................... [RUN TEST]")
+    print("B5: Credential leakage (local) .............. [RUN TEST]")
+    print("B5: Checkpoint resume (master) .............. [RUN test_b5_checkpoint_resume]")
     print("B6: Metadata allowlist enforcement .......... [RUN TEST]")
     print("B7: Watch channel renewal ................... [RUN TEST]")
     print("="*60)

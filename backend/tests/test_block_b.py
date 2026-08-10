@@ -8,6 +8,7 @@ from tests.test_signoff_block_b import (  # noqa: F401
     test_B3_webhook_authenticity_rejection,
     test_B4_rate_limit_resilience,
     test_B5_credential_leakage,
+    test_b5_checkpoint_resume,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "test_B3_webhook_authenticity_rejection",
     "test_B4_rate_limit_resilience",
     "test_B5_credential_leakage",
+    "test_b5_checkpoint_resume",
 ]
