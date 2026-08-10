@@ -76,7 +76,7 @@ cd "D:\PROJECTS\Sync Ai Final"
 | ID | Criterion | Engineer self-report | Reviewer PASS/FAIL | Evidence | Notes |
 |----|-----------|---------------------|-------------------|----------|-------|
 | Z1 | Contracts present and parseable | PASS | | | |
-| Z2 | Fixture lint + MANIFEST v2.1 alignment | PASS | | | |
+| Z2 | Fixture lint + MANIFEST v2 alignment | PASS | | | directory fixtures (code_corpus/) allowed |
 | Z3 | Mock shape normalization / swap readiness | PASS | | | |
 
 **Reviewer name / date / signature:** _______________
