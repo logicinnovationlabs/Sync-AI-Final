@@ -1,8 +1,13 @@
 {
-  "version": "v1",
+  "version": "v2",
   "expected_counts": {
-    "google_drive": 4,
-    "google_gmail": 1
+    "google_drive": 25,
+    "google_gmail": 3,
+    "confluence": 10,
+    "github": 5,
+    "jira": 6,
+    "slack": 6,
+    "notion": 5
   },
   "delta_types": [
     "created",

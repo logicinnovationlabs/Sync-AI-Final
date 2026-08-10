@@ -86,7 +86,11 @@ class TestBlockZ:
         manifest = fixture_loader.load("MANIFEST")
         assert manifest.get("version") == TestConfig.FIXTURES_VERSION
         version_mismatches = []
+        fixtures_root = Path(TestConfig.FIXTURES_PATH)
         for name in manifest.get("fixtures", []):
+            # Directory fixtures (e.g. code_corpus/) have no top-level version field.
+            if (fixtures_root / name).is_dir() and not (fixtures_root / f"{name}.json").exists():
+                continue
             data = fixture_loader.load(name)
             if data.get("version") != TestConfig.FIXTURES_VERSION:
                 version_mismatches.append(name)

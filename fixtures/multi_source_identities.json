@@ -1,5 +1,5 @@
 {
-  "version": "v1",
+  "version": "v2",
   "identities": [
     {
       "principal_id": "principal-alice",
@@ -10,7 +10,12 @@
         },
         {
           "source_type": "google_gmail",
-          "external_id": "alice@example.com"
+          "external_id": "alice@example.com",
+          "email": "alice@example.com"
+        },
+        {
+          "source_type": "github",
+          "external_id": "github_alice_00ualice"
         }
       ]
     },
@@ -23,7 +28,12 @@
         },
         {
           "source_type": "google_gmail",
-          "external_id": "bob@example.com"
+          "external_id": "bob@example.com",
+          "email": "bob@example.com"
+        },
+        {
+          "source_type": "jira",
+          "external_id": "jira_bob_00ubob"
         }
       ]
     },
@@ -33,6 +43,14 @@
         {
           "source_type": "google_drive",
           "external_id": "drive_carol"
+        },
+        {
+          "source_type": "slack",
+          "external_id": "slack_carol_00ucarol"
+        },
+        {
+          "source_type": "confluence",
+          "external_id": "confluence_carol_00ucarol"
         }
       ]
     },
@@ -40,8 +58,272 @@
       "principal_id": "principal-diana",
       "sources": [
         {
+          "source_type": "google_gmail",
+          "external_id": "diana@example.com",
+          "email": "diana@example.com"
+        },
+        {
+          "source_type": "github",
+          "external_id": "github_diana_00udiana"
+        },
+        {
+          "source_type": "notion",
+          "external_id": "notion_diana_00udiana"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-erin",
+      "sources": [
+        {
           "source_type": "google_drive",
-          "external_id": "drive_diana"
+          "external_id": "drive_erin"
+        },
+        {
+          "source_type": "google_gmail",
+          "external_id": "erin@example.com",
+          "email": "erin@example.com"
+        },
+        {
+          "source_type": "slack",
+          "external_id": "slack_erin_00uerin"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-frank",
+      "sources": [
+        {
+          "source_type": "jira",
+          "external_id": "jira_frank_00ufrank"
+        },
+        {
+          "source_type": "confluence",
+          "external_id": "confluence_frank_00ufrank"
+        },
+        {
+          "source_type": "github",
+          "external_id": "github_frank_00ufrank"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-grace",
+      "sources": [
+        {
+          "source_type": "google_drive",
+          "external_id": "drive_grace"
+        },
+        {
+          "source_type": "slack",
+          "external_id": "slack_grace_00ugrace"
+        },
+        {
+          "source_type": "jira",
+          "external_id": "jira_grace_00ugrace"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-hank",
+      "sources": [
+        {
+          "source_type": "google_gmail",
+          "external_id": "hank@example.com",
+          "email": "hank@example.com"
+        },
+        {
+          "source_type": "notion",
+          "external_id": "notion_hank_00uhank"
+        },
+        {
+          "source_type": "confluence",
+          "external_id": "confluence_hank_00uhank"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-ivy",
+      "sources": [
+        {
+          "source_type": "google_drive",
+          "external_id": "drive_ivy"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-jake",
+      "sources": [
+        {
+          "source_type": "google_drive",
+          "external_id": "drive_jake"
+        },
+        {
+          "source_type": "google_gmail",
+          "external_id": "jake@example.com"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-kate",
+      "sources": [
+        {
+          "source_type": "google_drive",
+          "external_id": "drive_kate"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-leo",
+      "sources": [
+        {
+          "source_type": "google_drive",
+          "external_id": "drive_leo"
+        },
+        {
+          "source_type": "google_gmail",
+          "external_id": "leo@example.com"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-maya",
+      "sources": [
+        {
+          "source_type": "google_drive",
+          "external_id": "drive_maya"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-nate",
+      "sources": [
+        {
+          "source_type": "google_drive",
+          "external_id": "drive_nate"
+        },
+        {
+          "source_type": "google_gmail",
+          "external_id": "nate@example.com"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-olivia",
+      "sources": [
+        {
+          "source_type": "google_drive",
+          "external_id": "drive_olivia"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-paul",
+      "sources": [
+        {
+          "source_type": "google_drive",
+          "external_id": "drive_paul"
+        },
+        {
+          "source_type": "google_gmail",
+          "external_id": "paul@example.com"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-quinn",
+      "sources": [
+        {
+          "source_type": "google_drive",
+          "external_id": "drive_quinn"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-rita",
+      "sources": [
+        {
+          "source_type": "google_drive",
+          "external_id": "drive_rita"
+        },
+        {
+          "source_type": "google_gmail",
+          "external_id": "rita@example.com"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-sam",
+      "sources": [
+        {
+          "source_type": "google_drive",
+          "external_id": "drive_sam"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-tina",
+      "sources": [
+        {
+          "source_type": "google_drive",
+          "external_id": "drive_tina"
+        },
+        {
+          "source_type": "google_gmail",
+          "external_id": "tina@example.com"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-uma",
+      "sources": [
+        {
+          "source_type": "google_drive",
+          "external_id": "drive_uma"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-vic",
+      "sources": [
+        {
+          "source_type": "google_drive",
+          "external_id": "drive_vic"
+        },
+        {
+          "source_type": "google_gmail",
+          "external_id": "vic@example.com"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-wes",
+      "sources": [
+        {
+          "source_type": "google_drive",
+          "external_id": "drive_wes"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-xena",
+      "sources": [
+        {
+          "source_type": "google_drive",
+          "external_id": "drive_xena"
+        },
+        {
+          "source_type": "google_gmail",
+          "external_id": "xena@example.com"
+        }
+      ]
+    },
+    {
+      "principal_id": "principal-yara",
+      "sources": [
+        {
+          "source_type": "google_drive",
+          "external_id": "drive_yara"
         }
       ]
     }

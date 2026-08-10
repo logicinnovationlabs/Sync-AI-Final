@@ -1,5 +1,5 @@
 {
-  "version": "v1",
+  "version": "v2",
   "edges": [
     {
       "id": "edge-1",
@@ -15,14 +15,14 @@
     },
     {
       "id": "edge-3",
-      "source": "doc-roadmap",
-      "target": "doc-api-docs",
-      "type": "REFERENCES"
+      "source": "principal-carol",
+      "target": "doc-security",
+      "type": "OWNS"
     },
     {
       "id": "edge-4",
-      "source": "principal-carol",
-      "target": "doc-security",
+      "source": "principal-alice",
+      "target": "doc-onboarding",
       "type": "OWNS"
     },
     {
@@ -33,9 +33,639 @@
     },
     {
       "id": "edge-6",
+      "source": "principal-alice",
+      "target": "doc-topic-00",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-7",
+      "source": "principal-bob",
+      "target": "doc-topic-01",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-8",
+      "source": "principal-erin",
+      "target": "doc-topic-02",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-9",
+      "source": "principal-frank",
+      "target": "doc-topic-03",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-10",
+      "source": "principal-hank",
+      "target": "doc-topic-04",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-11",
+      "source": "principal-ivy",
+      "target": "doc-topic-05",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-12",
+      "source": "principal-jake",
+      "target": "doc-topic-06",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-13",
+      "source": "principal-kate",
+      "target": "doc-topic-07",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-14",
+      "source": "principal-leo",
+      "target": "doc-topic-08",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-15",
+      "source": "principal-rita",
+      "target": "doc-topic-09",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-16",
+      "source": "principal-sam",
+      "target": "doc-topic-10",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-17",
+      "source": "principal-tina",
+      "target": "doc-topic-11",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-18",
+      "source": "principal-wes",
+      "target": "doc-topic-12",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-19",
+      "source": "principal-yara",
+      "target": "doc-topic-13",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-20",
+      "source": "principal-alice",
+      "target": "doc-topic-14",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-21",
+      "source": "principal-bob",
+      "target": "doc-topic-15",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-22",
+      "source": "principal-erin",
+      "target": "doc-topic-16",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-23",
+      "source": "principal-frank",
+      "target": "doc-topic-17",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-24",
+      "source": "principal-hank",
+      "target": "doc-topic-18",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-25",
+      "source": "principal-ivy",
+      "target": "doc-topic-19",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-26",
+      "source": "principal-jake",
+      "target": "doc-topic-20",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-27",
+      "source": "principal-kate",
+      "target": "doc-topic-21",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-28",
+      "source": "principal-leo",
+      "target": "doc-topic-22",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-29",
+      "source": "principal-rita",
+      "target": "doc-topic-23",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-30",
+      "source": "principal-sam",
+      "target": "doc-topic-24",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-31",
+      "source": "principal-tina",
+      "target": "doc-topic-25",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-32",
+      "source": "principal-wes",
+      "target": "doc-topic-26",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-33",
+      "source": "principal-yara",
+      "target": "doc-topic-27",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-34",
+      "source": "principal-alice",
+      "target": "doc-topic-28",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-35",
+      "source": "principal-bob",
+      "target": "doc-topic-29",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-36",
+      "source": "principal-erin",
+      "target": "doc-partial-00",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-37",
+      "source": "principal-frank",
+      "target": "doc-partial-01",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-38",
+      "source": "principal-hank",
+      "target": "doc-partial-02",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-39",
+      "source": "principal-ivy",
+      "target": "doc-partial-03",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-40",
+      "source": "principal-jake",
+      "target": "doc-partial-04",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-41",
+      "source": "principal-kate",
+      "target": "doc-partial-05",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-42",
+      "source": "principal-leo",
+      "target": "doc-partial-06",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-43",
+      "source": "principal-rita",
+      "target": "doc-partial-07",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-44",
+      "source": "principal-sam",
+      "target": "doc-partial-08",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-45",
+      "source": "principal-tina",
+      "target": "doc-partial-09",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-46",
+      "source": "principal-diana",
+      "target": "doc-rt-cross-tenant",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-47",
+      "source": "principal-hank",
+      "target": "doc-rt-no-access",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-48",
+      "source": "principal-alice",
+      "target": "doc-rt-direct-allow",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-49",
+      "source": "principal-hank",
+      "target": "doc-rt-group-allow",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-50",
+      "source": "principal-hank",
+      "target": "doc-rt-inherited-allow",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-51",
+      "source": "principal-hank",
+      "target": "doc-rt-deny-override",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-52",
+      "source": "principal-erin",
+      "target": "doc-rt-unshare",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-53",
+      "source": "principal-hank",
+      "target": "doc-rt-group-changed",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-54",
+      "source": "principal-hank",
+      "target": "doc-rt-container",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-55",
+      "source": "principal-erin",
+      "target": "doc-rt-removed-group",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-56",
+      "source": "principal-hank",
+      "target": "doc-rt-deleted",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-57",
+      "source": "principal-hank",
+      "target": "doc-rt-scope",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-58",
+      "source": "principal-carol",
+      "target": "doc-rt-auth-required",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-59",
+      "source": "principal-hank",
+      "target": "doc-rt-parent-denied",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-60",
+      "source": "principal-carol",
+      "target": "doc-rt-legal-only",
+      "type": "OWNS"
+    },
+    {
+      "id": "edge-61",
+      "source": "doc-topic-00",
+      "target": "doc-topic-01",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-62",
+      "source": "doc-topic-00",
+      "target": "doc-roadmap",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-63",
+      "source": "doc-topic-01",
+      "target": "doc-topic-02",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-64",
+      "source": "doc-topic-02",
+      "target": "doc-topic-03",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-65",
+      "source": "doc-topic-03",
+      "target": "doc-topic-04",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-66",
+      "source": "doc-topic-04",
+      "target": "doc-topic-05",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-67",
+      "source": "doc-topic-05",
+      "target": "doc-topic-06",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-68",
+      "source": "doc-topic-05",
+      "target": "doc-roadmap",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-69",
+      "source": "doc-topic-06",
+      "target": "doc-topic-07",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-70",
+      "source": "doc-topic-07",
+      "target": "doc-topic-08",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-71",
+      "source": "doc-topic-08",
+      "target": "doc-topic-09",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-72",
+      "source": "doc-topic-09",
+      "target": "doc-topic-10",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-73",
+      "source": "doc-topic-10",
+      "target": "doc-topic-11",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-74",
+      "source": "doc-topic-10",
+      "target": "doc-roadmap",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-75",
+      "source": "doc-topic-11",
+      "target": "doc-topic-12",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-76",
+      "source": "doc-topic-12",
+      "target": "doc-topic-13",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-77",
+      "source": "doc-topic-13",
+      "target": "doc-topic-14",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-78",
+      "source": "doc-topic-14",
+      "target": "doc-topic-15",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-79",
+      "source": "doc-topic-15",
+      "target": "doc-topic-16",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-80",
+      "source": "doc-topic-15",
+      "target": "doc-roadmap",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-81",
+      "source": "doc-topic-16",
+      "target": "doc-topic-17",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-82",
+      "source": "doc-topic-17",
+      "target": "doc-topic-18",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-83",
+      "source": "doc-topic-18",
+      "target": "doc-topic-19",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-84",
+      "source": "doc-topic-19",
+      "target": "doc-topic-20",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-85",
+      "source": "doc-topic-20",
+      "target": "doc-topic-21",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-86",
+      "source": "doc-topic-20",
+      "target": "doc-roadmap",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-87",
+      "source": "doc-topic-21",
+      "target": "doc-topic-22",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-88",
+      "source": "doc-topic-22",
+      "target": "doc-topic-23",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-89",
+      "source": "doc-topic-23",
+      "target": "doc-topic-24",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-90",
+      "source": "doc-topic-24",
+      "target": "doc-topic-25",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-91",
+      "source": "doc-topic-25",
+      "target": "doc-topic-26",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-92",
+      "source": "doc-topic-25",
+      "target": "doc-roadmap",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-93",
+      "source": "doc-topic-26",
+      "target": "doc-topic-27",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-94",
+      "source": "doc-topic-27",
+      "target": "doc-topic-28",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-95",
+      "source": "doc-topic-28",
+      "target": "doc-topic-29",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-96",
+      "source": "doc-topic-29",
+      "target": "doc-topic-00",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-97",
+      "source": "doc-roadmap",
+      "target": "doc-api-docs",
+      "type": "REFERENCES"
+    },
+    {
+      "id": "edge-98",
       "source": "doc-onboarding",
       "target": "doc-roadmap",
       "type": "REFERENCES"
+    },
+    {
+      "id": "edge-99",
+      "source": "principal-alice",
+      "target": "group-eng",
+      "type": "MEMBER_OF"
+    },
+    {
+      "id": "edge-100",
+      "source": "principal-bob",
+      "target": "group-eng",
+      "type": "MEMBER_OF"
+    },
+    {
+      "id": "edge-101",
+      "source": "principal-carol",
+      "target": "group-security",
+      "type": "MEMBER_OF"
+    },
+    {
+      "id": "edge-102",
+      "source": "principal-alice",
+      "target": "doc-topic-00",
+      "type": "WORKED_ON"
+    },
+    {
+      "id": "edge-103",
+      "source": "principal-bob",
+      "target": "doc-topic-01",
+      "type": "WORKED_ON"
+    },
+    {
+      "id": "edge-104",
+      "source": "principal-alice",
+      "target": "doc-topic-02",
+      "type": "WORKED_ON"
+    },
+    {
+      "id": "edge-105",
+      "source": "principal-bob",
+      "target": "doc-topic-03",
+      "type": "WORKED_ON"
+    },
+    {
+      "id": "edge-106",
+      "source": "principal-alice",
+      "target": "doc-topic-04",
+      "type": "WORKED_ON"
+    },
+    {
+      "id": "edge-107",
+      "source": "principal-bob",
+      "target": "doc-topic-05",
+      "type": "WORKED_ON"
+    },
+    {
+      "id": "edge-108",
+      "source": "principal-alice",
+      "target": "doc-topic-06",
+      "type": "WORKED_ON"
+    },
+    {
+      "id": "edge-109",
+      "source": "principal-bob",
+      "target": "doc-topic-07",
+      "type": "WORKED_ON"
+    },
+    {
+      "id": "edge-110",
+      "source": "principal-alice",
+      "target": "doc-topic-08",
+      "type": "WORKED_ON"
+    },
+    {
+      "id": "edge-111",
+      "source": "principal-bob",
+      "target": "doc-topic-09",
+      "type": "WORKED_ON"
     }
   ]
 }

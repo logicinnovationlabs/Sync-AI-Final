@@ -56,8 +56,10 @@ def lint_fixtures(fixtures_path: Path) -> LintReport:
             manifest = json.load(f)
         for name in manifest.get("fixtures", []):
             if name not in fixtures and name != "crawl_expectations":
-                # crawl_expectations is optional extra; still listed ok if present
-                if not (Path(fixtures_path) / f"{name}.json").exists():
+                # Accept either <name>.json or a directory fixture (e.g. code_corpus/).
+                json_path = Path(fixtures_path) / f"{name}.json"
+                dir_path = Path(fixtures_path) / name
+                if not json_path.exists() and not dir_path.is_dir():
                     report.errors.append(
                         LintIssue("MANIFEST.json", f"Listed fixture missing: {name}", name)
                     )

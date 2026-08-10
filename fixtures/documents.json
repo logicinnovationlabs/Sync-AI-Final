@@ -1,5 +1,5 @@
 {
-  "version": "v1",
+  "version": "v2",
   "documents": [
     {
       "id": "doc-roadmap",
@@ -11,13 +11,15 @@
         "principal-alice",
         "group-eng"
       ],
-      "body": "Q3 milestones for Sync AI enterprise search platform.",
+      "body": "Q3 milestones for Sync AI enterprise search platform. project roadmap covers delivery phases and launch gates.",
       "checkpoint": "cp-drive-1",
       "delta_type": "created",
       "chunks": [
         "chk-roadmap-1",
         "chk-roadmap-2"
-      ]
+      ],
+      "object_type": "prose",
+      "sensitivity": "internal"
     },
     {
       "id": "doc-api-docs",
@@ -29,12 +31,14 @@
         "principal-bob",
         "group-eng"
       ],
-      "body": "REST and MCP API documentation for federated search.",
+      "body": "REST and MCP API documentation for federated search. API documentation includes auth headers and error codes.",
       "checkpoint": "cp-drive-2",
       "delta_type": "updated",
       "chunks": [
         "chk-api-1"
-      ]
+      ],
+      "object_type": "prose",
+      "sensitivity": "internal"
     },
     {
       "id": "doc-security",
@@ -46,12 +50,14 @@
         "principal-carol",
         "group-security"
       ],
-      "body": "Tenant isolation and credential handling requirements.",
+      "body": "Tenant isolation and credential handling requirements. security policy for production connectors.",
       "checkpoint": "cp-drive-3",
       "delta_type": "created",
       "chunks": [
         "chk-sec-1"
-      ]
+      ],
+      "object_type": "prose",
+      "sensitivity": "restricted"
     },
     {
       "id": "doc-onboarding",
@@ -62,12 +68,14 @@
       "acl": [
         "group-eng"
       ],
-      "body": "Welcome guide for engineering onboarding.",
+      "body": "Welcome guide for engineering onboarding. eng onboarding checklist. kubernetes deployment vector search embeddings kafka consumer lag observability dashboards",
       "checkpoint": "cp-gmail-1",
       "delta_type": "created",
       "chunks": [
         "chk-onboard-1"
-      ]
+      ],
+      "object_type": "email",
+      "sensitivity": "internal"
     },
     {
       "id": "doc-restricted",
@@ -78,12 +86,1213 @@
       "acl": [
         "principal-diana"
       ],
-      "body": "Confidential acquisition terms.",
+      "body": "Confidential acquisition terms. M&A Deal Sheet restricted to exec.",
       "checkpoint": "cp-drive-4",
       "delta_type": "created",
       "chunks": [
         "chk-restr-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "restricted"
+    },
+    {
+      "id": "doc-topic-00",
+      "tenant_id": "tenant-a",
+      "title": "Project Roadmap Guide",
+      "source": "google_drive",
+      "owner_id": "principal-alice",
+      "acl": [
+        "principal-alice",
+        "group-eng"
+      ],
+      "body": "Authoritative guide to project roadmap. Operators should follow project roadmap runbooks during incidents.",
+      "checkpoint": "cp-topic-00",
+      "delta_type": "created",
+      "chunks": [
+        "chk-topic-00-1",
+        "chk-topic-00-2"
+      ],
+      "object_type": "prose",
+      "sensitivity": "internal",
+      "tags": [
+        "project",
+        "eng"
       ]
+    },
+    {
+      "id": "doc-topic-01",
+      "tenant_id": "tenant-a",
+      "title": "Api Documentation handler module",
+      "source": "confluence",
+      "owner_id": "principal-bob",
+      "acl": [
+        "principal-bob",
+        "group-eng"
+      ],
+      "body": "# API documentation\ndef handle_API_documentation():\n    '''Implementation notes for API documentation.'''\n    return get_user_info()\n",
+      "checkpoint": "cp-topic-01",
+      "delta_type": "updated",
+      "chunks": [
+        "chk-topic-01-1",
+        "chk-topic-01-2"
+      ],
+      "object_type": "code",
+      "sensitivity": "internal",
+      "tags": [
+        "API",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-02",
+      "tenant_id": "tenant-a",
+      "title": "[SYNC-102] kubernetes deployment",
+      "source": "github",
+      "owner_id": "principal-erin",
+      "acl": [
+        "principal-erin",
+        "group-eng"
+      ],
+      "body": "JIRA ticket: investigate kubernetes deployment. Acceptance criteria cover kubernetes deployment regression tests. How does kubernetes deployment work?",
+      "checkpoint": "cp-topic-02",
+      "delta_type": "deleted",
+      "chunks": [
+        "chk-topic-02-1",
+        "chk-topic-02-2"
+      ],
+      "object_type": "ticket",
+      "sensitivity": "internal",
+      "tags": [
+        "kubernetes",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-03",
+      "tenant_id": "tenant-a",
+      "title": "Email: postgres indexing",
+      "source": "jira",
+      "owner_id": "principal-frank",
+      "acl": [
+        "principal-frank",
+        "group-eng"
+      ],
+      "body": "From: eng@example.com\nSubject: Re: postgres indexing\n\nTeam \u2014 please review the latest notes on postgres indexing. How does postgres indexing work?",
+      "checkpoint": "cp-topic-03",
+      "delta_type": "created",
+      "chunks": [
+        "chk-topic-03-1",
+        "chk-topic-03-2"
+      ],
+      "object_type": "email",
+      "sensitivity": "internal",
+      "tags": [
+        "postgres",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-04",
+      "tenant_id": "tenant-a",
+      "title": "Oauth Token Refresh Guide",
+      "source": "confluence",
+      "owner_id": "principal-hank",
+      "acl": [
+        "principal-hank",
+        "group-eng"
+      ],
+      "body": "Authoritative guide to oauth token refresh. Operators should follow oauth token refresh runbooks during incidents. How does oauth token refresh work?",
+      "checkpoint": "cp-topic-04",
+      "delta_type": "updated",
+      "chunks": [
+        "chk-topic-04-1",
+        "chk-topic-04-2"
+      ],
+      "object_type": "wiki",
+      "sensitivity": "internal",
+      "tags": [
+        "oauth",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-05",
+      "tenant_id": "tenant-a",
+      "title": "Vector Search Embeddings Guide",
+      "source": "slack",
+      "owner_id": "principal-ivy",
+      "acl": [
+        "principal-ivy",
+        "group-eng"
+      ],
+      "body": "Authoritative guide to vector search embeddings. Operators should follow vector search embeddings runbooks during incidents. How does vector search embeddings work?",
+      "checkpoint": "cp-topic-05",
+      "delta_type": "deleted",
+      "chunks": [
+        "chk-topic-05-1",
+        "chk-topic-05-2"
+      ],
+      "object_type": "prose",
+      "sensitivity": "internal",
+      "tags": [
+        "vector",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-06",
+      "tenant_id": "tenant-a",
+      "title": "Acl Inheritance Rules handler module",
+      "source": "notion",
+      "owner_id": "principal-jake",
+      "acl": [
+        "principal-jake",
+        "group-eng"
+      ],
+      "body": "# acl inheritance rules\ndef handle_acl_inheritance_rules():\n    '''Implementation notes for acl inheritance rules.'''\n    return get_user_info()\n How does acl inheritance rules work?",
+      "checkpoint": "cp-topic-06",
+      "delta_type": "created",
+      "chunks": [
+        "chk-topic-06-1",
+        "chk-topic-06-2"
+      ],
+      "object_type": "code",
+      "sensitivity": "internal",
+      "tags": [
+        "acl",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-07",
+      "tenant_id": "tenant-a",
+      "title": "[SYNC-107] chunking strategies",
+      "source": "google_drive",
+      "owner_id": "principal-kate",
+      "acl": [
+        "principal-kate",
+        "group-eng"
+      ],
+      "body": "JIRA ticket: investigate chunking strategies. Acceptance criteria cover chunking strategies regression tests. How does chunking strategies work?",
+      "checkpoint": "cp-topic-07",
+      "delta_type": "updated",
+      "chunks": [
+        "chk-topic-07-1",
+        "chk-topic-07-2"
+      ],
+      "object_type": "ticket",
+      "sensitivity": "internal",
+      "tags": [
+        "chunking",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-08",
+      "tenant_id": "tenant-a",
+      "title": "Email: kafka consumer lag",
+      "source": "google_gmail",
+      "owner_id": "principal-leo",
+      "acl": [
+        "principal-leo",
+        "group-eng"
+      ],
+      "body": "From: eng@example.com\nSubject: Re: kafka consumer lag\n\nTeam \u2014 please review the latest notes on kafka consumer lag. How does kafka consumer lag work?",
+      "checkpoint": "cp-topic-08",
+      "delta_type": "deleted",
+      "chunks": [
+        "chk-topic-08-1",
+        "chk-topic-08-2"
+      ],
+      "object_type": "email",
+      "sensitivity": "internal",
+      "tags": [
+        "kafka",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-09",
+      "tenant_id": "tenant-a",
+      "title": "Redis Caching Patterns Guide",
+      "source": "github",
+      "owner_id": "principal-rita",
+      "acl": [
+        "principal-rita",
+        "group-eng"
+      ],
+      "body": "Authoritative guide to redis caching patterns. Operators should follow redis caching patterns runbooks during incidents. How does redis caching patterns work?",
+      "checkpoint": "cp-topic-09",
+      "delta_type": "created",
+      "chunks": [
+        "chk-topic-09-1",
+        "chk-topic-09-2"
+      ],
+      "object_type": "wiki",
+      "sensitivity": "internal",
+      "tags": [
+        "redis",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-10",
+      "tenant_id": "tenant-a",
+      "title": "Fastapi Middleware Guide",
+      "source": "jira",
+      "owner_id": "principal-sam",
+      "acl": [
+        "principal-sam",
+        "group-eng"
+      ],
+      "body": "Authoritative guide to fastapi middleware. Operators should follow fastapi middleware runbooks during incidents. How does fastapi middleware work?",
+      "checkpoint": "cp-topic-10",
+      "delta_type": "updated",
+      "chunks": [
+        "chk-topic-10-1",
+        "chk-topic-10-2"
+      ],
+      "object_type": "prose",
+      "sensitivity": "internal",
+      "tags": [
+        "fastapi",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-11",
+      "tenant_id": "tenant-a",
+      "title": "Tenant Isolation handler module",
+      "source": "confluence",
+      "owner_id": "principal-tina",
+      "acl": [
+        "principal-tina",
+        "group-eng"
+      ],
+      "body": "# tenant isolation\ndef handle_tenant_isolation():\n    '''Implementation notes for tenant isolation.'''\n    return get_user_info()\n How does tenant isolation work?",
+      "checkpoint": "cp-topic-11",
+      "delta_type": "deleted",
+      "chunks": [
+        "chk-topic-11-1",
+        "chk-topic-11-2"
+      ],
+      "object_type": "code",
+      "sensitivity": "internal",
+      "tags": [
+        "tenant",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-12",
+      "tenant_id": "tenant-a",
+      "title": "[SYNC-112] observability dashboards",
+      "source": "slack",
+      "owner_id": "principal-wes",
+      "acl": [
+        "principal-wes",
+        "group-eng"
+      ],
+      "body": "JIRA ticket: investigate observability dashboards. Acceptance criteria cover observability dashboards regression tests. How does observability dashboards work?",
+      "checkpoint": "cp-topic-12",
+      "delta_type": "created",
+      "chunks": [
+        "chk-topic-12-1",
+        "chk-topic-12-2"
+      ],
+      "object_type": "ticket",
+      "sensitivity": "internal",
+      "tags": [
+        "observability",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-13",
+      "tenant_id": "tenant-a",
+      "title": "Email: backup restore drills",
+      "source": "notion",
+      "owner_id": "principal-yara",
+      "acl": [
+        "principal-yara",
+        "group-eng"
+      ],
+      "body": "From: eng@example.com\nSubject: Re: backup restore drills\n\nTeam \u2014 please review the latest notes on backup restore drills. How does backup restore drills work?",
+      "checkpoint": "cp-topic-13",
+      "delta_type": "updated",
+      "chunks": [
+        "chk-topic-13-1",
+        "chk-topic-13-2"
+      ],
+      "object_type": "email",
+      "sensitivity": "internal",
+      "tags": [
+        "backup",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-14",
+      "tenant_id": "tenant-a",
+      "title": "Encryption At Rest Guide",
+      "source": "google_drive",
+      "owner_id": "principal-alice",
+      "acl": [
+        "principal-alice",
+        "group-eng"
+      ],
+      "body": "Authoritative guide to encryption at rest. Operators should follow encryption at rest runbooks during incidents. How does encryption at rest work?",
+      "checkpoint": "cp-topic-14",
+      "delta_type": "deleted",
+      "chunks": [
+        "chk-topic-14-1",
+        "chk-topic-14-2"
+      ],
+      "object_type": "wiki",
+      "sensitivity": "internal",
+      "tags": [
+        "encryption",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-15",
+      "tenant_id": "tenant-a",
+      "title": "Scim User Provisioning Guide",
+      "source": "confluence",
+      "owner_id": "principal-bob",
+      "acl": [
+        "principal-bob",
+        "group-eng"
+      ],
+      "body": "Authoritative guide to scim user provisioning. Operators should follow scim user provisioning runbooks during incidents. How does scim user provisioning work?",
+      "checkpoint": "cp-topic-15",
+      "delta_type": "created",
+      "chunks": [
+        "chk-topic-15-1",
+        "chk-topic-15-2"
+      ],
+      "object_type": "prose",
+      "sensitivity": "internal",
+      "tags": [
+        "scim",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-16",
+      "tenant_id": "tenant-a",
+      "title": "Gmail Connector Crawl handler module",
+      "source": "github",
+      "owner_id": "principal-erin",
+      "acl": [
+        "principal-erin",
+        "group-eng"
+      ],
+      "body": "# gmail connector crawl\ndef handle_gmail_connector_crawl():\n    '''Implementation notes for gmail connector crawl.'''\n    return get_user_info()\n How does gmail connector crawl work?",
+      "checkpoint": "cp-topic-16",
+      "delta_type": "updated",
+      "chunks": [
+        "chk-topic-16-1",
+        "chk-topic-16-2"
+      ],
+      "object_type": "code",
+      "sensitivity": "internal",
+      "tags": [
+        "gmail",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-17",
+      "tenant_id": "tenant-a",
+      "title": "[SYNC-117] drive delta sync",
+      "source": "jira",
+      "owner_id": "principal-frank",
+      "acl": [
+        "principal-frank",
+        "group-eng"
+      ],
+      "body": "JIRA ticket: investigate drive delta sync. Acceptance criteria cover drive delta sync regression tests. How does drive delta sync work?",
+      "checkpoint": "cp-topic-17",
+      "delta_type": "deleted",
+      "chunks": [
+        "chk-topic-17-1",
+        "chk-topic-17-2"
+      ],
+      "object_type": "ticket",
+      "sensitivity": "internal",
+      "tags": [
+        "drive",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-18",
+      "tenant_id": "tenant-a",
+      "title": "Email: bm25 ranking tuning",
+      "source": "confluence",
+      "owner_id": "principal-hank",
+      "acl": [
+        "principal-hank",
+        "group-eng"
+      ],
+      "body": "From: eng@example.com\nSubject: Re: bm25 ranking tuning\n\nTeam \u2014 please review the latest notes on bm25 ranking tuning. How does bm25 ranking tuning work?",
+      "checkpoint": "cp-topic-18",
+      "delta_type": "created",
+      "chunks": [
+        "chk-topic-18-1",
+        "chk-topic-18-2"
+      ],
+      "object_type": "email",
+      "sensitivity": "internal",
+      "tags": [
+        "bm25",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-19",
+      "tenant_id": "tenant-a",
+      "title": "Query Latency Budgets Guide",
+      "source": "slack",
+      "owner_id": "principal-ivy",
+      "acl": [
+        "principal-ivy",
+        "group-eng"
+      ],
+      "body": "Authoritative guide to query latency budgets. Operators should follow query latency budgets runbooks during incidents. How does query latency budgets work?",
+      "checkpoint": "cp-topic-19",
+      "delta_type": "updated",
+      "chunks": [
+        "chk-topic-19-1",
+        "chk-topic-19-2"
+      ],
+      "object_type": "wiki",
+      "sensitivity": "internal",
+      "tags": [
+        "query",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-20",
+      "tenant_id": "tenant-a",
+      "title": "Tokenizer Normalization Guide",
+      "source": "notion",
+      "owner_id": "principal-jake",
+      "acl": [
+        "principal-jake",
+        "group-eng"
+      ],
+      "body": "Authoritative guide to tokenizer normalization. Operators should follow tokenizer normalization runbooks during incidents. How does tokenizer normalization work?",
+      "checkpoint": "cp-topic-20",
+      "delta_type": "deleted",
+      "chunks": [
+        "chk-topic-20-1",
+        "chk-topic-20-2"
+      ],
+      "object_type": "prose",
+      "sensitivity": "internal",
+      "tags": [
+        "tokenizer",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-21",
+      "tenant_id": "tenant-a",
+      "title": "Celery Task Retries handler module",
+      "source": "google_drive",
+      "owner_id": "principal-kate",
+      "acl": [
+        "principal-kate",
+        "group-eng"
+      ],
+      "body": "# celery task retries\ndef handle_celery_task_retries():\n    '''Implementation notes for celery task retries.'''\n    return get_user_info()\n How does celery task retries work?",
+      "checkpoint": "cp-topic-21",
+      "delta_type": "created",
+      "chunks": [
+        "chk-topic-21-1",
+        "chk-topic-21-2"
+      ],
+      "object_type": "code",
+      "sensitivity": "internal",
+      "tags": [
+        "celery",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-22",
+      "tenant_id": "tenant-a",
+      "title": "[SYNC-122] alembic migrations",
+      "source": "confluence",
+      "owner_id": "principal-leo",
+      "acl": [
+        "principal-leo",
+        "group-eng"
+      ],
+      "body": "JIRA ticket: investigate alembic migrations. Acceptance criteria cover alembic migrations regression tests. How does alembic migrations work?",
+      "checkpoint": "cp-topic-22",
+      "delta_type": "updated",
+      "chunks": [
+        "chk-topic-22-1",
+        "chk-topic-22-2"
+      ],
+      "object_type": "ticket",
+      "sensitivity": "internal",
+      "tags": [
+        "alembic",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-23",
+      "tenant_id": "tenant-a",
+      "title": "Email: opensearch facets",
+      "source": "github",
+      "owner_id": "principal-rita",
+      "acl": [
+        "principal-rita",
+        "group-eng"
+      ],
+      "body": "From: eng@example.com\nSubject: Re: opensearch facets\n\nTeam \u2014 please review the latest notes on opensearch facets. How does opensearch facets work?",
+      "checkpoint": "cp-topic-23",
+      "delta_type": "deleted",
+      "chunks": [
+        "chk-topic-23-1",
+        "chk-topic-23-2"
+      ],
+      "object_type": "email",
+      "sensitivity": "internal",
+      "tags": [
+        "opensearch",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-24",
+      "tenant_id": "tenant-a",
+      "title": "Jwt Scope Enforcement Guide",
+      "source": "jira",
+      "owner_id": "principal-sam",
+      "acl": [
+        "principal-sam",
+        "group-eng"
+      ],
+      "body": "Authoritative guide to jwt scope enforcement. Operators should follow jwt scope enforcement runbooks during incidents. How does jwt scope enforcement work?",
+      "checkpoint": "cp-topic-24",
+      "delta_type": "created",
+      "chunks": [
+        "chk-topic-24-1",
+        "chk-topic-24-2"
+      ],
+      "object_type": "wiki",
+      "sensitivity": "internal",
+      "tags": [
+        "jwt",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-25",
+      "tenant_id": "tenant-a",
+      "title": "Rbac Group Expansion Guide",
+      "source": "confluence",
+      "owner_id": "principal-tina",
+      "acl": [
+        "principal-tina",
+        "group-eng"
+      ],
+      "body": "Authoritative guide to rbac group expansion. Operators should follow rbac group expansion runbooks during incidents. How does rbac group expansion work?",
+      "checkpoint": "cp-topic-25",
+      "delta_type": "updated",
+      "chunks": [
+        "chk-topic-25-1",
+        "chk-topic-25-2"
+      ],
+      "object_type": "prose",
+      "sensitivity": "internal",
+      "tags": [
+        "rbac",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-26",
+      "tenant_id": "tenant-a",
+      "title": "Snippet Highlighting handler module",
+      "source": "slack",
+      "owner_id": "principal-wes",
+      "acl": [
+        "principal-wes",
+        "group-eng"
+      ],
+      "body": "# snippet highlighting\ndef handle_snippet_highlighting():\n    '''Implementation notes for snippet highlighting.'''\n    return get_user_info()\n How does snippet highlighting work?",
+      "checkpoint": "cp-topic-26",
+      "delta_type": "deleted",
+      "chunks": [
+        "chk-topic-26-1",
+        "chk-topic-26-2"
+      ],
+      "object_type": "code",
+      "sensitivity": "internal",
+      "tags": [
+        "snippet",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-27",
+      "tenant_id": "tenant-a",
+      "title": "[SYNC-127] federator hybrid merge",
+      "source": "notion",
+      "owner_id": "principal-yara",
+      "acl": [
+        "principal-yara",
+        "group-eng"
+      ],
+      "body": "JIRA ticket: investigate federator hybrid merge. Acceptance criteria cover federator hybrid merge regression tests. How does federator hybrid merge work?",
+      "checkpoint": "cp-topic-27",
+      "delta_type": "created",
+      "chunks": [
+        "chk-topic-27-1",
+        "chk-topic-27-2"
+      ],
+      "object_type": "ticket",
+      "sensitivity": "internal",
+      "tags": [
+        "federator",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-28",
+      "tenant_id": "tenant-a",
+      "title": "Email: canonical document hash",
+      "source": "google_drive",
+      "owner_id": "principal-alice",
+      "acl": [
+        "principal-alice",
+        "group-eng"
+      ],
+      "body": "From: eng@example.com\nSubject: Re: canonical document hash\n\nTeam \u2014 please review the latest notes on canonical document hash. How does canonical document hash work?",
+      "checkpoint": "cp-topic-28",
+      "delta_type": "updated",
+      "chunks": [
+        "chk-topic-28-1",
+        "chk-topic-28-2"
+      ],
+      "object_type": "email",
+      "sensitivity": "internal",
+      "tags": [
+        "canonical",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-topic-29",
+      "tenant_id": "tenant-a",
+      "title": "Knowledge Graph Edges Guide",
+      "source": "confluence",
+      "owner_id": "principal-bob",
+      "acl": [
+        "principal-bob",
+        "group-eng"
+      ],
+      "body": "Authoritative guide to knowledge graph edges. Operators should follow knowledge graph edges runbooks during incidents. How does knowledge graph edges work?",
+      "checkpoint": "cp-topic-29",
+      "delta_type": "deleted",
+      "chunks": [
+        "chk-topic-29-1",
+        "chk-topic-29-2"
+      ],
+      "object_type": "wiki",
+      "sensitivity": "internal",
+      "tags": [
+        "knowledge",
+        "eng"
+      ]
+    },
+    {
+      "id": "doc-partial-00",
+      "tenant_id": "tenant-a",
+      "title": "Notes touching project",
+      "source": "jira",
+      "owner_id": "principal-erin",
+      "acl": [
+        "group-eng",
+        "group-product"
+      ],
+      "body": "Peripheral discussion that mentions project but is not the primary project roadmap reference.",
+      "checkpoint": "cp-partial-00",
+      "delta_type": "updated",
+      "chunks": [
+        "chk-partial-00-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "internal"
+    },
+    {
+      "id": "doc-partial-01",
+      "tenant_id": "tenant-a",
+      "title": "Notes touching API",
+      "source": "confluence",
+      "owner_id": "principal-frank",
+      "acl": [
+        "group-eng",
+        "group-product"
+      ],
+      "body": "Peripheral discussion that mentions API but is not the primary API documentation reference.",
+      "checkpoint": "cp-partial-01",
+      "delta_type": "updated",
+      "chunks": [
+        "chk-partial-01-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "internal"
+    },
+    {
+      "id": "doc-partial-02",
+      "tenant_id": "tenant-a",
+      "title": "Notes touching kubernetes",
+      "source": "slack",
+      "owner_id": "principal-hank",
+      "acl": [
+        "group-eng",
+        "group-product"
+      ],
+      "body": "Peripheral discussion that mentions kubernetes but is not the primary kubernetes deployment reference.",
+      "checkpoint": "cp-partial-02",
+      "delta_type": "updated",
+      "chunks": [
+        "chk-partial-02-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "internal"
+    },
+    {
+      "id": "doc-partial-03",
+      "tenant_id": "tenant-a",
+      "title": "Notes touching postgres",
+      "source": "notion",
+      "owner_id": "principal-ivy",
+      "acl": [
+        "group-eng",
+        "group-product"
+      ],
+      "body": "Peripheral discussion that mentions postgres but is not the primary postgres indexing reference.",
+      "checkpoint": "cp-partial-03",
+      "delta_type": "updated",
+      "chunks": [
+        "chk-partial-03-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "internal"
+    },
+    {
+      "id": "doc-partial-04",
+      "tenant_id": "tenant-a",
+      "title": "Notes touching oauth",
+      "source": "google_drive",
+      "owner_id": "principal-jake",
+      "acl": [
+        "group-eng",
+        "group-product"
+      ],
+      "body": "Peripheral discussion that mentions oauth but is not the primary oauth token refresh reference.",
+      "checkpoint": "cp-partial-04",
+      "delta_type": "updated",
+      "chunks": [
+        "chk-partial-04-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "internal"
+    },
+    {
+      "id": "doc-partial-05",
+      "tenant_id": "tenant-a",
+      "title": "Notes touching vector",
+      "source": "google_gmail",
+      "owner_id": "principal-kate",
+      "acl": [
+        "group-eng",
+        "group-product"
+      ],
+      "body": "Peripheral discussion that mentions vector but is not the primary vector search embeddings reference.",
+      "checkpoint": "cp-partial-05",
+      "delta_type": "updated",
+      "chunks": [
+        "chk-partial-05-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "internal"
+    },
+    {
+      "id": "doc-partial-06",
+      "tenant_id": "tenant-a",
+      "title": "Notes touching acl",
+      "source": "github",
+      "owner_id": "principal-leo",
+      "acl": [
+        "group-eng",
+        "group-product"
+      ],
+      "body": "Peripheral discussion that mentions acl but is not the primary acl inheritance rules reference.",
+      "checkpoint": "cp-partial-06",
+      "delta_type": "updated",
+      "chunks": [
+        "chk-partial-06-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "internal"
+    },
+    {
+      "id": "doc-partial-07",
+      "tenant_id": "tenant-a",
+      "title": "Notes touching chunking",
+      "source": "jira",
+      "owner_id": "principal-rita",
+      "acl": [
+        "group-eng",
+        "group-product"
+      ],
+      "body": "Peripheral discussion that mentions chunking but is not the primary chunking strategies reference.",
+      "checkpoint": "cp-partial-07",
+      "delta_type": "updated",
+      "chunks": [
+        "chk-partial-07-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "internal"
+    },
+    {
+      "id": "doc-partial-08",
+      "tenant_id": "tenant-a",
+      "title": "Notes touching kafka",
+      "source": "confluence",
+      "owner_id": "principal-sam",
+      "acl": [
+        "group-eng",
+        "group-product"
+      ],
+      "body": "Peripheral discussion that mentions kafka but is not the primary kafka consumer lag reference.",
+      "checkpoint": "cp-partial-08",
+      "delta_type": "updated",
+      "chunks": [
+        "chk-partial-08-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "internal"
+    },
+    {
+      "id": "doc-partial-09",
+      "tenant_id": "tenant-a",
+      "title": "Notes touching redis",
+      "source": "slack",
+      "owner_id": "principal-tina",
+      "acl": [
+        "group-eng",
+        "group-product"
+      ],
+      "body": "Peripheral discussion that mentions redis but is not the primary redis caching patterns reference.",
+      "checkpoint": "cp-partial-09",
+      "delta_type": "updated",
+      "chunks": [
+        "chk-partial-09-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "internal"
+    },
+    {
+      "id": "doc-rt-cross-tenant",
+      "tenant_id": "tenant-c",
+      "title": "Cross-tenant confidential M&A annex",
+      "source": "google_drive",
+      "owner_id": "principal-diana",
+      "acl": [
+        "principal-diana",
+        "group-exec"
+      ],
+      "body": "Cross-tenant confidential M&A annex. CONFIDENTIAL red-team fixture content for ACL cases.",
+      "checkpoint": "cp-doc-rt-cross-tenant",
+      "delta_type": "created",
+      "chunks": [
+        "chk-doc-rt-cross-tenant-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "restricted",
+      "deleted": false
+    },
+    {
+      "id": "doc-rt-no-access",
+      "tenant_id": "tenant-a",
+      "title": "Executive compensation confidential",
+      "source": "google_drive",
+      "owner_id": "principal-hank",
+      "acl": [
+        "principal-hank"
+      ],
+      "body": "Executive compensation confidential. CONFIDENTIAL red-team fixture content for ACL cases.",
+      "checkpoint": "cp-doc-rt-no-access",
+      "delta_type": "created",
+      "chunks": [
+        "chk-doc-rt-no-access-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "restricted",
+      "deleted": false
+    },
+    {
+      "id": "doc-rt-direct-allow",
+      "tenant_id": "tenant-a",
+      "title": "Alice private notebook getUserInfo",
+      "source": "google_drive",
+      "owner_id": "principal-alice",
+      "acl": [
+        "principal-alice"
+      ],
+      "body": "Alice private notebook getUserInfo. CONFIDENTIAL red-team fixture content for ACL cases.",
+      "checkpoint": "cp-doc-rt-direct-allow",
+      "delta_type": "created",
+      "chunks": [
+        "chk-doc-rt-direct-allow-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "internal",
+      "deleted": false
+    },
+    {
+      "id": "doc-rt-group-allow",
+      "tenant_id": "tenant-a",
+      "title": "Eng shared sprint board",
+      "source": "google_drive",
+      "owner_id": "principal-hank",
+      "acl": [
+        "group-eng"
+      ],
+      "body": "Eng shared sprint board. CONFIDENTIAL red-team fixture content for ACL cases.",
+      "checkpoint": "cp-doc-rt-group-allow",
+      "delta_type": "created",
+      "chunks": [
+        "chk-doc-rt-group-allow-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "internal",
+      "deleted": false
+    },
+    {
+      "id": "doc-rt-inherited-allow",
+      "tenant_id": "tenant-a",
+      "title": "Inherited container eng wiki page",
+      "source": "google_drive",
+      "owner_id": "principal-hank",
+      "acl": [
+        "group-eng",
+        "group-all-tenant-a"
+      ],
+      "body": "Inherited container eng wiki page. CONFIDENTIAL red-team fixture content for ACL cases.",
+      "checkpoint": "cp-doc-rt-inherited-allow",
+      "delta_type": "created",
+      "chunks": [
+        "chk-doc-rt-inherited-allow-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "internal",
+      "deleted": false
+    },
+    {
+      "id": "doc-rt-deny-override",
+      "tenant_id": "tenant-a",
+      "title": "Deny override payroll detail",
+      "source": "google_drive",
+      "owner_id": "principal-hank",
+      "acl": [
+        "principal-hank"
+      ],
+      "body": "Deny override payroll detail. CONFIDENTIAL red-team fixture content for ACL cases.",
+      "checkpoint": "cp-doc-rt-deny-override",
+      "delta_type": "created",
+      "chunks": [
+        "chk-doc-rt-deny-override-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "restricted",
+      "deleted": false
+    },
+    {
+      "id": "doc-rt-unshare",
+      "tenant_id": "tenant-a",
+      "title": "Unshared private notebook draft",
+      "source": "google_drive",
+      "owner_id": "principal-erin",
+      "acl": [
+        "principal-erin"
+      ],
+      "body": "Unshared private notebook draft. CONFIDENTIAL red-team fixture content for ACL cases.",
+      "checkpoint": "cp-doc-rt-unshare",
+      "delta_type": "created",
+      "chunks": [
+        "chk-doc-rt-unshare-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "restricted",
+      "deleted": false
+    },
+    {
+      "id": "doc-rt-group-changed",
+      "tenant_id": "tenant-a",
+      "title": "Former eng board minutes restricted",
+      "source": "google_drive",
+      "owner_id": "principal-hank",
+      "acl": [
+        "principal-hank"
+      ],
+      "body": "Former eng board minutes restricted. CONFIDENTIAL red-team fixture content for ACL cases.",
+      "checkpoint": "cp-doc-rt-group-changed",
+      "delta_type": "created",
+      "chunks": [
+        "chk-doc-rt-group-changed-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "restricted",
+      "deleted": false
+    },
+    {
+      "id": "doc-rt-container",
+      "tenant_id": "tenant-a",
+      "title": "HR folder performance reviews",
+      "source": "google_drive",
+      "owner_id": "principal-hank",
+      "acl": [
+        "principal-hank"
+      ],
+      "body": "HR folder performance reviews. CONFIDENTIAL red-team fixture content for ACL cases.",
+      "checkpoint": "cp-doc-rt-container",
+      "delta_type": "created",
+      "chunks": [
+        "chk-doc-rt-container-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "restricted",
+      "deleted": false
+    },
+    {
+      "id": "doc-rt-removed-group",
+      "tenant_id": "tenant-a",
+      "title": "Removed group exclusive notes",
+      "source": "google_drive",
+      "owner_id": "principal-erin",
+      "acl": [
+        "principal-erin"
+      ],
+      "body": "Removed group exclusive notes. CONFIDENTIAL red-team fixture content for ACL cases.",
+      "checkpoint": "cp-doc-rt-removed-group",
+      "delta_type": "created",
+      "chunks": [
+        "chk-doc-rt-removed-group-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "restricted",
+      "deleted": false
+    },
+    {
+      "id": "doc-rt-deleted",
+      "tenant_id": "tenant-a",
+      "title": "Deleted confidential archive",
+      "source": "google_drive",
+      "owner_id": "principal-hank",
+      "acl": [
+        "principal-hank"
+      ],
+      "body": "Deleted confidential archive. CONFIDENTIAL red-team fixture content for ACL cases.",
+      "checkpoint": "cp-doc-rt-deleted",
+      "delta_type": "deleted",
+      "chunks": [
+        "chk-doc-rt-deleted-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "restricted",
+      "deleted": true
+    },
+    {
+      "id": "doc-rt-scope",
+      "tenant_id": "tenant-a",
+      "title": "Insufficient scope classified memo",
+      "source": "google_drive",
+      "owner_id": "principal-hank",
+      "acl": [
+        "principal-hank"
+      ],
+      "body": "Insufficient scope classified memo. CONFIDENTIAL red-team fixture content for ACL cases.",
+      "checkpoint": "cp-doc-rt-scope",
+      "delta_type": "created",
+      "chunks": [
+        "chk-doc-rt-scope-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "restricted",
+      "deleted": false
+    },
+    {
+      "id": "doc-rt-auth-required",
+      "tenant_id": "tenant-b",
+      "title": "Auth required secret blueprint",
+      "source": "google_drive",
+      "owner_id": "principal-carol",
+      "acl": [
+        "group-security",
+        "principal-carol"
+      ],
+      "body": "Auth required secret blueprint. CONFIDENTIAL red-team fixture content for ACL cases.",
+      "checkpoint": "cp-doc-rt-auth-required",
+      "delta_type": "created",
+      "chunks": [
+        "chk-doc-rt-auth-required-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "restricted",
+      "deleted": false
+    },
+    {
+      "id": "doc-rt-parent-denied",
+      "tenant_id": "tenant-a",
+      "title": "Parent denied child visible trap",
+      "source": "google_drive",
+      "owner_id": "principal-hank",
+      "acl": [
+        "principal-hank"
+      ],
+      "body": "Parent denied child visible trap. CONFIDENTIAL red-team fixture content for ACL cases.",
+      "checkpoint": "cp-doc-rt-parent-denied",
+      "delta_type": "created",
+      "chunks": [
+        "chk-doc-rt-parent-denied-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "restricted",
+      "deleted": false
+    },
+    {
+      "id": "doc-rt-legal-only",
+      "tenant_id": "tenant-b",
+      "title": "Attorney client privileged brief",
+      "source": "google_drive",
+      "owner_id": "principal-carol",
+      "acl": [
+        "group-legal",
+        "principal-carol"
+      ],
+      "body": "Attorney client privileged brief. CONFIDENTIAL red-team fixture content for ACL cases.",
+      "checkpoint": "cp-doc-rt-legal-only",
+      "delta_type": "created",
+      "chunks": [
+        "chk-doc-rt-legal-only-1"
+      ],
+      "object_type": "prose",
+      "sensitivity": "restricted",
+      "deleted": false
     }
   ]
 }

@@ -1,5 +1,19 @@
 {
-  "version": "v1",
+  "version": "v2",
+  "generated_at": "2026-08-09T00:00:00Z",
+  "description": "Shared Block Z fixtures (architecture section 24 sizes) + code_corpus for E1",
+  "counts": {
+    "documents": 60,
+    "principals": 25,
+    "groups": 10,
+    "acl_redteam_cases": 15,
+    "relevance_queries": 30,
+    "multi_source_3plus": 8,
+    "graph_edges": 111,
+    "activity_events": 65,
+    "code_corpus_files": 36,
+    "code_corpus_languages": 3
+  },
   "fixtures": [
     "documents",
     "principals",
@@ -10,6 +24,19 @@
     "graph_edges",
     "multi_source_identities",
     "performance_baselines",
-    "crawl_expectations"
-  ]
+    "crawl_expectations",
+    "activity_events",
+    "code_corpus"
+  ],
+  "code_corpus": {
+    "path": "code_corpus/",
+    "languages": [
+      "python",
+      "javascript",
+      "go"
+    ],
+    "file_count": 36,
+    "source": "migrated from services/block-e-chunking/fixtures/code (preserved in place)",
+    "e1_floor": ">=30 files across 3+ languages"
+  }
 }

@@ -1,5 +1,5 @@
 {
-  "version": "v1",
+  "version": "v2",
   "baselines": {
     "lexical_p95_ms": 200,
     "vector_p95_ms": 150,

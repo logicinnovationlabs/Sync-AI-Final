@@ -26,7 +26,7 @@ class TestConfig:
 
     FIXTURES_PATH = os.environ.get("FIXTURES_PATH", str(_DEFAULT_FIXTURES))
     CONTRACTS_PATH = os.environ.get("CONTRACTS_PATH", str(_DEFAULT_CONTRACTS))
-    FIXTURES_VERSION = os.environ.get("FIXTURES_VERSION", "v1")
+    FIXTURES_VERSION = os.environ.get("FIXTURES_VERSION", "v2")
     MOCK_BASE_PORT = int(os.environ.get("MOCK_BASE_PORT", "10000"))
     REAL_BASE_PORT = int(os.environ.get("REAL_BASE_PORT", "8000"))
     # USE_REAL_SERVICES=1 (or true) forces integration phase (real deps).

@@ -1,36 +1,252 @@
 {
-  "version": "v1",
+  "version": "v2",
   "cases": [
     {
-      "case_id": "rt-cross-tenant",
+      "case_id": "rt-01-cross-tenant",
+      "scenario": "cross_tenant",
+      "description": "Tenant-a eng must not see tenant-c M&A docs",
       "tenant_id": "tenant-a",
       "principal_id": "principal-alice",
       "query": "M&A Deal Sheet",
       "forbidden_document_ids": [
         "doc-restricted",
+        "doc-rt-cross-tenant",
         "doc-security"
-      ]
+      ],
+      "expected_outcome": "deny",
+      "must_return_zero_from_forbidden": true
     },
     {
-      "case_id": "rt-no-access",
+      "case_id": "rt-02-no-access",
+      "scenario": "no_direct_access",
+      "description": "Bob has no ACL on executive compensation",
       "tenant_id": "tenant-a",
       "principal_id": "principal-bob",
-      "query": "Security Policy",
+      "query": "Executive compensation confidential",
       "forbidden_document_ids": [
-        "doc-security",
-        "doc-restricted"
-      ]
+        "doc-restricted",
+        "doc-rt-no-access",
+        "doc-security"
+      ],
+      "expected_outcome": "deny",
+      "must_return_zero_from_forbidden": true
     },
     {
-      "case_id": "rt-group-only",
-      "tenant_id": "tenant-b",
-      "principal_id": "principal-carol",
-      "query": "roadmap",
+      "case_id": "rt-03-direct-allow",
+      "scenario": "direct_allow",
+      "description": "Alice direct ACL allow on private notebook",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "query": "Alice private notebook getUserInfo",
       "forbidden_document_ids": [
-        "doc-roadmap",
-        "doc-api-docs",
-        "doc-onboarding"
-      ]
+        "doc-restricted",
+        "doc-rt-auth-required",
+        "doc-rt-container",
+        "doc-rt-cross-tenant",
+        "doc-rt-deleted",
+        "doc-rt-deny-override",
+        "doc-rt-group-changed",
+        "doc-rt-legal-only",
+        "doc-rt-no-access",
+        "doc-rt-parent-denied",
+        "doc-rt-removed-group",
+        "doc-rt-scope",
+        "doc-rt-unshare",
+        "doc-security"
+      ],
+      "must_include_document_ids": [
+        "doc-rt-direct-allow"
+      ],
+      "expected_outcome": "allow",
+      "must_return_zero_from_forbidden": true
+    },
+    {
+      "case_id": "rt-04-group-allow",
+      "scenario": "group_allow",
+      "description": "Bob via group-eng can see eng sprint board",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-bob",
+      "query": "Eng shared sprint board",
+      "forbidden_document_ids": [
+        "doc-restricted",
+        "doc-rt-deny-override",
+        "doc-rt-no-access",
+        "doc-rt-unshare",
+        "doc-security"
+      ],
+      "must_include_document_ids": [
+        "doc-rt-group-allow"
+      ],
+      "expected_outcome": "allow",
+      "must_return_zero_from_forbidden": true
+    },
+    {
+      "case_id": "rt-05-inherited-allow",
+      "scenario": "inherited_allow",
+      "description": "Container inheritance grants eng wiki access",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-erin",
+      "query": "Inherited container eng wiki page",
+      "forbidden_document_ids": [
+        "doc-restricted",
+        "doc-rt-deny-override",
+        "doc-security"
+      ],
+      "must_include_document_ids": [
+        "doc-rt-inherited-allow"
+      ],
+      "expected_outcome": "allow",
+      "must_return_zero_from_forbidden": true
+    },
+    {
+      "case_id": "rt-06-deny-override",
+      "scenario": "deny_override",
+      "description": "DENY on eng overrides group allow for payroll detail",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "query": "Deny override payroll detail",
+      "forbidden_document_ids": [
+        "doc-restricted",
+        "doc-rt-deny-override",
+        "doc-security"
+      ],
+      "expected_outcome": "deny",
+      "must_return_zero_from_forbidden": true
+    },
+    {
+      "case_id": "rt-07-unshare",
+      "scenario": "unshare",
+      "description": "Unshared notebook not visible to former collaborators",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-bob",
+      "query": "Unshared private notebook draft",
+      "forbidden_document_ids": [
+        "doc-restricted",
+        "doc-rt-unshare",
+        "doc-security"
+      ],
+      "expected_outcome": "deny",
+      "must_return_zero_from_forbidden": true
+    },
+    {
+      "case_id": "rt-08-group-changed",
+      "scenario": "group_membership_changed",
+      "description": "After group change, eng no longer sees board minutes",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-bob",
+      "query": "Former eng board minutes restricted",
+      "forbidden_document_ids": [
+        "doc-restricted",
+        "doc-rt-group-changed",
+        "doc-security"
+      ],
+      "expected_outcome": "deny",
+      "must_return_zero_from_forbidden": true
+    },
+    {
+      "case_id": "rt-09-container-restricted",
+      "scenario": "container_restriction",
+      "description": "HR container docs blocked for eng",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "query": "HR folder performance reviews",
+      "forbidden_document_ids": [
+        "doc-restricted",
+        "doc-rt-container",
+        "doc-security"
+      ],
+      "expected_outcome": "deny",
+      "must_return_zero_from_forbidden": true
+    },
+    {
+      "case_id": "rt-10-removed-group",
+      "scenario": "removed_from_group",
+      "description": "User removed from group loses exclusive notes",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-bob",
+      "query": "Removed group exclusive notes",
+      "forbidden_document_ids": [
+        "doc-restricted",
+        "doc-rt-removed-group",
+        "doc-security"
+      ],
+      "expected_outcome": "deny",
+      "must_return_zero_from_forbidden": true
+    },
+    {
+      "case_id": "rt-11-deleted",
+      "scenario": "deleted_document",
+      "description": "Deleted confidential archive must not surface",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "query": "Deleted confidential archive",
+      "forbidden_document_ids": [
+        "doc-restricted",
+        "doc-rt-deleted",
+        "doc-security"
+      ],
+      "expected_outcome": "deny",
+      "must_return_zero_from_forbidden": true
+    },
+    {
+      "case_id": "rt-12-insufficient-scope",
+      "scenario": "insufficient_scope",
+      "description": "Classified memo requires elevated admin scope",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-bob",
+      "query": "Insufficient scope classified memo",
+      "forbidden_document_ids": [
+        "doc-restricted",
+        "doc-rt-scope",
+        "doc-security"
+      ],
+      "expected_outcome": "deny",
+      "must_return_zero_from_forbidden": true
+    },
+    {
+      "case_id": "rt-13-auth-required-cross",
+      "scenario": "cross_tenant_auth",
+      "description": "Tenant-a cannot read tenant-b secret blueprint",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "query": "Auth required secret blueprint",
+      "forbidden_document_ids": [
+        "doc-restricted",
+        "doc-rt-auth-required",
+        "doc-security"
+      ],
+      "expected_outcome": "deny",
+      "must_return_zero_from_forbidden": true
+    },
+    {
+      "case_id": "rt-14-parent-denied",
+      "scenario": "parent_denied_child",
+      "description": "Parent-denied trap document blocked for eng",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-alice",
+      "query": "Parent denied child visible trap",
+      "forbidden_document_ids": [
+        "doc-restricted",
+        "doc-rt-parent-denied",
+        "doc-security"
+      ],
+      "expected_outcome": "deny",
+      "must_return_zero_from_forbidden": true
+    },
+    {
+      "case_id": "rt-15-legal-only",
+      "scenario": "legal_only",
+      "description": "Legal privileged brief forbidden to tenant-a eng",
+      "tenant_id": "tenant-a",
+      "principal_id": "principal-bob",
+      "query": "Attorney client privileged brief",
+      "forbidden_document_ids": [
+        "doc-restricted",
+        "doc-rt-legal-only",
+        "doc-security"
+      ],
+      "expected_outcome": "deny",
+      "must_return_zero_from_forbidden": true
     }
   ]
 }
