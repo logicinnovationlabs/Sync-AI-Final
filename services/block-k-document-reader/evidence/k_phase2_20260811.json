@@ -1,0 +1,33 @@
+{
+  "phase": 2,
+  "backends": {
+    "storage": "minio",
+    "acl": "http",
+    "db_url": "postgresql://user:pass@localhost:15434/block_d",
+    "storage_endpoint": "localhost:19000",
+    "acl_service_url": "http://localhost:18001"
+  },
+  "results": [
+    {
+      "id": "K1",
+      "pass": true,
+      "detail": "allow=200 deny_b=403 post_revoke_403=10/10"
+    },
+    {
+      "id": "K2",
+      "pass": true,
+      "detail": "status=200 streaming=True body_len=10551296 gen_growth=183883"
+    },
+    {
+      "id": "K3",
+      "pass": true,
+      "detail": "status=200 structure_match=True body_match=True title_match=True"
+    },
+    {
+      "id": "K2-small",
+      "pass": true,
+      "detail": "status=200 streaming_header=None"
+    }
+  ],
+  "overall": true
+}

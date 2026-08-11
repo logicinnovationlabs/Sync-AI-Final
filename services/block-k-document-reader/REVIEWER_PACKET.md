@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | Block | K — Document Reader Service |
-| Engineer self-report | Phase 1 mock **PASS** (see SIGNOFF.md) |
+| Engineer self-report | Phase 1 mock **PASS**; Phase 2 compose **PASS** (2026-08-11) |
 | Reviewer | **PENDING** |
 | API | `GET /api/v1/document/{id}` |
 
@@ -50,3 +50,23 @@ $env:PYTHONPATH = (Get-Location).Path
 | K3 | Structure fidelity 100% | PASS (Phase 1) | | | Fixture `structured_document.json` |
 
 **Reviewer name / date / signature:** _______________
+
+
+## Reproduce — Phase 2 seeded compose (2026-08-11)
+
+`powershell
+cd "D:\PROJECTS\Sync Ai Final\services\block-k-document-reader"
+docker compose -f docker-compose.test.yml up -d
+postgresql://user:pass@localhost:15434/block_d = "postgresql://user:pass@localhost:15434/block_d"
+localhost:19000 = "localhost:19000"
+minioadmin = "minioadmin"
+minioadmin = "minioadmin"
+documents = "documents"
+http://localhost:18001 = "http://localhost:18001"
+minio = "minio"
+http = "http"
+& "D:\PROJECTS\Sync Ai Final\.venv\Scripts\python.exe" scripts\seed_phase2.py
+& "D:\PROJECTS\Sync Ai Final\.venv\Scripts\python.exe" scripts\verify_k_phase2.py
+`
+
+Evidence: evidence/k_phase2_20260811.json
