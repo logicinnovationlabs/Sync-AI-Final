@@ -1,0 +1,43 @@
+{
+  "document_id": "doc-structure-k3",
+  "tenant_id": "tenant-k",
+  "title": "Quarterly Report",
+  "owner_principal_id": "user-a",
+  "created_at": "2026-08-10T12:00:00Z",
+  "updated_at": "2026-08-11T10:00:00Z",
+  "visibility_mode": "acl",
+  "hidden_fields": [],
+  "body": "# Quarterly Report\n\n## Heading 1\nOverview of Q3 performance.\n\n## Subheading\nDetails follow.\n\n| Metric | Value |\n|--------|-------|\n| Revenue | 10M |\n| Users | 50k |\n\n```python\ndef hello():\n    return \"world\"\n```\n",
+  "structured_metadata": {
+    "headings": [
+      "Quarterly Report",
+      "Heading 1",
+      "Subheading"
+    ],
+    "tables": [
+      {
+        "headers": [
+          "Metric",
+          "Value"
+        ],
+        "rows": [
+          [
+            "Revenue",
+            "10M"
+          ],
+          [
+            "Users",
+            "50k"
+          ]
+        ]
+      }
+    ],
+    "code_blocks": [
+      {
+        "language": "python",
+        "code": "def hello():\n    return \"world\""
+      }
+    ],
+    "language": "en"
+  }
+}
