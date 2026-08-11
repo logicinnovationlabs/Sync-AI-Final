@@ -232,6 +232,90 @@ class Settings(BaseSettings):
     identity_cache_ttl: int = Field(default=86400)
     acl_inheritance_cache_ttl: int = Field(default=600)
     acl_revalidation_interval_seconds: int = Field(default=900)
+    
+    # ------------------------------------------------------------------
+    # Block D: Storage & Encryption
+    # ------------------------------------------------------------------
+    encryption_key_name: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("ENCRYPTION_KEY_NAME", "encryption_key_name"),
+    )
+    backup_bucket: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("BACKUP_BUCKET", "backup_bucket"),
+    )
+    
+    # ------------------------------------------------------------------
+    # Block E: Chunking & Embeddings
+    # ------------------------------------------------------------------
+    chunk_size: int = Field(
+        default=512,
+        validation_alias=AliasChoices("CHUNK_SIZE", "chunk_size"),
+    )
+    chunk_overlap: int = Field(
+        default=50,
+        validation_alias=AliasChoices("CHUNK_OVERLAP", "chunk_overlap"),
+    )
+    embedding_model_version: str = Field(
+        default="v1",
+        validation_alias=AliasChoices("EMBEDDING_MODEL_VERSION", "embedding_model_version"),
+    )
+    embedding_batch_size: int = Field(
+        default=100,
+        validation_alias=AliasChoices("EMBEDDING_BATCH_SIZE", "embedding_batch_size"),
+    )
+    embedding_dimensions: int = Field(
+        default=384,
+        validation_alias=AliasChoices("EMBEDDING_DIMENSIONS", "embedding_dimensions"),
+    )
+    
+    # ------------------------------------------------------------------
+    # Block F: Lexical Search (OpenSearch)
+    # ------------------------------------------------------------------
+    opensearch_url: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("OPENSEARCH_URL", "opensearch_url"),
+    )
+    opensearch_host: str = Field(
+        default="localhost",
+        validation_alias=AliasChoices("OPENSEARCH_HOST", "opensearch_host"),
+    )
+    opensearch_port: int = Field(
+        default=9200,
+        validation_alias=AliasChoices("OPENSEARCH_PORT", "opensearch_port"),
+    )
+    opensearch_index_prefix: str = Field(
+        default="snyq",
+        validation_alias=AliasChoices("OPENSEARCH_INDEX_PREFIX", "opensearch_index_prefix"),
+    )
+    lexical_max_results: int = Field(
+        default=100,
+        validation_alias=AliasChoices("LEXICAL_MAX_RESULTS", "lexical_max_results"),
+    )
+    
+    # ------------------------------------------------------------------
+    # Block G: Vector Search (Qdrant)
+    # ------------------------------------------------------------------
+    qdrant_url: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("QDRANT_URL", "qdrant_url"),
+    )
+    qdrant_host: str = Field(
+        default="localhost",
+        validation_alias=AliasChoices("QDRANT_HOST", "qdrant_host"),
+    )
+    qdrant_port: int = Field(
+        default=6333,
+        validation_alias=AliasChoices("QDRANT_PORT", "qdrant_port"),
+    )
+    qdrant_collection_prefix: str = Field(
+        default="snyq",
+        validation_alias=AliasChoices("QDRANT_COLLECTION_PREFIX", "qdrant_collection_prefix"),
+    )
+    vector_search_top_k: int = Field(
+        default=10,
+        validation_alias=AliasChoices("VECTOR_SEARCH_TOP_K", "vector_search_top_k"),
+    )
 
     # ------------------------------------------------------------------
     # Derived / compat properties used by existing modules
