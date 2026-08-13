@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Start-Process \"C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe\")",
+      "Bash(ENV_FILE=.env.test python -c \"from app.core.config import get_settings; s = get_settings\\(\\); print\\('Settings loaded OK'\\); print\\(f'DB: {s.DB_HOST}:{s.DB_NAME}'\\); print\\(f'Redis: {s.REDIS_URL}'\\)\")",
+      "Bash(python -c \"from app.core.config import get_settings; s = get_settings\\(\\); print\\('Settings loaded OK'\\); print\\(f'DB: {s.DB_HOST}:{s.DB_NAME}'\\); print\\(f'Redis: {s.REDIS_URL}'\\)\")",
+      "Bash(python -c \"import os; print\\(os.getcwd\\(\\)\\); print\\(os.path.exists\\('.env'\\)\\)\")",
+      "Bash(cp /c/Users/prath/OneDrive/Desktop/SnyQ_Phase_2/.env.test /c/Users/prath/OneDrive/Desktop/SnyQ_Phase_2/backend/.env)",
+      "Bash(python -c \"from app.core.config import get_settings; s = get_settings\\(\\); print\\('Settings loaded OK'\\); print\\(f'DB: {s.db_host}:{s.db_name}'\\); print\\(f'Redis: {s.redis_url}'\\)\")"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\prath\\OneDrive\\Desktop\\SnyQ_Phase_2"
+    ]
+  }
+}

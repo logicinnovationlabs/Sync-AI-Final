@@ -32,7 +32,9 @@ import inspect
 try:
     import nest_asyncio
     nest_asyncio.apply()
-except ImportError:
+except (ImportError, ValueError):
+    # ImportError: nest_asyncio not installed
+    # ValueError: Can't patch uvloop (used by uvicorn in production)
     pass
 
 logger = logging.getLogger(__name__)

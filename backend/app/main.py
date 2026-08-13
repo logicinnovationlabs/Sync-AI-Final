@@ -14,10 +14,12 @@ from datetime import datetime
 from app.core.config import settings
 from app.core.exceptions import SnyQException
 from app.core.errors import ErrorResponse, ErrorDetail
-from app.api.v1 import auth, oauth, me, admin, connectors, scoped_probes, embed
+from app.api.v1 import auth, oauth, me, admin, connectors, scoped_probes, embed, signals as signals_routes
 from app.api.v1 import identity as identity_routes
 from app.api.v1 import acl as acl_routes
 from app.api.v1.search import lexical, vector
+from app.api.v1.search import graph as graph_search
+from app.api.v1.search import federated as federated_search
 from app.connectors.google.webhooks import router as webhooks_router
 
 from app.middleware.tenant_middleware import TenantMiddleware
@@ -113,23 +115,43 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-# Mount routers
+# Mount routers (both with /api/v1 prefix and root level for client compatibility)
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(oauth.router, prefix="/api/v1")
+app.include_router(oauth.router)
 app.include_router(me.router, prefix="/api/v1")
+app.include_router(me.router)
 app.include_router(admin.router, prefix="/api/v1")
+app.include_router(admin.router)
 app.include_router(connectors.router, prefix="/api/v1")
+app.include_router(connectors.router)
 app.include_router(scoped_probes.router, prefix="/api/v1")
+app.include_router(scoped_probes.router)
 app.include_router(webhooks_router, prefix="/api/v1")
-# Block C: identity resolution + ACL debug endpoints (Pratham)
+# Block C: identity resolution + ACL debug endpoints
 app.include_router(identity_routes.router, prefix="/api/v1")
+app.include_router(identity_routes.router)
 app.include_router(acl_routes.router, prefix="/api/v1")
+app.include_router(acl_routes.router)
 # Block E: Chunking & Embeddings
 app.include_router(embed.router, prefix="/api/v1", tags=["embeddings"])
+app.include_router(embed.router, tags=["embeddings"])
 # Block F: Lexical Search
 app.include_router(lexical.router, prefix="/api/v1", tags=["search-lexical"])
+app.include_router(lexical.router, tags=["search-lexical"])
 # Block G: Vector Search
 app.include_router(vector.router, prefix="/api/v1", tags=["search-vector"])
+app.include_router(vector.router, tags=["search-vector"])
+# Block H: Graph Search
+app.include_router(graph_search.router, prefix="/api/v1", tags=["search-graph"])
+app.include_router(graph_search.router, tags=["search-graph"])
+# Block I: Activity Signals
+app.include_router(signals_routes.router, prefix="/api/v1", tags=["signals"])
+app.include_router(signals_routes.router, tags=["signals"])
+# Block J: Federated Search
+app.include_router(federated_search.router, prefix="/api/v1", tags=["search-federated"])
+app.include_router(federated_search.router, tags=["search-federated"])
+
 
 
 # Health check

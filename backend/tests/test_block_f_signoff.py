@@ -138,7 +138,11 @@ class TestBlockFSignoff:
         
         print(f"  Documents indexed: {count}")
         print(f"  Time: {elapsed_seconds:.2f}s")
-        print(f"  Throughput: {count / elapsed_seconds:.0f} docs/sec")
+        # Avoid division by zero
+        if elapsed_seconds > 0:
+            print(f"  Throughput: {count / elapsed_seconds:.0f} docs/sec")
+        else:
+            print(f"  Throughput: N/A (instant)")
         
         print(f"\n[RESULT] F1 Results:")
         print(f"  Total time: {elapsed_seconds:.2f}s")

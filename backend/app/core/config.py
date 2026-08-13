@@ -316,6 +316,70 @@ class Settings(BaseSettings):
         default=10,
         validation_alias=AliasChoices("VECTOR_SEARCH_TOP_K", "vector_search_top_k"),
     )
+    
+    # ------------------------------------------------------------------
+    # Block H: Graph Search (Neo4j)
+    # ------------------------------------------------------------------
+    graph_backend: str = Field(
+        default="mock",
+        validation_alias=AliasChoices("GRAPH_BACKEND", "graph_backend"),
+    )
+    neo4j_uri: str = Field(
+        default="bolt://localhost:7687",
+        validation_alias=AliasChoices("NEO4J_URI", "neo4j_uri"),
+    )
+    neo4j_user: str = Field(
+        default="neo4j",
+        validation_alias=AliasChoices("NEO4J_USER", "neo4j_user"),
+    )
+    neo4j_password: str = Field(
+        default="password",
+        validation_alias=AliasChoices("NEO4J_PASSWORD", "neo4j_password"),
+    )
+    neo4j_database_prefix: str = Field(
+        default="graph_tenant_",
+        validation_alias=AliasChoices("NEO4J_DATABASE_PREFIX", "neo4j_database_prefix"),
+    )
+    neo4j_cache_ttl_seconds: int = Field(
+        default=3600,
+        validation_alias=AliasChoices("NEO4J_CACHE_TTL_SECONDS", "neo4j_cache_ttl_seconds"),
+    )
+    max_traversal_depth: int = Field(
+        default=2,
+        validation_alias=AliasChoices("MAX_TRAVERSAL_DEPTH", "max_traversal_depth"),
+    )
+    traversal_result_limit: int = Field(
+        default=100,
+        validation_alias=AliasChoices("TRAVERSAL_RESULT_LIMIT", "traversal_result_limit"),
+    )
+    
+    # ------------------------------------------------------------------
+    # Block I: Activity Signals (Postgres)
+    # ------------------------------------------------------------------
+    signals_backend: str = Field(
+        default="mock",
+        validation_alias=AliasChoices("SIGNALS_BACKEND", "signals_backend"),
+    )
+    privacy_threshold: int = Field(
+        default=5,
+        validation_alias=AliasChoices("PRIVACY_THRESHOLD", "privacy_threshold"),
+    )
+    retention_days: int = Field(
+        default=90,
+        validation_alias=AliasChoices("RETENTION_DAYS", "retention_days"),
+    )
+    high_privacy_retention_days: int = Field(
+        default=30,
+        validation_alias=AliasChoices("HIGH_PRIVACY_RETENTION_DAYS", "high_privacy_retention_days"),
+    )
+    freshness_sla_seconds: int = Field(
+        default=900,
+        validation_alias=AliasChoices("FRESHNESS_SLA_SECONDS", "freshness_sla_seconds"),
+    )
+    popularity_window_days: int = Field(
+        default=30,
+        validation_alias=AliasChoices("POPULARITY_WINDOW_DAYS", "popularity_window_days"),
+    )
 
     # ------------------------------------------------------------------
     # Derived / compat properties used by existing modules

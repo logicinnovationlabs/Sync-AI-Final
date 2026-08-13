@@ -1,0 +1,262 @@
+name: snyq_signoff
+
+# ============================================================
+# docker-compose.signoff.yml
+# Runs the full Block A-J signoff test suite against real
+# seeded data in a hermetic Docker environment.
+# ============================================================
+#
+# Usage:
+#   docker-compose -f docker-compose.signoff.yml up --build --exit-code-from test-runner
+#   docker-compose -f docker-compose.signoff.yml down -v   # cleanup
+#
+
+services:
+  # ── Infrastructure ─────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: signoff_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: control_plane
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  redis:
+    image: redis:7-alpine
+    container_name: signoff_redis
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  vault:
+    image: hashicorp/vault:1.15.6
+    container_name: signoff_vault
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: root
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    cap_add:
+      - IPC_LOCK
+    command: server -dev
+    ports:
+      - "8201:8200"
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: signoff_qdrant
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6333
+    ports:
+      - "6334:6333"
+
+  opensearch:
+    image: opensearchproject/opensearch:2.11.1
+    container_name: signoff_opensearch
+    environment:
+      discovery.type: single-node
+      plugins.security.disabled: "true"
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "9201:9200"
+
+  minio:
+    image: minio/minio:latest
+    container_name: signoff_minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    ports:
+      - "9002:9000"
+      - "9003:9001"
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v23.3.18
+    container_name: signoff_redpanda
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp
+      - "1"
+      - --memory
+      - 512M
+      - --reserve-memory
+      - 0M
+      - --node-id
+      - "0"
+      - --check=false
+      - --kafka-addr
+      - PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr
+      - PLAINTEXT://redpanda:9092
+    ports:
+      - "9093:9092"
+
+  # ── DB Migrations ──────────────────────────────────────────
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: signoff_migrate
+    env_file:
+      - .env.docker
+    environment:
+      CONTROL_PLANE_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/control_plane
+      DB_HOST: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: python -m alembic upgrade head
+    restart: "no"
+
+  # ── Seed Real Data ─────────────────────────────────────────
+  seed:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: signoff_seed
+    env_file:
+      - .env.docker
+    environment:
+      CONTROL_PLANE_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/control_plane
+      DB_HOST: postgres
+      REDIS_URL: redis://redis:6379
+      VAULT_URL: http://vault:8200
+      KMS_KEY_VAULT_URL: http://vault:8200
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      vault:
+        condition: service_started
+    command: python scripts/seed_tenants.py
+    restart: "no"
+
+  # ── App (required by some signoff tests) ───────────────────
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: signoff_app
+    env_file:
+      - .env.docker
+    environment:
+      CONTROL_PLANE_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/control_plane
+      DB_HOST: postgres
+      REDIS_URL: redis://redis:6379
+      VAULT_URL: http://vault:8200
+      KMS_KEY_VAULT_URL: http://vault:8200
+      KAFKA_BROKERS: redpanda:9092
+      LEXICAL_SEARCH_URL: http://opensearch:9200
+      OPENSEARCH_URL: http://opensearch:9200
+      VECTOR_SEARCH_URL: http://qdrant:6333
+      QDRANT_URL: http://qdrant:6333
+      OBJECT_STORE_CONNECTION_STRING: endpoint=http://minio:9000;accessKey=minioadmin;secretKey=minioadmin;useSSL=false;bucket=glean-data
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      CELERY_TASK_ALWAYS_EAGER: "true"
+      LLM_PROVIDER: fake
+      EMBEDDING_PROVIDER: fake
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+      vault:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+  # ── Signoff Test Runner ────────────────────────────────────
+  test-runner:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.test
+    container_name: signoff_test_runner
+    env_file:
+      - .env.docker
+    environment:
+      # Infra endpoints (Docker service names)
+      CONTROL_PLANE_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/control_plane
+      TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/control_plane
+      DB_HOST: postgres
+      REDIS_URL: redis://redis:6379
+      SESSION_STORE_REDIS_URL: redis://redis:6379
+      VAULT_URL: http://vault:8200
+      KMS_KEY_VAULT_URL: http://vault:8200
+      KAFKA_BROKERS: redpanda:9092
+      LEXICAL_SEARCH_URL: http://opensearch:9200
+      OPENSEARCH_URL: http://opensearch:9200
+      OPENSEARCH_HOST: opensearch
+      OPENSEARCH_PORT: "9200"
+      VECTOR_SEARCH_URL: http://qdrant:6333
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: "6333"
+      QDRANT_COLLECTION_NAME: documents
+      OBJECT_STORE_CONNECTION_STRING: endpoint=http://minio:9000;accessKey=minioadmin;secretKey=minioadmin;useSSL=false;bucket=glean-data
+
+      # App settings
+      LLM_PROVIDER: fake
+      EMBEDDING_PROVIDER: fake
+      EMBEDDING_DIMENSION: "3072"
+      CELERY_TASK_ALWAYS_EAGER: "true"
+      ENVIRONMENT: test
+      LOG_LEVEL: INFO
+      TOKEN_ENCRYPTION_KEY: "test-key-32-bytes-long-for-test!!"
+
+      # Pytest controls
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      app:
+        condition: service_healthy
+      vault:
+        condition: service_started
+      qdrant:
+        condition: service_started
+      opensearch:
+        condition: service_started
+    command: >
+      pytest tests/
+        --tb=short
+        -v
+        --timeout=300
+        --ignore=tests/smoke_google_refresh_token.py
+        --ignore=tests/block_e/
+        -p no:cacheprovider
+        --junitxml=/app/test-results/signoff-results.xml
+    volumes:
+      - ./test-results:/app/test-results
+
+volumes: {}

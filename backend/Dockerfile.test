@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install system dependencies (libmagic, tesseract OCR, build tools, PostgreSQL client, curl)
+# Install system dependencies (libmagic, tesseract OCR, build tools)
 RUN apt-get update && apt-get install -y \
     build-essential \
     libpq-dev \
@@ -20,12 +20,17 @@ RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir -r requirements-dev.txt
 
-# Copy application code, migrations, configs, and scripts
+# Install pytest-timeout for robustness
+RUN pip install --no-cache-dir pytest-timeout
+
+# Copy application code, migrations, configs, scripts, and tests
 COPY app ./app
 COPY migrations ./migrations
 COPY alembic.ini ./
 COPY scripts ./scripts
 COPY keys ./keys
+COPY tests ./tests
+COPY pyproject.toml ./
 
 # Set environment variables defaults
 ENV PYTHONUNBUFFERED=1 \
@@ -33,10 +38,4 @@ ENV PYTHONUNBUFFERED=1 \
     JWT_PRIVATE_KEY_PATH=/app/keys/private.pem \
     JWT_PUBLIC_KEY_PATH=/app/keys/public.pem
 
-EXPOSE 8000
-
-HEALTHCHECK --interval=5s --timeout=5s --retries=10 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
+CMD ["pytest", "tests/", "-v", "--tb=short", "-p", "no:cacheprovider"]

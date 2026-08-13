@@ -1,0 +1,19 @@
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements-test.txt .
+RUN pip install --no-cache-dir -r requirements-test.txt
+COPY fixtures ./fixtures
+COPY contracts ./contracts
+COPY tests ./tests
+COPY pytest.ini .
+
+ENV TEST_PHASE=integration \
+    USE_REAL_SERVICES=1 \
+    USE_INPROCESS_MOCKS=false \
+    REAL_BASE_PORT=8000 \
+    TEST_SERVICE_HOST=app \
+    FIXTURES_PATH=/app/fixtures \
+    CONTRACTS_PATH=/app/contracts \
+    JWT_TEST_SECRET=test-suite-hs256-secret-32b-min!!
+
+CMD ["pytest", "tests/", "-m", "block_a or block_b or block_c or block_d or block_e or block_f or block_g", "-v", "--tb=short"]

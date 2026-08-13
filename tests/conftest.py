@@ -59,10 +59,15 @@ class TestConfig:
 
     @classmethod
     def get_service_url(cls, block: str, mock: bool = True) -> str:
+        host = os.environ.get("TEST_SERVICE_HOST", "127.0.0.1")
+        if not mock or os.environ.get("UNIFIED_BACKEND", "true").lower() == "true":
+            # For real integration testing, all consolidated endpoints (A-G) are on REAL_BASE_PORT
+            if not mock:
+                return f"http://{host}:{cls.REAL_BASE_PORT}"
         base_port = cls.MOCK_BASE_PORT if mock else cls.REAL_BASE_PORT
         port = base_port + cls.PORT_OFFSET.get(block.upper(), 0)
-        host = os.environ.get("TEST_SERVICE_HOST", "127.0.0.1")
         return f"http://{host}:{port}"
+
 
     @classmethod
     def using_mocks(cls) -> bool:
