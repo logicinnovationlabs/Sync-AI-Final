@@ -22,10 +22,18 @@ FIXTURES_DIR = Path(__file__).parent.parent.parent / "services" / "block-h-graph
 
 @pytest.fixture
 async def graph_store():
-    """Get mock graph store for Phase 1 testing."""
-    from app.services.graph.mock_store import MockGraphStore
+    """Get graph store for testing - real or mock based on configuration."""
+    from app.services.graph import get_graph_store
+    from app.core.config import settings
     
-    store = MockGraphStore()
+    store = get_graph_store()
+    
+    # Log which backend we're using
+    if settings.graph_backend == "neo4j":
+        print(f"\n[REAL BACKEND] Using Neo4j at {settings.neo4j_uri}")
+    else:
+        print("\n[MOCK BACKEND] Using MockGraphStore")
+    
     await store.ensure_tenant(TEST_TENANT)
     yield store
     await store.clear_tenant(TEST_TENANT)

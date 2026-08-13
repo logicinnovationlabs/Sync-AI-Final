@@ -3,6 +3,7 @@ Block F Signoff Tests for Consolidated Backend
 Tests F1-F4 criteria for lexical search.
 """
 
+import asyncio
 import pytest
 import time
 from typing import List, Dict, Any
@@ -97,16 +98,24 @@ class MockOpenSearchStore:
 
 
 @pytest.fixture
-def mock_store():
-    """Provide mock lexical store."""
-    return MockOpenSearchStore()
+async def lexical_store():
+    """Get lexical store for testing - real or mock based on config."""
+    if settings.lexical_backend == "opensearch":
+        print(f"\n[REAL BACKEND] Using OpenSearch at {settings.opensearch_url}")
+        store = OpenSearchLexicalStore()
+        await asyncio.sleep(0.1)  # Brief wait for connection
+        return store
+    else:
+        print("\n[MOCK BACKEND] Using MockOpenSearchStore")
+        return MockOpenSearchStore()
 
 
 @pytest.mark.block_f
 class TestBlockFSignoff:
     """Block F Signoff Tests (F1-F4)"""
     
-    def test_f1_index_lag(self, mock_store):
+    @pytest.mark.asyncio
+    async def test_f1_index_lag(self, lexical_store):
         """
         F1: Index lag (<5 min for 10k docs).
         Pass threshold: < 300 seconds total.
@@ -131,8 +140,7 @@ class TestBlockFSignoff:
         # Time the indexing
         start_time = time.time()
         
-        import asyncio
-        count = asyncio.run(mock_store.index_batch(tenant_id, documents))
+        count = await lexical_store.index_batch(tenant_id, documents)
         
         elapsed_seconds = time.time() - start_time
         
@@ -147,7 +155,8 @@ class TestBlockFSignoff:
         print(f"\n[RESULT] F1 Results:")
         print(f"  Total time: {elapsed_seconds:.2f}s")
         print(f"  Threshold: < 300s (scaled for 10k docs)")
-        print(f"  Mock test: {num_docs} docs, production: 10,000 docs")
+        backend_type = "REAL" if settings.lexical_backend == "opensearch" else "MOCK"
+        print(f"  Backend: {backend_type} | Test docs: {num_docs}")
         
         # For mock, just verify it completed successfully
         assert count == num_docs
@@ -155,7 +164,8 @@ class TestBlockFSignoff:
         
         print(f"  [PASS] F1: Index lag test completed")
     
-    def test_f2_latency(self, mock_store):
+    @pytest.mark.asyncio
+    async def test_f2_latency(self, lexical_store):
         """
         F2: Query latency (p95 <200ms).
         Pass threshold: 95th percentile < 200ms.
@@ -199,7 +209,8 @@ class TestBlockFSignoff:
         print(f"\n[RESULT] F2 Results:")
         print(f"  P95 latency: {p95_latency:.2f}ms")
         print(f"  Threshold: < 200ms")
-        print(f"  Mock test (production will use real OpenSearch)")
+        backend_type = "REAL OpenSearch" if settings.lexical_backend == "opensearch" else "MOCK"
+        print(f"  Backend: {backend_type}")
         
         # Mock test will be very fast
         assert p95_latency < 200
@@ -266,8 +277,7 @@ class TestBlockFSignoff:
         tenant_id = "test-tenant"
         
         # Index documents
-        import asyncio
-        asyncio.run(mock_store.index_batch(tenant_id, MOCK_DOCUMENTS))
+        await lexical_store.index_batch(tenant_id, MOCK_DOCUMENTS)
         
         # Test 1: Valid ACL terms (should return results)
         valid_result = asyncio.run(mock_store.search(

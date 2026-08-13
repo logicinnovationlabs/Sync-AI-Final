@@ -3,6 +3,7 @@ Block G Signoff Tests for Consolidated Backend
 Tests G1-G4 criteria for vector search.
 """
 
+import asyncio
 import pytest
 import time
 import random
@@ -109,16 +110,24 @@ class MockQdrantStore:
 
 
 @pytest.fixture
-def mock_store():
-    """Provide mock vector store."""
-    return MockQdrantStore()
+async def vector_store():
+    """Get vector store for testing - real or mock based on config."""
+    if settings.vector_backend == "qdrant":
+        print(f"\n[REAL BACKEND] Using Qdrant at {settings.qdrant_url}")
+        store = QdrantVectorStore()
+        await asyncio.sleep(0.1)  # Brief wait for connection
+        return store
+    else:
+        print("\n[MOCK BACKEND] Using MockQdrantStore")
+        return MockQdrantStore()
 
 
 @pytest.mark.block_g
 class TestBlockGSignoff:
     """Block G Signoff Tests (G1-G4)"""
     
-    def test_g1_recall_at_10(self, mock_store):
+    @pytest.mark.asyncio
+    async def test_g1_recall_at_10(self, vector_store):
         """
         G1: Recall@10 (≥90%).
         Pass: At least 90% of relevant chunks in top 10 results.
@@ -231,7 +240,8 @@ class TestBlockGSignoff:
         print(f"\n[RESULT] G2 Results:")
         print(f"  P95 latency: {p95_latency:.2f}ms")
         print(f"  Threshold: < 100ms")
-        print(f"  Mock test (production will use real Qdrant)")
+        backend_type = "REAL Qdrant" if settings.vector_backend == "qdrant" else "MOCK"
+        print(f"  Backend: {backend_type}")
         
         # Mock test will be fast
         assert p95_latency < 100
