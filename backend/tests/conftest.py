@@ -151,3 +151,123 @@ def test_client() -> TestClient:
     Fixture for FastAPI test client.
     """
     return TestClient(app)
+
+
+# ---------------------------------------------------------------------------
+# Block K: Document Reader Fixtures
+# ---------------------------------------------------------------------------
+@pytest.fixture
+def k_app():
+    """
+    Fixture for Block K (Document Reader) tests.
+    
+    Returns tuple: (client, store, acl, app)
+    - client: FastAPI TestClient with async support
+    - store: In-memory document store
+    - acl: Mock ACL checker
+    - app: FastAPI app instance
+    """
+    from fastapi.testclient import TestClient
+    from httpx import AsyncClient
+    from app.core.config import settings
+    from app.services.document_reader.store import InMemoryDocumentStore
+    from app.services.document_reader.acl_checker import MockACLChecker
+    
+    # Create test instances
+    store = InMemoryDocumentStore(settings)
+    acl = MockACLChecker()
+    
+    # Create test client
+    client = TestClient(app)
+    
+    # Monkey-patch the document endpoint to use test instances
+    import app.api.v1.document as doc_module
+    original_store = doc_module.store
+    original_acl = doc_module.acl_checker
+    
+    doc_module.store = store
+    doc_module.acl_checker = acl
+    
+    yield client, store, acl, app
+    
+    # Restore original instances
+    doc_module.store = original_store
+    doc_module.acl_checker = original_acl
+
+
+@pytest_asyncio.fixture
+async def k_app_async():
+    """
+    Async fixture for Block K tests that need async client.
+    
+    Returns tuple: (client, store, acl, app)
+    """
+    from httpx import AsyncClient
+    from app.core.config import settings
+    from app.services.document_reader.store import InMemoryDocumentStore
+    from app.services.document_reader.acl_checker import MockACLChecker
+    
+    store = InMemoryDocumentStore(settings)
+    acl = MockACLChecker()
+    
+    # Monkey-patch
+    import app.api.v1.document as doc_module
+    original_store = doc_module.store
+    original_acl = doc_module.acl_checker
+    
+    doc_module.store = store
+    doc_module.acl_checker = acl
+    
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        yield client, store, acl, app
+    
+    # Restore
+    doc_module.store = original_store
+    doc_module.acl_checker = original_acl
+
+
+# ---------------------------------------------------------------------------
+# Block L: Assistant Orchestrator Fixtures
+# ---------------------------------------------------------------------------
+@pytest.fixture
+def l_app():
+    """
+    Fixture for Block L (Assistant Orchestrator) tests.
+    
+    Returns TestClient configured for assistant endpoints.
+    """
+    return TestClient(app)
+
+
+# ---------------------------------------------------------------------------
+# Helper Functions
+# ---------------------------------------------------------------------------
+def make_bearer(tenant_id: str, principal_id: str, scopes: list = None) -> str:
+    """
+    Create a test bearer token for authentication.
+    
+    Args:
+        tenant_id: Tenant ID
+        principal_id: User/principal ID
+        scopes: List of scopes (default: ["read", "write"])
+    
+    Returns:
+        JWT token string
+    """
+    import jwt
+    from datetime import datetime, timedelta
+    
+    if scopes is None:
+        scopes = ["read", "write"]
+    
+    payload = {
+        "tenant_id": tenant_id,
+        "principal_id": principal_id,
+        "scopes": scopes,
+        "exp": datetime.utcnow() + timedelta(hours=1),
+        "iat": datetime.utcnow(),
+    }
+    
+    # Use a test secret (matches app.services.token_service.TokenService)
+    secret = os.getenv("JWT_SECRET_KEY", "test-secret-key")
+    return jwt.encode(payload, secret, algorithm="HS256")

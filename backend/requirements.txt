@@ -66,3 +66,11 @@ python-docx==1.1.0
 openpyxl==3.1.0
 python-pptx==0.6.21
 beautifulsoup4==4.12.0
+
+# Block K - Document Reader
+minio>=7.2.0
+
+# Block L - Assistant Orchestrator
+langgraph>=0.2
+langchain-core>=0.2
+psycopg[binary]>=3.1

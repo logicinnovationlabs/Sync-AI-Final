@@ -20,6 +20,8 @@ from app.api.v1 import acl as acl_routes
 from app.api.v1.search import lexical, vector
 from app.api.v1.search import graph as graph_search
 from app.api.v1.search import federated as federated_search
+from app.services.assistant.api import routes as assistant_routes
+from app.api.v1 import document as document_routes
 from app.connectors.google.webhooks import router as webhooks_router
 
 from app.middleware.tenant_middleware import TenantMiddleware
@@ -141,17 +143,16 @@ app.include_router(lexical.router, prefix="/api/v1", tags=["search-lexical"])
 app.include_router(lexical.router, tags=["search-lexical"])
 # Block G: Vector Search
 app.include_router(vector.router, prefix="/api/v1", tags=["search-vector"])
-app.include_router(vector.router, tags=["search-vector"])
 # Block H: Graph Search
 app.include_router(graph_search.router, prefix="/api/v1", tags=["search-graph"])
-app.include_router(graph_search.router, tags=["search-graph"])
 # Block I: Activity Signals
 app.include_router(signals_routes.router, prefix="/api/v1", tags=["signals"])
-app.include_router(signals_routes.router, tags=["signals"])
 # Block J: Federated Search
 app.include_router(federated_search.router, prefix="/api/v1", tags=["search-federated"])
-app.include_router(federated_search.router, tags=["search-federated"])
-
+# Block K: Document Reader
+app.include_router(document_routes.router, prefix="/api/v1", tags=["document-reader"])
+# Block L: Assistant Orchestrator
+app.include_router(assistant_routes.router, prefix="/api/v1/assistant", tags=["assistant"])
 
 
 # Health check
