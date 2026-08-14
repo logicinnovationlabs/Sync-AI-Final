@@ -9,12 +9,9 @@ from app.services.vector.qdrant_store import QdrantVectorStore
 
 
 def get_vector_store() -> VectorStore:
-    """Factory function to get vector store based on configuration."""
-    if settings.vector_backend == "qdrant":
-        return QdrantVectorStore()
-    else:  # "mock" or default
-        from app.services.vector.mock_store import MockVectorStore
-        return MockVectorStore()
+    """Factory function to get vector store - always returns real Qdrant for tests."""
+    # For signoff tests, always use real Qdrant
+    return QdrantVectorStore()
 
 
 __all__ = ["VectorStore", "QdrantVectorStore", "get_vector_store"]

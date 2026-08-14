@@ -179,7 +179,19 @@ class ObjectStorageClient:
             
         Returns:
             List of object paths (relative to the tenant/connector prefix)
+            
+        Raises:
+            PermissionError: If prefix tries to access another tenant's data
         """
+        # SECURITY: Prevent cross-tenant access via prefix manipulation
+        if prefix and prefix.startswith("tenant_"):
+            # User is trying to access another tenant's prefix
+            expected_tenant_prefix = f"tenant_{tenant_id}/"
+            if not prefix.startswith(expected_tenant_prefix):
+                raise PermissionError(
+                    f"Cross-tenant access denied: tenant {tenant_id} cannot access prefix {prefix}"
+                )
+        
         base_prefix = self._build_path(tenant_id, connector_instance_id, prefix)
         
         logger.info(f"Listing objects with prefix {base_prefix}")

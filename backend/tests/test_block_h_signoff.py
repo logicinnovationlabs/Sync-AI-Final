@@ -14,44 +14,54 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import pytest
+import pytest_asyncio
 
 # Test configuration
 TEST_TENANT = "block-h-test"
-FIXTURES_DIR = Path(__file__).parent.parent.parent / "services" / "block-h-graph" / "fixtures"
+FIXTURES_DIR = Path(__file__).parent / "fixtures" / "block_z"
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def graph_store():
-    """Get graph store for testing - real or mock based on configuration."""
+    """Always use real Neo4j – raises ConnectionError if unavailable."""
     from app.services.graph import get_graph_store
     from app.core.config import settings
     
-    store = get_graph_store()
+    print(f"\n[BLOCK H] Forcing real Neo4j backend at {settings.neo4j_uri}...")
+
+    try:
+        store = get_graph_store()
+        # Clear any existing data for this tenant first
+        await store.clear_tenant(TEST_TENANT)
+        # Then ensure tenant exists
+        await store.ensure_tenant(TEST_TENANT)
+        print("[BLOCK H] OK Neo4j reachable, tenant ensured (clean slate)")
+    except Exception as e:
+        raise ConnectionError(f"Neo4j not reachable: {e}")
     
-    # Log which backend we're using
-    if settings.graph_backend == "neo4j":
-        print(f"\n[REAL BACKEND] Using Neo4j at {settings.neo4j_uri}")
-    else:
-        print("\n[MOCK BACKEND] Using MockGraphStore")
-    
-    await store.ensure_tenant(TEST_TENANT)
     yield store
-    await store.clear_tenant(TEST_TENANT)
+    
+    # Final cleanup
+    try:
+        await store.clear_tenant(TEST_TENANT)
+    except:
+        pass  # Best effort cleanup
 
 
-@pytest.fixture
+
+@pytest_asyncio.fixture
 async def load_fixtures(graph_store):
     """Load test fixtures into graph store."""
     # Load graph edges from fixtures
     edges_file = FIXTURES_DIR / "graph_edges.json"
     if not edges_file.exists():
-        pytest.skip(f"Fixtures not found: {edges_file}")
+        raise FileNotFoundError(f"Fixtures not found: {edges_file}")
     
     try:
         with open(edges_file) as f:
             data = json.load(f)
     except Exception as e:
-        pytest.skip(f"Could not load fixtures: {e}")
+        raise RuntimeError(f"Could not load fixtures: {e}")
     
     edges = data.get("edges", [])
     for edge in edges:

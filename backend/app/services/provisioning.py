@@ -42,7 +42,9 @@ def provision_tenant(
     Returns:
         Tenant routing information
     """
-    schema_name = f"tenant_{tenant_id}"
+    # Sanitize tenant_id for PostgreSQL (replace hyphens with underscores)
+    safe_tenant_id = tenant_id.replace("-", "_")
+    schema_name = f"tenant_{safe_tenant_id}"
     object_store_prefix = f"tenant_{tenant_id}"
     secrets_key_ref = f"tenant_{tenant_id}_secrets"
     

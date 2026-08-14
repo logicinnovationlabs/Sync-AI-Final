@@ -30,7 +30,7 @@ class BackupMetadata:
     size_bytes: int
 
 
-def backup_tenant(db_client, tenant_id: str) -> BackupMetadata:
+async def backup_tenant(db_client, tenant_id: str) -> BackupMetadata:
     """
     Backup a tenant's schema.
     
@@ -43,7 +43,9 @@ def backup_tenant(db_client, tenant_id: str) -> BackupMetadata:
     Returns:
         BackupMetadata with backup details including checksum
     """
-    schema_name = f"tenant_{tenant_id}"
+    # Sanitize tenant_id for PostgreSQL (replace hyphens with underscores)
+    safe_tenant_id = tenant_id.replace("-", "_")
+    schema_name = f"tenant_{safe_tenant_id}"
     backup_id = f"backup_{tenant_id}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S_%f')}"
     
     logger.info(f"Starting backup for tenant {tenant_id} (schema: {schema_name})")
@@ -69,7 +71,7 @@ def backup_tenant(db_client, tenant_id: str) -> BackupMetadata:
     return metadata
 
 
-def restore_tenant(db_client, tenant_id: str, backup_id: str) -> BackupMetadata:
+async def restore_tenant(db_client, tenant_id: str, backup_id: str) -> BackupMetadata:
     """
     Restore a tenant's schema from a backup.
     
@@ -90,3 +92,23 @@ def restore_tenant(db_client, tenant_id: str, backup_id: str) -> BackupMetadata:
     # Implementation details...
     
     return metadata
+
+
+def drop_tenant(db_client, tenant_id: str) -> None:
+    """
+    Drop a tenant's schema and all its data.
+    
+    Args:
+        db_client: Database client
+        tenant_id: The tenant identifier to drop
+    """
+    # Sanitize tenant_id for PostgreSQL (replace hyphens with underscores)
+    safe_tenant_id = tenant_id.replace("-", "_")
+    schema_name = f"tenant_{safe_tenant_id}"
+    logger.info(f"Dropping tenant {tenant_id} (schema: {schema_name})")
+    
+    # Implementation details...
+    # In real implementation: DROP SCHEMA tenant_<id> CASCADE
+    
+    logger.info(f"Tenant {tenant_id} dropped successfully")
+

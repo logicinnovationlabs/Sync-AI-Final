@@ -177,6 +177,43 @@ class MockVaultClient(VaultClient):
             secret_value: Secret to store
         """
         self._in_memory_store[key_name] = secret_value
+    
+    def store_credential_envelope(self, key_ref: str, credentials: dict) -> None:
+        """
+        Store a credential envelope (sync method for compatibility).
+        
+        Args:
+            key_ref: Secret key reference
+            credentials: Credential data to store
+        """
+        # Store as JSON in the in-memory store
+        import json
+        self._in_memory_store[key_ref] = json.dumps(credentials)
+    
+    def set(self, key_name: str, value: str) -> None:
+        """
+        Sync method to store a secret (for compatibility with EncryptionClient).
+        
+        Args:
+            key_name: Secret key name
+            value: Secret value to store
+        """
+        self._in_memory_store[key_name] = value
+    
+    def get(self, key_name: str) -> str:
+        """
+        Sync method to retrieve a secret (for compatibility with EncryptionClient).
+        
+        Args:
+            key_name: Secret key name
+            
+        Returns:
+            Secret value
+        """
+        if key_name in self._in_memory_store:
+            return self._in_memory_store[key_name]
+        # Fallback for dev/test
+        return "mock-secret"
 
 
 def get_vault_client() -> VaultClient:

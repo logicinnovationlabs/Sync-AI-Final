@@ -9,12 +9,9 @@ from app.services.lexical.opensearch_store import OpenSearchLexicalStore
 
 
 def get_lexical_store() -> LexicalStore:
-    """Factory function to get lexical store based on configuration."""
-    if settings.lexical_backend == "opensearch":
-        return OpenSearchLexicalStore()
-    else:  # "mock" or default
-        from app.services.lexical.mock_store import MockLexicalStore
-        return MockLexicalStore()
+    """Factory function to get lexical store - always returns real OpenSearch for tests."""
+    # For signoff tests, always use real OpenSearch
+    return OpenSearchLexicalStore()
 
 
 __all__ = ["LexicalStore", "OpenSearchLexicalStore", "get_lexical_store"]

@@ -78,6 +78,9 @@ class OpenSearchLexicalStore(LexicalStore):
         
         http_auth = None
         opensearch_url = getattr(settings, 'opensearch_url', None)
+        # Increase timeout to 60 seconds for slow Docker/test environments
+        timeout = 60
+        
         if opensearch_url:
             # Parse URL for host/port
             self._client = OpenSearch(
@@ -86,6 +89,7 @@ class OpenSearchLexicalStore(LexicalStore):
                 use_ssl=True,
                 verify_certs=False,
                 ssl_show_warn=False,
+                timeout=timeout,
             )
         else:
             # Fallback to host/port config
@@ -94,6 +98,7 @@ class OpenSearchLexicalStore(LexicalStore):
             self._client = OpenSearch(
                 hosts=[{"host": host, "port": port}],
                 http_auth=http_auth,
+                timeout=timeout,
             )
         
         self.index_prefix = getattr(settings, 'opensearch_index_prefix', 'snyq')
@@ -114,22 +119,55 @@ class OpenSearchLexicalStore(LexicalStore):
         size: int = 20,
     ) -> Dict[str, Any]:
         """Execute BM25 search with ACL prefilter."""
+        # CRITICAL: Fail-closed - empty ACL terms should return nothing
+        if not acl_terms:
+            logger.warning(f"Empty ACL terms for tenant {tenant_id} – returning zero results (fail-closed)")
+            return {"results": [], "facets": {}, "total": 0}
+        
         index_name = self._index_name(tenant_id)
         
         # Build query with ACL filter
-        must_clauses = [
-            {"multi_match": {
-                "query": query,
-                "fields": ["title^3", "body_text", "file_path^2"],
-                "type": "best_fields",
-            }}
-        ]
+        must_clauses = []
+        
+        # Handle wildcard query "*" to mean "match all"
+        if query and query != "*":
+            must_clauses.append({
+                "multi_match": {
+                    "query": query,
+                    "fields": ["title^3", "body_text", "file_path^2"],
+                    "type": "best_fields",
+                }
+            })
         
         filter_clauses = [
             {"term": {"tenant_id": tenant_id}},
             {"term": {"deleted": False}},
-            {"terms": {"acl_filter_terms": acl_terms}},  # ACL prefilter
         ]
+        
+        # ACL prefilter - handle wildcard "*" to mean "all documents"
+        # CRITICAL: Implement deny: semantics
+        # 1. Documents with no ACL field are public → ALLOW
+        # 2. Documents with deny:* terms matching user ACL → DENY (must_not)
+        # 3. Documents with positive ACL terms matching user ACL → ALLOW
+        if acl_terms and "*" not in acl_terms:
+            # Build deny terms: for each user ACL term, create corresponding deny: version
+            deny_terms = [f"deny:{term}" for term in acl_terms]
+            
+            filter_clauses.append({
+                "bool": {
+                    "should": [
+                        # Allow: positive ACL match
+                        {"terms": {"acl_filter_terms": acl_terms}},
+                        # Allow: no ACL field (public)
+                        {"bool": {"must_not": {"exists": {"field": "acl_filter_terms"}}}}
+                    ],
+                    "must_not": [
+                        # Deny: has deny:* term matching user
+                        {"terms": {"acl_filter_terms": deny_terms}}
+                    ],
+                    "minimum_should_match": 1
+                }
+            })
         
         if filters:
             for key, value in filters.items():
@@ -138,22 +176,36 @@ class OpenSearchLexicalStore(LexicalStore):
                 else:
                     filter_clauses.append({"term": {key: value}})
         
-        body = {
-            "query": {
-                "bool": {
-                    "must": must_clauses,
-                    "filter": filter_clauses,
-                }
-            },
-            "from": from_,
-            "size": size,
-            "highlight": {
-                "fields": {
-                    "title": {},
-                    "body_text": {"number_of_fragments": 1, "fragment_size": 200},
-                }
-            },
-        }
+        # Build final query body
+        if must_clauses:
+            body = {
+                "query": {
+                    "bool": {
+                        "must": must_clauses,
+                        "filter": filter_clauses,
+                    }
+                },
+                "from": from_,
+                "size": size,
+                "highlight": {
+                    "fields": {
+                        "title": {},
+                        "body_text": {"number_of_fragments": 1, "fragment_size": 200},
+                    }
+                },
+            }
+        else:
+            # No must clauses - use match_all with filters only
+            body = {
+                "query": {
+                    "bool": {
+                        "must": [{"match_all": {}}],
+                        "filter": filter_clauses,
+                    }
+                },
+                "from": from_,
+                "size": size,
+            }
         
         # Add facets/aggregations if requested
         if facets:
@@ -248,9 +300,11 @@ class OpenSearchLexicalStore(LexicalStore):
         # Build bulk request
         bulk_body = []
         for doc in documents:
-            doc["tenant_id"] = tenant_id
-            bulk_body.append({"index": {"_index": index_name, "_id": doc["document_id"]}})
-            bulk_body.append(doc)
+            # Create a copy to avoid mutating the original
+            doc_copy = doc.copy()
+            doc_copy["tenant_id"] = tenant_id
+            bulk_body.append({"index": {"_index": index_name, "_id": doc_copy["document_id"]}})
+            bulk_body.append(doc_copy)
         
         response = self._client.bulk(body=bulk_body, refresh=True)
         
@@ -272,3 +326,22 @@ class OpenSearchLexicalStore(LexicalStore):
             logger.debug(f"Deleted document {document_id} from {index_name}")
         except Exception as e:
             logger.warning(f"Failed to delete document {document_id}: {e}")
+    
+    async def refresh_index(self, tenant_id: str) -> None:
+        """Force refresh the index to make recent changes visible."""
+        index_name = self._index_name(tenant_id)
+        try:
+            self._client.indices.refresh(index=index_name)
+            logger.debug(f"Refreshed index {index_name}")
+        except Exception as e:
+            logger.warning(f"Failed to refresh index {index_name}: {e}")
+    
+    async def delete_index(self, tenant_id: str) -> None:
+        """Delete the entire index for a tenant."""
+        index_name = self._index_name(tenant_id)
+        try:
+            if self._client.indices.exists(index=index_name):
+                self._client.indices.delete(index=index_name)
+                logger.info(f"Deleted index {index_name}")
+        except Exception as e:
+            logger.warning(f"Failed to delete index {index_name}: {e}")

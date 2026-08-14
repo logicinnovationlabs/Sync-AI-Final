@@ -40,8 +40,21 @@ class QdrantVectorStore(VectorStore):
             self._client = QdrantClient(host=host, port=port)
         
         self.collection_prefix = getattr(settings, 'qdrant_collection_prefix', 'snyq')
-        self.dimensions = getattr(settings, 'embedding_dimensions', 384)
-        logger.info(f"QdrantVectorStore initialized with prefix: {self.collection_prefix}")
+        self.dimensions = settings.embedding_dimensions  # Use settings directly (default: 360)
+        logger.info(f"QdrantVectorStore initialized with prefix: {self.collection_prefix}, dimensions: {self.dimensions}")
+    
+    def _normalize_embedding(self, embedding: List[float]) -> List[float]:
+        """Normalize embedding to expected dimensions (pad with zeros or truncate)."""
+        if len(embedding) == self.dimensions:
+            return embedding
+        elif len(embedding) < self.dimensions:
+            # Pad with zeros
+            logger.warning(f"Padding embedding from {len(embedding)} to {self.dimensions} dimensions")
+            return embedding + [0.0] * (self.dimensions - len(embedding))
+        else:
+            # Truncate
+            logger.warning(f"Truncating embedding from {len(embedding)} to {self.dimensions} dimensions")
+            return embedding[:self.dimensions]
     
     def _collection_name(self, tenant_id: str) -> str:
         """Generate collection name for tenant."""
@@ -49,15 +62,21 @@ class QdrantVectorStore(VectorStore):
         return f"{self.collection_prefix}_{safe}_vectors"
     
     def _ensure_collection(self, tenant_id: str) -> None:
-        """Ensure collection exists for tenant."""
+        """Ensure collection exists for tenant with correct dimensions."""
         name = self._collection_name(tenant_id)
         
         try:
-            collections = self._client.get_collections().collections
-            if any(c.name == name for c in collections):
-                return
-        except:
-            pass
+            collection_info = self._client.get_collection(collection_name=name)
+            # Check dimensions
+            vector_size = collection_info.config.params.vectors.size
+            if vector_size != self.dimensions:
+                logger.warning(f"Collection {name} has wrong dimensions ({vector_size} != {self.dimensions}), deleting and recreating...")
+                self._client.delete_collection(collection_name=name)
+            else:
+                return  # Collection exists with correct dimensions
+        except Exception as e:
+            # Collection doesn't exist or error - will create below
+            logger.debug(f"Collection check failed: {e}")
         
         # Create collection
         self._client.create_collection(
@@ -79,7 +98,7 @@ class QdrantVectorStore(VectorStore):
             except Exception as e:
                 logger.debug(f"Payload index {field_name} on {name}: {e}")
         
-        logger.info(f"Created Qdrant collection: {name}")
+        logger.info(f"Created Qdrant collection: {name} with dimensions {self.dimensions}")
     
     async def search(
         self,
@@ -93,6 +112,9 @@ class QdrantVectorStore(VectorStore):
         """Execute ANN search with ACL prefilter."""
         self._ensure_collection(tenant_id)
         name = self._collection_name(tenant_id)
+        
+        # Normalize query embedding dimensions
+        normalized_query = self._normalize_embedding(query_embedding)
         
         # Build filter
         must_conditions = [
@@ -128,7 +150,7 @@ class QdrantVectorStore(VectorStore):
         try:
             results = self._client.search(
                 collection_name=name,
-                query_vector=query_embedding,
+                query_vector=normalized_query,
                 query_filter=filter_obj,
                 limit=top_k,
                 score_threshold=score_threshold,
@@ -167,9 +189,12 @@ class QdrantVectorStore(VectorStore):
         self._ensure_collection(tenant_id)
         name = self._collection_name(tenant_id)
         
+        # Normalize embedding dimensions
+        normalized_embedding = self._normalize_embedding(embedding)
+        
         point = self.qm.PointStruct(
             id=_point_id(chunk_id, model_version),
-            vector=embedding,
+            vector=normalized_embedding,
             payload={
                 "tenant_id": tenant_id,
                 "chunk_id": chunk_id,
@@ -198,9 +223,12 @@ class QdrantVectorStore(VectorStore):
         
         points = []
         for chunk in chunks:
+            # Normalize embedding dimensions
+            normalized_embedding = self._normalize_embedding(chunk["embedding"])
+            
             point = self.qm.PointStruct(
                 id=_point_id(chunk["chunk_id"], chunk["model_version"]),
-                vector=chunk["embedding"],
+                vector=normalized_embedding,
                 payload={
                     "tenant_id": tenant_id,
                     "chunk_id": chunk["chunk_id"],

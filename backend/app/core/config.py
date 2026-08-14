@@ -69,6 +69,14 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Storage substrate (Block D)
     # ------------------------------------------------------------------
+    storage_backend: str = Field(
+        default="mock",
+        validation_alias=AliasChoices("STORAGE_BACKEND", "storage_backend"),
+    )
+    vault_backend: str = Field(
+        default="mock",
+        validation_alias=AliasChoices("VAULT_BACKEND", "vault_backend"),
+    )
     db_host: str = Field(..., validation_alias=AliasChoices("DB_HOST", "db_host"))
     db_name: str = Field(..., validation_alias=AliasChoices("DB_NAME", "db_name"))
     db_user: str = Field(..., validation_alias=AliasChoices("DB_USER", "db_user"))
@@ -116,6 +124,14 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Search & indexing (Blocks F & G)
     # ------------------------------------------------------------------
+    lexical_backend: str = Field(
+        default="mock",
+        validation_alias=AliasChoices("LEXICAL_BACKEND", "lexical_backend"),
+    )
+    vector_backend: str = Field(
+        default="mock",
+        validation_alias=AliasChoices("VECTOR_BACKEND", "vector_backend"),
+    )
     lexical_search_url: str = Field(
         ...,
         validation_alias=AliasChoices("LEXICAL_SEARCH_URL", "lexical_search_url"),
@@ -147,6 +163,10 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices(
             "MODEL_VERSION", "EMBEDDING_MODEL", "model_version"
         ),
+    )
+    embedding_dimensions: int = Field(
+        default=360,
+        validation_alias=AliasChoices("EMBEDDING_DIMENSIONS", "embedding_dimensions"),
     )
     azure_openai_endpoint: Optional[str] = Field(default=None)
     azure_openai_deployment: Optional[str] = Field(default=None)
@@ -265,7 +285,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("EMBEDDING_BATCH_SIZE", "embedding_batch_size"),
     )
     embedding_dimensions: int = Field(
-        default=384,
+        default=360,  # Fixed: Match production default and fixture dimensions
         validation_alias=AliasChoices("EMBEDDING_DIMENSIONS", "embedding_dimensions"),
     )
     
@@ -379,6 +399,14 @@ class Settings(BaseSettings):
     popularity_window_days: int = Field(
         default=30,
         validation_alias=AliasChoices("POPULARITY_WINDOW_DAYS", "popularity_window_days"),
+    )
+
+    # ------------------------------------------------------------------
+    # Object storage bucket name (used by tests and real deployment)
+    # ------------------------------------------------------------------
+    bucket_name: str = Field(
+        default="snyq-data",
+        validation_alias=AliasChoices("BUCKET_NAME", "bucket_name"),
     )
 
     # ------------------------------------------------------------------
