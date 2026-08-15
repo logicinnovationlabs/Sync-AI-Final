@@ -14,7 +14,9 @@ from datetime import datetime
 from app.core.config import settings
 from app.core.exceptions import SnyQException
 from app.core.errors import ErrorResponse, ErrorDetail
-from app.api.v1 import auth, oauth, me, admin, connectors, scoped_probes, embed, signals as signals_routes
+from app.api.v1 import auth, oauth, me, connectors, scoped_probes, embed, signals as signals_routes
+from app.api.v1.admin import admin_router
+from app.api.v1.admin.tenant import router as tenant_bootstrap_router
 from app.api.v1 import identity as identity_routes
 from app.api.v1 import acl as acl_routes
 from app.api.v1.search import lexical, vector
@@ -123,8 +125,10 @@ app.include_router(oauth.router, prefix="/api/v1")
 app.include_router(oauth.router)
 app.include_router(me.router, prefix="/api/v1")
 app.include_router(me.router)
-app.include_router(admin.router, prefix="/api/v1")
-app.include_router(admin.router)
+# Block N: Glean-style admin console (users, connectors, audit, sessions)
+app.include_router(admin_router, prefix="/api/v1", tags=["admin"])
+# First-time tenant bootstrap at POST /admin/tenants (no JWT exists yet)
+app.include_router(tenant_bootstrap_router, prefix="/admin", tags=["admin"])
 app.include_router(connectors.router, prefix="/api/v1")
 app.include_router(connectors.router)
 app.include_router(scoped_probes.router, prefix="/api/v1")

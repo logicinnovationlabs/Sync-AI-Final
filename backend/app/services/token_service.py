@@ -89,6 +89,9 @@ class TokenService:
         tenant_id: str,
         principal_id: str,
         scopes: List[str],
+        role: Optional[str] = None,
+        token_version: int = 0,
+        must_change_password: bool = False,
     ) -> str:
         """
         Issue an RS256 access token.
@@ -97,6 +100,10 @@ class TokenService:
             tenant_id: Exactly one tenant UUID (A1)
             principal_id: User/principal UUID
             scopes: List of granted scopes
+            role: Optional org role claim (Block N). Omitted when None so
+                Block A–J tests that mint tokens without a User row stay valid.
+            token_version: Snapshot of users.token_version at issue time.
+            must_change_password: Hint for the client to force a password change.
             
         Returns:
             Signed JWT string.
@@ -115,6 +122,10 @@ class TokenService:
             "exp": now + timedelta(seconds=self.access_ttl),
             "jti": jti,
         }
+        if role is not None:
+            payload["role"] = role
+            payload["token_version"] = token_version
+            payload["must_change_password"] = must_change_password
         
         token = jwt.encode(
             payload,
@@ -207,6 +218,19 @@ class TokenService:
             revoked = await redis_client.sismember(tenant_id, f"revoked:{jti}", jti)
             if revoked:
                 raise RevokedTokenError(jti)
+
+        # Block N: principal-level session revoke via token_version (Redis,
+        # no tenant-DB lookup — Block A tests mint JWTs without a User row).
+        principal_id = payload.get("sub")
+        tv_claim = payload.get("token_version")
+        if tenant_id and principal_id is not None and tv_claim is not None:
+            stored = await redis_client.get(tenant_id, f"token_version:{principal_id}")
+            if stored is not None:
+                try:
+                    if int(stored) > int(tv_claim):
+                        raise RevokedTokenError(str(jti or principal_id))
+                except (TypeError, ValueError):
+                    pass
         
         # A1: Ensure exactly one tenant_id
         if "tenant_id" not in payload:

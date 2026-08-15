@@ -29,8 +29,19 @@ from app.models.user import User
 from app.models.group import Group, GroupMembership
 from app.models.oauth_client import OAuthClient, RefreshToken
 from app.models.scope import ScopeRegistry
+from app.models.audit_log import AuditLog  # noqa: F401 — Block N metadata
+from app.models.tenant_connector import TenantConnector  # noqa: F401
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from app.services.native_auth import native_auth_service
 from app.storage.control_plane_db import ControlPlaneSessionLocal
 from app.storage.vault_client import vault_client
+
+# Known passwords for Postman / live API against Docker-seeded Alpha
+ALPHA_ADMIN_EMAIL = "admin@alpha.test"
+ALPHA_ADMIN_PASSWORD = "AlphaAdmin123!"
+ALPHA_MEMBER_EMAIL = "member@alpha.test"
+ALPHA_MEMBER_PASSWORD = "AlphaMember123!"
 
 
 async def create_dev_tenant(session, name: str, subdomain: str, db_name: str, db_password: str):
@@ -119,6 +130,55 @@ async def create_dev_tenant(session, name: str, subdomain: str, db_name: str, db
     return tenant
 
 
+async def _ensure_user(session, *, email: str, password: str, display_name: str, tenant_id, role: str):
+    from sqlalchemy import select
+
+    existing = await session.execute(select(User).where(User.email == email))
+    if existing.scalar_one_or_none() is not None:
+        print(f"  [INFO] User already exists: {email}")
+        return
+    await native_auth_service.create_native_user(
+        email=email,
+        password=password,
+        display_name=display_name,
+        tenant_id=tenant_id,
+        db_session=session,
+        role=role,
+        must_change_password=False,
+        is_active=True,
+    )
+    print(f"  [OK] Created {role}: {email}")
+
+
+async def seed_block_n_users(tenant):
+    """Seed Full Admin + member into Alpha's tenant DB for Postman / live login."""
+    if tenant.subdomain != "alpha":
+        return
+    print("\nSeeding Block N native users on tenant alpha...")
+    tenant_engine = create_async_engine(
+        f"postgresql+asyncpg://postgres:postgres@{DB_HOST}:5432/{tenant.db_name}"
+    )
+    SessionLocal = async_sessionmaker(tenant_engine, class_=AsyncSession, expire_on_commit=False)
+    async with SessionLocal() as session:
+        await _ensure_user(
+            session,
+            email=ALPHA_ADMIN_EMAIL,
+            password=ALPHA_ADMIN_PASSWORD,
+            display_name="Alpha Admin",
+            tenant_id=tenant.tenant_id,
+            role="admin",
+        )
+        await _ensure_user(
+            session,
+            email=ALPHA_MEMBER_EMAIL,
+            password=ALPHA_MEMBER_PASSWORD,
+            display_name="Alpha Member",
+            tenant_id=tenant.tenant_id,
+            role="member",
+        )
+    await tenant_engine.dispose()
+
+
 async def seed_tenants():
     """Seed 3 development tenants."""
     print("=" * 80)
@@ -152,6 +212,8 @@ async def seed_tenants():
         )
         
         await session.commit()
+
+    await seed_block_n_users(tenant_a)
     
     print("\n" + "=" * 80)
     print("[OK] SEEDING COMPLETE")
@@ -160,6 +222,11 @@ async def seed_tenants():
     print(f"  1. {tenant_a.name} ({tenant_a.subdomain})")
     print(f"  2. {tenant_b.name} ({tenant_b.subdomain})")
     print(f"  3. {tenant_c.name} ({tenant_c.subdomain})")
+    print("\nBlock N live login (Postman / curl) against tenant alpha:")
+    print(f"  POST /api/v1/auth/login")
+    print(f"  admin:  {ALPHA_ADMIN_EMAIL} / {ALPHA_ADMIN_PASSWORD}")
+    print(f"  member: {ALPHA_MEMBER_EMAIL} / {ALPHA_MEMBER_PASSWORD}")
+    print(f"  tenant_subdomain: alpha")
 
 
 if __name__ == "__main__":

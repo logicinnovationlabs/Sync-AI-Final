@@ -1,190 +1,132 @@
 #!/usr/bin/env python3
 """
-Example script demonstrating native authentication flow.
+Example script demonstrating native authentication + Block N admin invite.
 
-Usage: python scripts/demo_native_auth.py
+Usage:
+  1. Bootstrap a tenant (one-time): POST /api/v1/admin/tenants with admin_email.
+  2. Set SNYQ_ADMIN_EMAIL / SNYQ_ADMIN_PASSWORD (the bootstrap temp password,
+     or the password after /me/change-password).
+  3. python scripts/demo_native_auth.py
 """
 
 import asyncio
+import os
 import httpx
 from uuid import uuid4
 
 
-BASE_URL = "http://localhost:8000/api/v1"
+BASE_URL = os.getenv("SNYQ_API_URL", "http://localhost:8000/api/v1")
+ADMIN_EMAIL = os.getenv("SNYQ_ADMIN_EMAIL", "admin@example.com")
+ADMIN_PASSWORD = os.getenv("SNYQ_ADMIN_PASSWORD", "")
+TENANT_SUBDOMAIN = os.getenv("SNYQ_TENANT_SUBDOMAIN", "alpha")
 
 
 async def demo_native_auth():
-    """Demonstrate native authentication flow."""
-    
     print("=" * 80)
-    print("NATIVE AUTHENTICATION DEMO")
+    print("NATIVE AUTHENTICATION DEMO (Block N)")
     print("=" * 80)
     print()
-    
-    # Step 1: Create a user
-    print("Step 1: Creating a new user...")
-    print("-" * 80)
-    
+
     email = f"demo-{uuid4().hex[:8]}@example.com"
-    password = "DemoPassword123!"
-    
-    create_user_payload = {
-        "tenant_subdomain": "alpha",  # Assuming 'alpha' tenant exists
-        "email": email,
-        "password": password,
-        "display_name": "Demo User",
-    }
-    
+
     async with httpx.AsyncClient() as client:
-        try:
-            response = await client.post(
-                f"{BASE_URL}/admin/users",
-                json=create_user_payload,
-            )
-            response.raise_for_status()
-            user = response.json()
-            
-            print(f"✓ User created successfully!")
-            print(f"  Email: {user['email']}")
-            print(f"  Principal ID: {user['principal_id']}")
-            print(f"  Tenant ID: {user['tenant_id']}")
-            print()
-        except httpx.HTTPStatusError as e:
-            print(f"✗ Failed to create user: {e.response.text}")
+        if not ADMIN_PASSWORD:
+            print("Set SNYQ_ADMIN_PASSWORD to an existing Full Admin password.")
+            print("Unauthenticated POST /admin/users was removed in Block N.")
+            print("Bootstrap: POST /api/v1/admin/tenants with admin_email / admin_display_name.")
             return
-        except httpx.RequestError as e:
-            print(f"✗ Request error: {e}")
-            print("  Make sure the server is running at http://localhost:8000")
+
+        print("Step 1: Logging in as tenant admin...")
+        login_admin = await client.post(
+            f"{BASE_URL}/auth/login",
+            json={
+                "email": ADMIN_EMAIL,
+                "password": ADMIN_PASSWORD,
+                "tenant_subdomain": TENANT_SUBDOMAIN,
+            },
+        )
+        if login_admin.status_code != 200:
+            print(f"✗ Admin login failed: {login_admin.text}")
             return
-        
-        # Step 2: Login with email/password
-        print("Step 2: Logging in with email and password...")
-        print("-" * 80)
-        
+        admin_token = login_admin.json()["access_token"]
+        print("✓ Admin login successful")
+        print()
+
+        print("Step 2: Inviting a member (POST /admin/users)...")
+        create_resp = await client.post(
+            f"{BASE_URL}/admin/users",
+            headers={"Authorization": f"Bearer {admin_token}"},
+            json={
+                "email": email,
+                "display_name": "Demo User",
+                "role": "member",
+            },
+        )
+        if create_resp.status_code >= 400:
+            print(f"✗ Failed to create user: {create_resp.text}")
+            return
+        user = create_resp.json()
+        password = user["temporary_password"]
+        print(f"✓ User invited: {user['email']} (temp password returned in response)")
+        print()
+
+        print("Step 3: Member login...")
         login_payload = {
             "email": email,
             "password": password,
-            "tenant_subdomain": "alpha",
+            "tenant_subdomain": TENANT_SUBDOMAIN,
         }
-        
-        try:
-            response = await client.post(
-                f"{BASE_URL}/auth/login",
-                json=login_payload,
-            )
-            response.raise_for_status()
-            tokens = response.json()
-            
-            print(f"✓ Login successful!")
-            print(f"  Access Token: {tokens['access_token'][:50]}...")
-            print(f"  Token Type: {tokens['token_type']}")
-            print(f"  Expires In: {tokens['expires_in']} seconds")
-            print()
-            
-            access_token = tokens["access_token"]
-        except httpx.HTTPStatusError as e:
-            print(f"✗ Failed to login: {e.response.text}")
+        response = await client.post(f"{BASE_URL}/auth/login", json=login_payload)
+        if response.status_code != 200:
+            print(f"✗ Failed to login: {response.text}")
             return
-        
-        # Step 3: Access protected endpoint
-        print("Step 3: Accessing protected endpoint (/me)...")
-        print("-" * 80)
-        
-        try:
-            response = await client.get(
-                f"{BASE_URL}/me",
-                headers={"Authorization": f"Bearer {access_token}"},
-            )
-            response.raise_for_status()
-            me_data = response.json()
-            
-            print(f"✓ Successfully retrieved user info!")
-            print(f"  Principal ID: {me_data['principal_id']}")
-            print(f"  Tenant ID: {me_data['tenant_id']}")
-            print(f"  Scopes: {me_data['scopes']}")
-            print()
-        except httpx.HTTPStatusError as e:
-            print(f"✗ Failed to access /me: {e.response.text}")
+        tokens = response.json()
+        access_token = tokens["access_token"]
+        print(f"✓ Login successful (role={tokens.get('role')})")
+        print()
+
+        print("Step 4: GET /me...")
+        response = await client.get(
+            f"{BASE_URL}/me",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if response.status_code != 200:
+            print(f"✗ Failed to access /me: {response.text}")
             return
-        
-        # Step 4: Change password
-        print("Step 4: Changing password...")
-        print("-" * 80)
-        
+        me_data = response.json()
+        print(f"✓ principal_id={me_data['principal_id']} scopes={me_data['scopes']}")
+        print()
+
+        print("Step 5: Changing password...")
         new_password = "NewDemoPassword456!"
-        change_password_payload = {
-            "old_password": password,
-            "new_password": new_password,
-        }
-        
-        try:
-            response = await client.post(
-                f"{BASE_URL}/me/change-password",
-                json=change_password_payload,
-                headers={"Authorization": f"Bearer {access_token}"},
-            )
-            response.raise_for_status()
-            result = response.json()
-            
-            print(f"✓ {result['message']}")
-            print()
-        except httpx.HTTPStatusError as e:
-            print(f"✗ Failed to change password: {e.response.text}")
+        response = await client.post(
+            f"{BASE_URL}/me/change-password",
+            json={"old_password": password, "new_password": new_password},
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if response.status_code != 200:
+            print(f"✗ Failed to change password: {response.text}")
             return
-        
-        # Step 5: Login with new password
-        print("Step 5: Logging in with new password...")
-        print("-" * 80)
-        
+        print(f"✓ {response.json().get('message')}")
+        print()
+
         login_payload["password"] = new_password
-        
-        try:
-            response = await client.post(
-                f"{BASE_URL}/auth/login",
-                json=login_payload,
-            )
-            response.raise_for_status()
-            tokens = response.json()
-            
-            print(f"✓ Login with new password successful!")
-            print(f"  Access Token: {tokens['access_token'][:50]}...")
-            print()
-        except httpx.HTTPStatusError as e:
-            print(f"✗ Failed to login with new password: {e.response.text}")
+        response = await client.post(f"{BASE_URL}/auth/login", json=login_payload)
+        if response.status_code != 200:
+            print(f"✗ Failed to login with new password: {response.text}")
             return
-        
-        # Step 6: Verify old password no longer works
-        print("Step 6: Verifying old password no longer works...")
-        print("-" * 80)
-        
-        login_payload["password"] = password  # Old password
-        
-        try:
-            response = await client.post(
-                f"{BASE_URL}/auth/login",
-                json=login_payload,
-            )
-            response.raise_for_status()
-            print(f"✗ Old password still works (unexpected!)")
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 401:
-                print(f"✓ Old password correctly rejected")
-                print()
-            else:
-                print(f"✗ Unexpected error: {e.response.text}")
-    
-    print("=" * 80)
-    print("DEMO COMPLETE!")
-    print("=" * 80)
+        print("✓ Login with new password successful")
+        print()
+
+        login_payload["password"] = password
+        response = await client.post(f"{BASE_URL}/auth/login", json=login_payload)
+        if response.status_code == 401:
+            print("✓ Old password correctly rejected")
+        else:
+            print("✗ Old password still works (unexpected)")
+
     print()
-    print("Summary:")
-    print("  - Created a new user with email/password")
-    print("  - Logged in and received JWT tokens")
-    print("  - Accessed a protected endpoint")
-    print("  - Changed the password")
-    print("  - Verified new password works and old password is rejected")
-    print()
-    print("See NATIVE_AUTH.md for detailed documentation.")
+    print("DEMO COMPLETE")
 
 
 if __name__ == "__main__":

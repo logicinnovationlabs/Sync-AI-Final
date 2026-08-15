@@ -6,11 +6,16 @@ Provides:
 - get_tenant: resolve tenant routing from JWT
 - require_scope: factory for scope-based authorization (A5 — contracts error envelope)
 - require_matching_tenant: reject cross-tenant replay via X-Tenant-ID (A4)
+- require_admin: Block N org-admin guard (DB-backed role + is_active)
 """
 
-from typing import Dict, Any, Callable
+from typing import Any, AsyncGenerator, Callable, Dict
+from uuid import UUID
+
 from fastapi import Depends, HTTPException, Header
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import (
     InvalidTokenError,
@@ -20,8 +25,10 @@ from app.core.exceptions import (
     TenantNotFoundError,
     UnauthorizedError,
 )
+from app.models.user import User
 from app.services.token_service import token_service
 from app.services.tenant_resolver import tenant_resolver, TenantRouting
+from app.storage.tenant_db import tenant_db_manager
 
 
 security = HTTPBearer()
@@ -71,6 +78,59 @@ async def get_tenant(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Tenant resolution failed: {e}")
+
+
+async def get_tenant_session(
+    tenant: TenantRouting = Depends(get_tenant),
+) -> AsyncGenerator[AsyncSession, None]:
+    """Yield a tenant-DB session bound to the JWT tenant_id."""
+    async for session in tenant_db_manager.get_session(
+        tenant.db_host,
+        tenant.db_name,
+        tenant.db_user,
+        tenant.db_password,
+        str(tenant.tenant_id),
+    ):
+        yield session
+
+
+async def require_admin(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    tenant: TenantRouting = Depends(get_tenant),
+    db_session: AsyncSession = Depends(get_tenant_session),
+) -> Dict[str, Any]:
+    """
+    Block N admin guard: JWT must belong to an active user with role == 'admin'
+    in the tenant DB. Role is never taken from the request body; tenant_id
+    always comes from the JWT.
+    """
+    principal_raw = current_user.get("sub")
+    if not principal_raw:
+        raise UnauthorizedError("Token missing sub claim")
+    try:
+        principal_id = UUID(str(principal_raw))
+        tenant_uuid = UUID(str(tenant.tenant_id))
+    except (TypeError, ValueError):
+        raise UnauthorizedError("Token identity is malformed")
+
+    result = await db_session.execute(
+        select(User).where(
+            User.principal_id == principal_id,
+            User.tenant_id == tenant_uuid,
+        )
+    )
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise ForbiddenError("Admin role required")
+    if not user.is_active or user.status != "active":
+        raise ForbiddenError("Admin account is inactive")
+    if user.role != "admin":
+        raise ForbiddenError("Admin role required")
+
+    current_user["role"] = user.role
+    current_user["is_active"] = user.is_active
+    current_user["principal_id"] = str(user.principal_id)
+    return current_user
 
 
 def require_scope(required_scope: str) -> Callable:

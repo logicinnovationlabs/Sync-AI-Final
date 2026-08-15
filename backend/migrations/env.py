@@ -18,6 +18,8 @@ from app.models.user import User
 from app.models.group import Group, GroupMembership
 from app.models.oauth_client import OAuthClient, RefreshToken
 from app.models.scope import ScopeRegistry
+from app.models.audit_log import AuditLog  # noqa: F401 — Block N metadata
+from app.models.tenant_connector import TenantConnector  # noqa: F401
 
 # this is the Alembic Config object
 config = context.config

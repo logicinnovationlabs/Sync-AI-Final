@@ -85,7 +85,9 @@ class NativeAuthService:
         if not self.verify_password(password, user.password_hash):
             raise UnauthorizedError("Invalid email or password")
         
-        # Check user status
+        # Check user status (legacy) and Block N is_active flag
+        if getattr(user, "is_active", True) is False:
+            raise UnauthorizedError("User account is inactive")
         if user.status != "active":
             raise UnauthorizedError(f"User account is {user.status}")
         
@@ -98,6 +100,10 @@ class NativeAuthService:
         display_name: str,
         tenant_id: UUID,
         db_session: AsyncSession,
+        role: str = "member",
+        invited_by: Optional[UUID] = None,
+        must_change_password: bool = False,
+        is_active: bool = True,
     ) -> User:
         """
         Create a new native auth user.
@@ -108,6 +114,10 @@ class NativeAuthService:
             display_name: User's display name
             tenant_id: Tenant UUID
             db_session: Database session (tenant DB)
+            role: Org role ('admin' or 'member'). Defaults to member.
+            invited_by: principal_id of the inviting admin, if any.
+            must_change_password: Force password change on next login.
+            is_active: Whether the account can authenticate.
             
         Returns:
             Created User object.
@@ -115,6 +125,9 @@ class NativeAuthService:
         Raises:
             ValueError if user with email already exists.
         """
+        if role not in ("admin", "member"):
+            raise ValueError("role must be 'admin' or 'member'")
+
         # Check if user already exists
         stmt = select(User).where(
             User.email == email,
@@ -144,7 +157,12 @@ class NativeAuthService:
             display_name=display_name,
             password_hash=password_hash,
             source_profiles={"auth_type": "native"},
-            status="active",
+            status="active" if is_active else "deactivated",
+            role=role,
+            invited_by=invited_by,
+            must_change_password=must_change_password,
+            is_active=is_active,
+            token_version=0,
         )
         
         db_session.add(user)
@@ -188,8 +206,9 @@ class NativeAuthService:
         if not self.verify_password(old_password, user.password_hash):
             raise UnauthorizedError("Current password is incorrect")
         
-        # Hash and set new password
+        # Hash and set new password; clear forced-change flag
         user.password_hash = self.hash_password(new_password)
+        user.must_change_password = False
         
         await db_session.commit()
 

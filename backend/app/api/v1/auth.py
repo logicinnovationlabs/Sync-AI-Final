@@ -18,6 +18,7 @@ from app.core.config import settings
 from app.services.token_service import token_service
 from app.services.native_auth import native_auth_service
 from app.services.tenant_resolver import tenant_resolver
+from app.services.admin.scopes import scopes_for_role
 from app.storage.tenant_db import tenant_db_manager
 
 
@@ -39,6 +40,8 @@ class NativeLoginResponse(BaseModel):
     refresh_token: str
     token_type: str = "Bearer"
     expires_in: int
+    role: str = "member"
+    must_change_password: bool = False
 
 
 @router.post("/login", response_model=NativeLoginResponse)
@@ -105,11 +108,16 @@ async def native_login(request: NativeLoginRequest):
         except Exception as e:
             raise HTTPException(status_code=401, detail=str(e))
         
-        # Issue JWT tokens
+        # Issue JWT tokens — scopes follow persisted org role (Block N)
+        role = getattr(user, "role", None) or "member"
+        scopes = scopes_for_role(role)
         access_token = await token_service.issue_access_token(
             tenant_id=str(tenant_id),
             principal_id=str(user.principal_id),
-            scopes=["search.read", "document.read"],  # Default scopes for native users
+            scopes=scopes,
+            role=role,
+            token_version=getattr(user, "token_version", 0) or 0,
+            must_change_password=bool(getattr(user, "must_change_password", False)),
         )
         
         refresh_token = await token_service.issue_refresh_token(
@@ -121,6 +129,8 @@ async def native_login(request: NativeLoginRequest):
             access_token=access_token,
             refresh_token=refresh_token,
             expires_in=settings.token_ttl_access,
+            role=role,
+            must_change_password=bool(getattr(user, "must_change_password", False)),
         )
 
 

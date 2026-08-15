@@ -66,6 +66,7 @@ services:
       TENANT_CACHE_TTL_SECONDS: 1800
       ENVIRONMENT: development
       LOG_LEVEL: INFO
+      ORCHESTRATOR_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/control_plane
     volumes:
       - ./app:/app/app
       - ./tests:/app/tests
@@ -99,10 +100,12 @@ services:
       TENANT_CACHE_TTL_SECONDS: 1800
       ENVIRONMENT: test
       LOG_LEVEL: DEBUG
+      ORCHESTRATOR_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/control_plane
     volumes:
       - ./app:/app/app
       - ./tests:/app/tests
       - ./scripts:/app/scripts
+      - ./migrations:/app/migrations
       - ./keys:/app/keys
     profiles:
       - testing

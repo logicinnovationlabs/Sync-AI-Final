@@ -32,6 +32,8 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         "principal_id": current_user.get("sub"),
         "tenant_id": current_user.get("tenant_id"),
         "scopes": current_user.get("scopes", []),
+        "role": current_user.get("role"),
+        "must_change_password": current_user.get("must_change_password", False),
         "iat": current_user.get("iat"),
         "exp": current_user.get("exp"),
     }

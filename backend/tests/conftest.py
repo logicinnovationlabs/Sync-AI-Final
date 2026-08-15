@@ -16,13 +16,14 @@ from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from fastapi.testclient import TestClient
 
-from app.main import app
 from app.models.base import Base
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.models.group import Group, GroupMembership
 from app.models.oauth_client import OAuthClient, RefreshToken
 from app.models.scope import ScopeRegistry
+from app.models.audit_log import AuditLog  # noqa: F401 — Block N metadata
+from app.models.tenant_connector import TenantConnector  # noqa: F401
 from app.services.cursor_store import SyncCursor
 from app.storage.vault_client import MockVaultClient
 from app.storage.redis_client import TenantPartitionedRedisClient
@@ -39,6 +40,12 @@ else:
     _db_host = os.getenv("DB_HOST", "localhost")
 
 _redis_url = os.getenv("REDIS_URL", f"redis://{_db_host}:6379")
+
+# Block L episodic memory: same Docker Postgres as control_plane (not :5433)
+os.environ.setdefault(
+    "ORCHESTRATOR_DATABASE_URL",
+    f"postgresql://postgres:postgres@{_db_host}:5432/control_plane",
+)
 
 # Test database URL (reuses control_plane; fixtures drop+recreate tables per test)
 TEST_DB_URL = os.getenv(
@@ -145,12 +152,18 @@ async def mock_vault() -> MockVaultClient:
     return vault
 
 
+def _get_app():
+    """Lazy-import FastAPI app so Block D–J tests do not need Block L (langgraph)."""
+    from app.main import app
+    return app
+
+
 @pytest.fixture
 def test_client() -> TestClient:
     """
     Fixture for FastAPI test client.
     """
-    return TestClient(app)
+    return TestClient(_get_app())
 
 
 # ---------------------------------------------------------------------------
@@ -177,8 +190,8 @@ def k_app():
     store = InMemoryDocumentStore(settings)
     acl = MockACLChecker()
     
-    # Create test client
-    client = TestClient(app)
+    fastapi_app = _get_app()
+    client = TestClient(fastapi_app)
     
     # Monkey-patch the document endpoint to use test instances
     import app.api.v1.document as doc_module
@@ -188,7 +201,7 @@ def k_app():
     doc_module.store = store
     doc_module.acl_checker = acl
     
-    yield client, store, acl, app
+    yield client, store, acl, fastapi_app
     
     # Restore original instances
     doc_module.store = original_store
@@ -218,8 +231,9 @@ async def k_app_async():
     doc_module.store = store
     doc_module.acl_checker = acl
     
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        yield client, store, acl, app
+    fastapi_app = _get_app()
+    async with AsyncClient(app=fastapi_app, base_url="http://test") as client:
+        yield client, store, acl, fastapi_app
     
     # Restore
     doc_module.store = original_store
@@ -236,7 +250,7 @@ def l_app():
     
     Returns TestClient configured for assistant endpoints.
     """
-    return TestClient(app)
+    return TestClient(_get_app())
 
 
 # ---------------------------------------------------------------------------

@@ -3,11 +3,14 @@ User model - lives in each tenant's OWN database.
 
 principal_id is deterministic via UUIDv5(NAMESPACE, idp_subject) for SCIM idempotency (A3).
 Supports both SSO (via idp_subject) and native email/password authentication.
+
+Block N adds Glean-style org roles: admin vs member, invite metadata, and
+token_version for session revocation.
 """
 
 from typing import Optional
-from uuid import UUID, uuid4
-from sqlalchemy import String, Text
+from uuid import UUID
+from sqlalchemy import Boolean, Integer, String
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -68,6 +71,38 @@ class User(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(
         String(50), nullable=False, default="active", index=True
     )
+    role: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="member",
+        server_default="member",
+        comment="Glean-style org role: 'admin' or 'member'",
+    )
+    invited_by: Mapped[Optional[UUID]] = mapped_column(
+        PG_UUID(as_uuid=True),
+        nullable=True,
+        comment="principal_id of the admin who invited this user",
+    )
+    must_change_password: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default="true",
+        index=True,
+    )
+    token_version: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+        comment="Incremented to invalidate all outstanding JWTs (Block N session revoke)",
+    )
 
     def __repr__(self) -> str:
-        return f"<User(principal_id={self.principal_id}, email={self.email})>"
+        return f"<User(principal_id={self.principal_id}, email={self.email}, role={self.role})>"
