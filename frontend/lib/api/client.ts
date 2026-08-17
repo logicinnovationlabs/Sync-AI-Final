@@ -42,7 +42,7 @@ export async function apiFetch<T>(
     let message = res.statusText
     try {
       const data = await res.json()
-      message = data.detail ?? data.error?.message ?? message
+      message = formatApiError(data) ?? message
     } catch {
       // response wasn't JSON — fall back to statusText
     }
@@ -57,3 +57,25 @@ export async function apiFetch<T>(
 }
 
 export { API_BASE_URL }
+
+/** FastAPI `{ detail }` or the Block A error envelope `{ error: { message } }`. */
+export function formatApiError(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null
+  const body = data as {
+    detail?: unknown
+    error?: { message?: unknown }
+  }
+  if (typeof body.detail === "string" && body.detail) return body.detail
+  if (Array.isArray(body.detail) && body.detail.length > 0) {
+    const first = body.detail[0]
+    if (typeof first === "string") return first
+    if (first && typeof first === "object" && "msg" in first) {
+      return String((first as { msg: unknown }).msg)
+    }
+    return JSON.stringify(body.detail)
+  }
+  if (typeof body.error?.message === "string" && body.error.message) {
+    return body.error.message
+  }
+  return null
+}

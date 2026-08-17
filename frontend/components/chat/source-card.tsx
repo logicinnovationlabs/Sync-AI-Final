@@ -2,9 +2,17 @@
 
 import { motion } from "motion/react"
 import { ConnectorLogo } from "@/components/connector-logo"
-import type { DemoSource } from "@/lib/demo-answers"
+import type { ConnectorSourceType } from "@/lib/connectors"
 import { SPRING_PRESS } from "@/lib/ease"
 import { cn } from "@/lib/utils"
+
+export type SourceCardData = {
+  n: number
+  source?: ConnectorSourceType
+  title: string
+  snippet: string
+  meta: string
+}
 
 /**
  * A retrieved record, in the sources rail.
@@ -20,7 +28,7 @@ export function SourceCard({
   onActivate,
   onDeactivate,
 }: {
-  source: DemoSource
+  source: SourceCardData
   active: boolean
   onActivate: (n: number) => void
   onDeactivate: () => void
@@ -51,7 +59,9 @@ export function SourceCard({
         >
           {source.n}
         </span>
-        <ConnectorLogo source={source.source} bare className="size-3.5" />
+        {source.source ? (
+          <ConnectorLogo source={source.source} bare className="size-3.5" />
+        ) : null}
         <span className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium">
           {source.title}
         </span>

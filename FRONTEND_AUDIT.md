@@ -2,6 +2,7 @@
 
 **Date:** 2026-08-17  
 **Type:** Part A only. Inventory and contract mapping. No integration changes in this file's commit.  
+**Part B report:** `FRONTEND_INTEGRATION.md` (separate commit).  
 **This file is not a signoff.**
 
 | Field | Value |

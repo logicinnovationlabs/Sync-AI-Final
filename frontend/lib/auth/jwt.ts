@@ -11,6 +11,8 @@ export interface AccessTokenClaims {
   scopes: string[]
   iat: number
   exp: number
+  role?: string
+  must_change_password?: boolean
 }
 
 export function decodeAccessToken(token: string): AccessTokenClaims | null {

@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 export default function DocumentsPage() {
   return (
     <div className="flex h-full flex-col">
-      <PageHeader title="Documents" description="Every record SynQ can cite." />
+      <PageHeader title="Documents" description="Federated search (Block J) and document reader (Block K)." />
       <div className="min-h-0 flex-1 overflow-y-auto">
         <DocumentBrowser />
       </div>

@@ -14,7 +14,7 @@ export default function RegisterPage() {
         Create an account
       </h1>
       <p className="mt-2 text-center text-sm text-muted-foreground">
-        Join an existing workspace with its subdomain.
+        Join an existing workspace — an admin has to invite you first.
       </p>
 
       <div className="mt-8">

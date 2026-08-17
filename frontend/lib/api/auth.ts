@@ -11,6 +11,8 @@ export interface LoginResponse {
   refresh_token: string
   token_type: string
   expires_in: number
+  role?: string
+  must_change_password?: boolean
 }
 
 export function login(payload: LoginPayload) {
@@ -20,39 +22,16 @@ export function login(payload: LoginPayload) {
   })
 }
 
-export interface RegisterPayload {
-  tenant_subdomain: string
-  email: string
-  password: string
-  display_name: string
-}
-
-export interface RegisterResponse {
-  principal_id: string
-  email: string
-  display_name: string
-  tenant_id: string
-  auth_type: string
-}
-
 /**
- * Creates a native email/password user inside an existing tenant.
+ * Self-serve signup is not a Block A/N contract.
  *
- * ⚠️ This is `POST /api/v1/admin/users`, which the backend documents as
- * "(admin use)" but ships with **no auth dependency at all** — see
- * `backend/app/api/v1/admin.py:114`. It is the only endpoint that can create a
- * user, so self-serve signup goes through it, but the route needs a scope guard
- * before this is exposed publicly. Same applies to `POST /admin/tenants`.
- *
- * The tenant must already exist; an unknown subdomain comes back as a 404 with
- * `detail: "Tenant not found: …"`, which is surfaced to the user as-is.
+ * On suhani, `POST /api/v1/admin/users` accepted `{ tenant_subdomain, email,
+ * password, display_name }` with no auth. On Pratham, that route is
+ * `Depends(require_admin)` and the body is `{ email, display_name, role? }`
+ * with a server-generated temporary password. Calling the old shape would
+ * 401/403 (or create the wrong kind of user if a leftover unauthenticated
+ * path existed). Do not call this from the register page.
  */
-export function register(payload: RegisterPayload) {
-  return apiFetch<RegisterResponse>("/admin/users", {
-    method: "POST",
-    body: payload,
-  })
-}
 
 export interface ChangePasswordPayload {
   old_password: string
@@ -71,6 +50,8 @@ export interface MeResponse {
   principal_id: string
   tenant_id: string
   scopes: string[]
+  role?: string | null
+  must_change_password?: boolean
   iat: number
   exp: number
 }

@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { Input } from "@/components/motion/input"
 import { StatefulButton } from "@/components/motion/button/stateful"
-import { login } from "@/lib/api/auth"
+import { getMe, login } from "@/lib/api/auth"
 import { ApiError } from "@/lib/api/client"
 import { useAuthStore } from "@/lib/auth/auth-store"
 import { tenantFromHost } from "@/lib/auth/tenant"
@@ -55,17 +55,29 @@ export function LoginForm() {
     setSubmitting(true)
     setFormError(null)
     try {
+      const tenant = tenantFromHost()
+      if (!tenant) {
+        setFormError(
+          "No workspace on this host. Set NEXT_PUBLIC_DEFAULT_TENANT (seed tenant is `alpha`) or sign in from a tenant subdomain."
+        )
+        return
+      }
       const res = await login({
         ...values,
-        // Not asked for — derived from the hostname. See lib/auth/tenant.ts.
-        tenant_subdomain: tenantFromHost(),
+        tenant_subdomain: tenant,
       })
+      // Prove the stored token is the one Block A issued: /me must accept it.
+      const me = await getMe(res.access_token)
       setSession({
         accessToken: res.access_token,
         refreshToken: res.refresh_token,
         email: values.email,
       })
-      const next = searchParams.get("next") ?? "/chat"
+      const next =
+        searchParams.get("next") ??
+        (me.must_change_password || res.must_change_password
+          ? "/settings/account"
+          : "/chat")
       router.push(next)
     } catch (err) {
       setFormError(
