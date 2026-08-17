@@ -15,6 +15,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 import httpx
 
+from app.acl.filter import is_fail_closed
 from app.services.assistant.domain.models import ToolCall, ToolResult
 
 logger = logging.getLogger(__name__)
@@ -175,13 +176,12 @@ class SearchToolbox:
         """Call Block J Query Federator POST /api/v1/search."""
         acl = acl_bytes_for_transport(call.acl_compiled_filter)
         params = dict(call.query_params)
+        terms = acl_terms_for_json_body(acl)
         body: Dict[str, Any] = {
             "query": params.get("query", ""),
             "size": int(params.get("size", 20)),
             "from": int(params.get("from", 0)),
-            # Opaque filter also mirrored as acl_terms for backends that require
-            # List[str] JSON. Values are never inspected for control flow.
-            "acl_terms": acl_terms_for_json_body(acl),
+            "acl_terms": [] if is_fail_closed(terms) else terms,
             "debug": bool(params.get("debug", False)),
             "orchestrator_mode": mode,
         }
@@ -230,11 +230,12 @@ class SearchToolbox:
         """Call Block H POST /graph/traverse (or /api/v1/graph/traverse)."""
         acl = acl_bytes_for_transport(call.acl_compiled_filter)
         params = dict(call.query_params)
+        terms = acl_terms_for_json_body(acl)
         body: Dict[str, Any] = {
             "start_node_id": params.get("start_node_id", params.get("query", "")),
             "relationship_types": params.get("relationship_types") or [],
             "depth": int(params.get("depth", 2)),
-            "acl_terms": acl_terms_for_json_body(acl),
+            "acl_terms": [] if is_fail_closed(terms) else terms,
         }
         if tenant_id:
             body["tenant_id"] = tenant_id

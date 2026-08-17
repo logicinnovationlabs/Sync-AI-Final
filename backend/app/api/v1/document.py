@@ -51,12 +51,21 @@ async def shutdown():
     logger.info("Block K Document Reader shut down")
 
 
+async def get_tenant_id(current_user: Dict[str, Any] = Depends(get_current_user)) -> str:
+    """Extract tenant_id string from authenticated user claims."""
+    tenant_id = current_user.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(status_code=401, detail="Token missing tenant_id claim")
+    return str(tenant_id)
+
+
 @router.get("/document/{doc_id}")
 async def get_document(
     doc_id: str,
-    tenant_id: str = Depends(get_tenant),
+    tenant_id: str = Depends(get_tenant_id),
     current_user: Dict[str, Any] = Depends(get_current_user),
 ):
+
     """
     GET full document by ID with ACL re-check and optional streaming.
     

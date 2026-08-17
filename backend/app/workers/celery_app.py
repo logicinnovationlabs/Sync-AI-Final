@@ -6,8 +6,12 @@ Backend: Redis
 Task always eager: Configurable (true in tests for synchronous execution)
 """
 
+import app.core.compat  # noqa: F401 — pkg_resources shim before OpenTelemetry
 from celery import Celery
 from app.core.config import settings
+from app.core.telemetry import setup_telemetry
+
+setup_telemetry(service_name="snyq-celery")
 
 # Create Celery app
 celery_app = Celery(
@@ -46,3 +50,4 @@ if task_always_eager:
 
 # Auto-discover tasks
 celery_app.autodiscover_tasks(["app.workers"])
+# CeleryInstrumentor is applied in app.core.telemetry.setup_telemetry

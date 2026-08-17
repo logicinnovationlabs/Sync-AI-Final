@@ -129,11 +129,13 @@ class MinioDocumentStore:
         self.db_pool: Optional[asyncpg.Pool] = None
         endpoint = settings.storage_endpoint.replace("https://", "").replace("http://", "")
         from minio import Minio
+        from app.storage.vault_client import PlatformSecretKeys, vault_client
 
+        secret = vault_client.get(PlatformSecretKeys.MINIO_SECRET_KEY) or settings.storage_secret_key
         self.minio = Minio(
             endpoint,
             access_key=settings.storage_access_key,
-            secret_key=settings.storage_secret_key,
+            secret_key=secret,
             secure=settings.storage_secure,
         )
 

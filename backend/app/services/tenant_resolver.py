@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.exceptions import TenantNotFoundError, VaultError
 from app.models.tenant import Tenant
-from app.storage.control_plane_db import ControlPlaneSessionLocal
+from app.storage import control_plane_db as control_plane_db
 from app.storage.redis_client import redis_client
 from app.storage.vault_client import vault_client
 
@@ -76,10 +76,24 @@ class TenantResolver:
         # Step 1: Check per-tenant cache (A7: namespace-partitioned)
         cached = await redis_client.get_json(tenant_id, "routing")
         if cached:
-            return TenantRouting(**cached)
+            secret_key = cached.get("db_secret_key")
+            cached.pop("db_password", None)
+            if secret_key:
+                try:
+                    cached["db_password"] = await vault_client.get_secret(secret_key)
+                    return TenantRouting(
+                        tenant_id=cached["tenant_id"],
+                        db_host=cached["db_host"],
+                        db_name=cached["db_name"],
+                        db_user=cached["db_user"],
+                        db_password=cached["db_password"],
+                        config=cached.get("config") or {},
+                    )
+                except Exception:
+                    pass
 
         # Step 2: Query control-plane database
-        async with ControlPlaneSessionLocal() as session:
+        async with control_plane_db.ControlPlaneSessionLocal() as session:
             stmt = select(Tenant).where(Tenant.tenant_id == UUID(tenant_id))
             result = await session.execute(stmt)
             tenant = result.scalar_one_or_none()
@@ -93,7 +107,6 @@ class TenantResolver:
         except Exception as e:
             raise VaultError(f"Failed to retrieve secret for tenant {tenant_id}: {e}")
 
-        # Step 4: Build routing object
         routing = TenantRouting(
             tenant_id=str(tenant.tenant_id),
             db_host=tenant.db_host,
@@ -103,17 +116,20 @@ class TenantResolver:
             config=tenant.config,
         )
 
-        # Step 5: Cache the routing info (A7: per-tenant key)
-        # Note: we cache everything except the password for security
-        cache_data = {
-            "tenant_id": routing.tenant_id,
-            "db_host": routing.db_host,
-            "db_name": routing.db_name,
-            "db_user": routing.db_user,
-            "db_password": routing.db_password,  # Cached for TTL duration
-            "config": routing.config,
-        }
-        await redis_client.set_json(tenant_id, "routing", cache_data, ex=self.cache_ttl)
+        # Cache NAMES only — never the password (§28.2)
+        await redis_client.set_json(
+            tenant_id,
+            "routing",
+            {
+                "tenant_id": routing.tenant_id,
+                "db_host": routing.db_host,
+                "db_name": routing.db_name,
+                "db_user": routing.db_user,
+                "db_secret_key": tenant.db_secret_key,
+                "config": routing.config,
+            },
+            ex=self.cache_ttl,
+        )
 
         return routing
 

@@ -9,7 +9,7 @@ Provides:
 - require_admin: Block N org-admin guard (DB-backed role + is_active)
 """
 
-from typing import Any, AsyncGenerator, Callable, Dict
+from typing import Any, AsyncGenerator, Callable, Dict, Optional
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, Header
@@ -31,11 +31,11 @@ from app.services.tenant_resolver import tenant_resolver, TenantRouting
 from app.storage.tenant_db import tenant_db_manager
 
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> Dict[str, Any]:
     """
     Dependency to get the current authenticated user from JWT.
@@ -44,14 +44,17 @@ async def get_current_user(
         Dict with token payload (contains tenant_id, principal_id, scopes, etc.).
         
     Raises:
-        UnauthorizedError 401 if token is invalid or revoked (error envelope via handler).
+        UnauthorizedError 401 if token is missing, invalid or revoked (error envelope via handler).
     """
+    if not credentials or not credentials.credentials:
+        raise UnauthorizedError("Not authenticated")
     try:
         token = credentials.credentials
         payload = await token_service.validate_token(token)
         return payload
     except (InvalidTokenError, RevokedTokenError) as e:
         raise UnauthorizedError(str(e))
+
 
 
 async def get_tenant(

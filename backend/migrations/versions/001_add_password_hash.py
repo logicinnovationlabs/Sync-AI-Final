@@ -18,14 +18,16 @@ depends_on = None
 
 def upgrade() -> None:
     """Add composite email+tenant_id unique index (password_hash already in initial schema)."""
-    # password_hash column already created in 000_initial_schema.
-    # This migration adds the composite uniqueness index for email within a tenant.
-    op.create_index(
-        'ix_users_email_unique',
-        'users',
-        ['email', 'tenant_id'],
-        unique=True,
-    )
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    existing_indexes = {idx["name"] for idx in inspector.get_indexes("users")}
+    if "ix_users_email_unique" not in existing_indexes:
+        op.create_index(
+            'ix_users_email_unique',
+            'users',
+            ['email', 'tenant_id'],
+            unique=True,
+        )
 
 
 def downgrade() -> None:

@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import get_current_user, require_scope
+from app.acl.filter import is_fail_closed
 from app.models.federated import (
     BackendStatus,
     FederatedSearchRequest,
@@ -167,6 +168,15 @@ async def federated_search(
         scopes=current_user.get("scopes", []),
     )
     acl_terms = user_ctx.build_acl_terms()
+    if is_fail_closed(acl_terms):
+        return FederatedSearchResponse(
+            results=[],
+            total=0,
+            took_ms=0.0,
+            degraded=False,
+            backends=[],
+            query=body.query,
+        )
     
     # Fan-out to backends concurrently
     tasks = []

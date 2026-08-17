@@ -11,7 +11,13 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 from datetime import datetime
 
+import app.core.compat  # noqa: F401 — pkg_resources shim for Python 3.12+
+
 from app.core.config import settings
+from app.core.telemetry import setup_telemetry, instrument_fastapi
+
+# Block O – OpenTelemetry bootstrap (MUST run before FastAPI app is created)
+setup_telemetry(service_name="snyq-backend")
 from app.core.exceptions import SnyQException
 from app.core.errors import ErrorResponse, ErrorDetail
 from app.api.v1 import auth, oauth, me, connectors, scoped_probes, embed, signals as signals_routes
@@ -27,6 +33,7 @@ from app.api.v1 import document as document_routes
 from app.connectors.google.webhooks import router as webhooks_router
 
 from app.middleware.tenant_middleware import TenantMiddleware
+from app.middleware.http_metrics import HttpMetricsMiddleware
 from app.storage.redis_client import redis_client
 from app.storage.control_plane_db import control_plane_engine
 from app.storage.tenant_db import tenant_db_manager
@@ -35,7 +42,7 @@ from app.storage.tenant_db import tenant_db_manager
 # Configure logging
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper()),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    format="%(asctime)s - %(name)s - %(levelname)s - [trace=%(trace_id)s span=%(span_id)s] %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -68,6 +75,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Block O – Middleware ordering matters. In Starlette, add_middleware() wraps
+# earlier middleware. Execution order is reverse of add order:
+#   TenantMiddleware (innermost, runs closest to route — span is active here)
+#   FastAPIInstrumentor (creates the span)
+#   CORSMiddleware (outermost)
+# TenantMiddleware MUST be added before FastAPIInstrumentor so it runs AFTER
+# the span is created, allowing tenant.id to be set on a recording span.
+app.add_middleware(TenantMiddleware)
+app.add_middleware(HttpMetricsMiddleware)
 
 # CORS middleware
 app.add_middleware(
@@ -78,9 +94,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# Tenant resolution middleware
-app.add_middleware(TenantMiddleware)
+# Block O – instrument FastAPI (needs the app object)
+instrument_fastapi(app)
 
 
 # Exception handlers

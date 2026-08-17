@@ -1,0 +1,13 @@
+# Grafana dashboards provisioning
+apiVersion: 1
+
+providers:
+  - name: 'default'
+    orgId: 1
+    folder: 'SnyQ'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false

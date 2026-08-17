@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 
 from app.core.config import settings
+from app.storage.vault_client import PlatformSecretKeys, vault_client
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +58,8 @@ class Neo4jClientManager:
         return TenantNeo4jConfig(
             uri=settings.neo4j_uri,
             user=settings.neo4j_user,
-            password=settings.neo4j_password,
+            password=vault_client.get(PlatformSecretKeys.NEO4J_PASSWORD)
+            or settings.neo4j_password,
             database=self.database_name(tenant_id),
             tenant_id=tenant_id,
         )
@@ -68,7 +70,11 @@ class Neo4jClientManager:
         if self._admin_driver is None:
             self._admin_driver = GraphDatabase.driver(
                 settings.neo4j_uri,
-                auth=(settings.neo4j_user, settings.neo4j_password),
+                auth=(
+                    settings.neo4j_user,
+                    vault_client.get(PlatformSecretKeys.NEO4J_PASSWORD)
+                    or settings.neo4j_password,
+                ),
             )
         return self._admin_driver
 

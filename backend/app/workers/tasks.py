@@ -27,8 +27,38 @@ from app.connectors.google.services.drive_service import DriveConnector
 from app.connectors.google.services.gmail_service import GmailConnector
 from app.core.config import settings
 from app.storage.redis_client import TenantPartitionedRedisClient
+from app.storage.vault_client import PlatformSecretKeys, vault_client
 import asyncio
 import inspect
+
+# Block O – Worker-side trace context extraction (requirement §2.4)
+# Without this, CeleryInstrumentor still auto-instruments the task, but the
+# resulting span starts a *new* trace instead of continuing the one from the
+# API request.  This signal fires before every task execution and re-attaches
+# the context that was injected on the enqueue side.
+from opentelemetry import context as _otel_context
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+from celery.signals import task_prerun, task_postrun
+
+_trace_tokens = {}
+
+
+@task_prerun.connect
+def _extract_trace_context(task_id, task, args, kwargs, **extras):
+    """Extract W3C Trace Context from task headers and attach to current context."""
+    headers = task.request.headers or {}
+    if headers:
+        ctx = TraceContextTextMapPropagator().extract(carrier=headers)
+        _trace_tokens[task_id] = _otel_context.attach(ctx)
+
+
+@task_postrun.connect
+def _detach_trace_context(task_id, task, args, kwargs, **extras):
+    token = _trace_tokens.pop(task_id, None)
+    if token is not None:
+        _otel_context.detach(token)
+
+
 try:
     import nest_asyncio
     nest_asyncio.apply()
@@ -121,7 +151,7 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str) -> dict:
         oauth_manager = None
         if source_type.startswith("google_"):
             client_id = getattr(settings, "google_client_id", None) or getattr(settings, "GOOGLE_CLIENT_ID", "") or ""
-            client_secret = getattr(settings, "google_client_secret", None) or getattr(settings, "GOOGLE_CLIENT_SECRET", "") or ""
+            client_secret = vault_client.get(PlatformSecretKeys.GOOGLE_CLIENT_SECRET) or ""
             scopes = [
                 "https://www.googleapis.com/auth/drive.readonly",
                 "https://www.googleapis.com/auth/gmail.readonly",
@@ -234,7 +264,7 @@ def process_drive_notification(self, tenant_id: str) -> dict:
         
         # Create OAuth manager
         client_id = getattr(settings, "google_client_id", None) or getattr(settings, "GOOGLE_CLIENT_ID", "") or ""
-        client_secret = getattr(settings, "google_client_secret", None) or getattr(settings, "GOOGLE_CLIENT_SECRET", "") or ""
+        client_secret = vault_client.get(PlatformSecretKeys.GOOGLE_CLIENT_SECRET) or ""
         scopes = [
             "https://www.googleapis.com/auth/drive.readonly",
             "https://www.googleapis.com/auth/gmail.readonly",
@@ -327,7 +357,7 @@ def process_gmail_notification(self, tenant_id: str) -> dict:
         
         # Create OAuth manager
         client_id = getattr(settings, "google_client_id", None) or getattr(settings, "GOOGLE_CLIENT_ID", "") or ""
-        client_secret = getattr(settings, "google_client_secret", None) or getattr(settings, "GOOGLE_CLIENT_SECRET", "") or ""
+        client_secret = vault_client.get(PlatformSecretKeys.GOOGLE_CLIENT_SECRET) or ""
         scopes = [
             "https://www.googleapis.com/auth/drive.readonly",
             "https://www.googleapis.com/auth/gmail.readonly",
@@ -399,7 +429,7 @@ def renew_watch_channels() -> dict:
         
         # Create OAuth manager and watch manager
         client_id = getattr(settings, "GOOGLE_CLIENT_ID", "")
-        client_secret = getattr(settings, "GOOGLE_CLIENT_SECRET", "")
+        client_secret = vault_client.get(PlatformSecretKeys.GOOGLE_CLIENT_SECRET) or ""
         scopes = [
             "https://www.googleapis.com/auth/drive.readonly",
             "https://www.googleapis.com/auth/gmail.readonly",

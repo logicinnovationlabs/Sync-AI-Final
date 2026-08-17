@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from app.core.config import settings
 from app.api.deps import get_current_user, require_scope
+from app.acl.filter import is_fail_closed
 from app.services.vector.qdrant_store import QdrantVectorStore
 
 logger = logging.getLogger(__name__)
@@ -96,7 +97,7 @@ async def search_vector(
         )
     
     # Fail-closed if no ACL terms
-    if not request.acl_terms:
+    if is_fail_closed(request.acl_terms):
         logger.warning(
             f"ACL empty for user={request.user_id} tenant={request.tenant_id} — fail-closed"
         )

@@ -18,6 +18,7 @@ import logging
 
 import jwt
 from sqlalchemy.exc import SQLAlchemyError
+from opentelemetry import trace
 
 from app.core.exceptions import TenantNotFoundError, VaultError
 from app.services.token_service import token_service
@@ -63,6 +64,10 @@ class TenantMiddleware(BaseHTTPMiddleware):
                     # Resolve tenant and attach to request state
                     routing = await tenant_resolver.resolve(tenant_id)
                     request.state.tenant = routing
+                    # Set tenant.id on current span for trace correlation (§2.5)
+                    span = trace.get_current_span()
+                    if span and span.is_recording():
+                        span.set_attribute("tenant.id", tenant_id)
             except _EXPECTED_SOFT_FAIL as e:
                 # Expected: missing tenant, bad JWT shape, schema/DB soft errors.
                 # Route-level auth deps remain the real 401/403 gate.

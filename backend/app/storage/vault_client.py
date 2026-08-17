@@ -20,6 +20,37 @@ from app.core.config import settings
 from app.core.exceptions import VaultError
 
 
+class PlatformSecretKeys:
+    """Vault key NAMES for platform credentials — never store the value in metadata."""
+
+    NEO4J_PASSWORD = "kv/platform/neo4j_password"
+    GOOGLE_CLIENT_SECRET = "kv/platform/google_client_secret"
+    GOOGLE_REFRESH_TOKEN = "kv/platform/google_refresh_token"
+    QDRANT_API_KEY = "kv/platform/qdrant_api_key"
+    MINIO_SECRET_KEY = "kv/platform/minio_secret_key"
+    OPENSEARCH_PASSWORD = "kv/platform/opensearch_password"
+
+
+_SETTINGS_BOOTSTRAP = {
+    PlatformSecretKeys.NEO4J_PASSWORD: "neo4j_password",
+    PlatformSecretKeys.GOOGLE_CLIENT_SECRET: "google_client_secret",
+    PlatformSecretKeys.GOOGLE_REFRESH_TOKEN: "google_refresh_token",
+    PlatformSecretKeys.QDRANT_API_KEY: "qdrant_api_key",
+    PlatformSecretKeys.MINIO_SECRET_KEY: "storage_secret_key",
+}
+
+
+def _bootstrap_from_settings(key_name: str) -> Optional[str]:
+    attr = _SETTINGS_BOOTSTRAP.get(key_name)
+    if not attr:
+        return None
+    val = getattr(settings, attr, None)
+    if val is None:
+        return None
+    text = str(val).strip()
+    return text or None
+
+
 class VaultClient(ABC):
     """Abstract interface for secret storage."""
 
@@ -119,6 +150,18 @@ class AzureKeyVaultClient(VaultClient):
         except Exception as e:
             raise VaultError(f"Failed to set secret '{key_name}': {e}")
 
+    def get(self, key_name: str) -> str:
+        try:
+            return self.client.get_secret(key_name).value
+        except Exception as e:
+            raise VaultError(f"Failed to get secret '{key_name}': {e}")
+
+    def set(self, key_name: str, value: str) -> None:
+        try:
+            self.client.set_secret(key_name, value)
+        except Exception as e:
+            raise VaultError(f"Failed to set secret '{key_name}': {e}")
+
 
 class MockVaultClient(VaultClient):
     """
@@ -139,81 +182,40 @@ class MockVaultClient(VaultClient):
         safe_name = key_name.replace("/", "_").replace("-", "_")
         return f"VAULT_SECRET_{safe_name}"
 
-    async def get_secret(self, key_name: str) -> str:
-        """
-        Retrieve a secret from env vars or in-memory store.
-        
-        Args:
-            key_name: Secret key name
-            
-        Returns:
-            Secret value.
-            
-        Raises:
-            VaultError if secret not found.
-        """
-        # Check in-memory store first (for runtime set_secret calls)
+    def _lookup(self, key_name: str) -> str:
         if key_name in self._in_memory_store:
             return self._in_memory_store[key_name]
-        
-        # Check environment variable
-        env_key = self._env_key(key_name)
-        value = os.getenv(env_key)
-        if value is None:
-            # Fallback for dev/test mode
-            if settings.environment in ("development", "test"):
-                return "postgres"
-            raise VaultError(
-                f"Secret '{key_name}' not found. Set env var {env_key} or call set_secret()."
-            )
-        return value
+        env_val = os.getenv(self._env_key(key_name))
+        if env_val:
+            return env_val
+        boot = _bootstrap_from_settings(key_name)
+        if boot:
+            self._in_memory_store[key_name] = boot
+            return boot
+        if settings.environment in ("development", "test") and "db_password" in key_name:
+            return "postgres"
+        raise VaultError(
+            f"Secret '{key_name}' not found. Set env var {self._env_key(key_name)} or call set_secret()."
+        )
+
+    async def get_secret(self, key_name: str) -> str:
+        return self._lookup(key_name)
 
     async def set_secret(self, key_name: str, secret_value: str) -> None:
-        """
-        Store a secret in the in-memory store.
-        
-        Args:
-            key_name: Secret key name
-            secret_value: Secret to store
-        """
         self._in_memory_store[key_name] = secret_value
-    
+
     def store_credential_envelope(self, key_ref: str, credentials: dict) -> None:
-        """
-        Store a credential envelope (sync method for compatibility).
-        
-        Args:
-            key_ref: Secret key reference
-            credentials: Credential data to store
-        """
-        # Store as JSON in the in-memory store
         import json
         self._in_memory_store[key_ref] = json.dumps(credentials)
-    
+
     def set(self, key_name: str, value: str) -> None:
-        """
-        Sync method to store a secret (for compatibility with EncryptionClient).
-        
-        Args:
-            key_name: Secret key name
-            value: Secret value to store
-        """
         self._in_memory_store[key_name] = value
-    
+
     def get(self, key_name: str) -> str:
-        """
-        Sync method to retrieve a secret (for compatibility with EncryptionClient).
-        
-        Args:
-            key_name: Secret key name
-            
-        Returns:
-            Secret value
-        """
-        if key_name in self._in_memory_store:
-            return self._in_memory_store[key_name]
-        # Fallback for dev/test
-        return "mock-secret"
+        try:
+            return self._lookup(key_name)
+        except VaultError:
+            return ""
 
 
 def get_vault_client() -> VaultClient:

@@ -10,6 +10,7 @@ Provides:
 """
 
 import os
+import app.core.compat  # noqa: F401
 import pytest
 import pytest_asyncio
 from typing import AsyncGenerator
@@ -64,29 +65,32 @@ TEST_DB_URL = os.getenv(
 # ---------------------------------------------------------------------------
 @pytest_asyncio.fixture(autouse=True)
 async def redis_for_tests():
-    """Reconnect the global redis_client on each test's own event loop.
+    """Reconnect redis + control-plane engine on each test's event loop."""
+    from sqlalchemy.pool import NullPool
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-    pytest-asyncio 0.24 creates a NEW event loop per async test. The global
-    redis_client._client socket is bound to the PREVIOUS loop, so we must
-    always force-close it and create a brand-new connection on the current loop.
-    """
+    from app.storage import control_plane_db as cp
     from app.storage.redis_client import redis_client
 
-    # Force-close any stale connection (regardless of whether _client exists)
     if redis_client._client is not None:
         try:
             await redis_client._client.aclose()
         except Exception:
             pass
-    # Always null out _client so connect() creates a fresh one (bypasses guard)
     redis_client._client = None
-
-    # Connect fresh on this test's event loop
     await redis_client.connect()
+
+    try:
+        await cp.control_plane_engine.dispose()
+    except Exception:
+        pass
+    cp.control_plane_engine = create_async_engine(TEST_DB_URL, echo=False, poolclass=NullPool)
+    cp.ControlPlaneSessionLocal = async_sessionmaker(
+        cp.control_plane_engine, class_=AsyncSession, expire_on_commit=False
+    )
 
     yield
 
-    # Flush test keys and disconnect cleanly
     try:
         if redis_client._client:
             await redis_client._client.flushdb()
@@ -94,6 +98,10 @@ async def redis_for_tests():
     except Exception:
         pass
     redis_client._client = None
+    try:
+        await cp.control_plane_engine.dispose()
+    except Exception:
+        pass
 
 
 @pytest_asyncio.fixture
@@ -169,19 +177,25 @@ def test_client() -> TestClient:
 # ---------------------------------------------------------------------------
 # Block K: Document Reader Fixtures
 # ---------------------------------------------------------------------------
-@pytest.fixture
-def k_app():
+@pytest_asyncio.fixture
+async def k_app():
     """
     Fixture for Block K (Document Reader) tests.
     
     Returns tuple: (client, store, acl, app)
-    - client: FastAPI TestClient with async support
+    - client: httpx.AsyncClient with async support for ASGI
     - store: In-memory document store
     - acl: Mock ACL checker
     - app: FastAPI app instance
     """
-    from fastapi.testclient import TestClient
     from httpx import AsyncClient
+    try:
+        from httpx import ASGITransport
+        transport = ASGITransport(app=_get_app())
+        client_kwargs = {"transport": transport, "base_url": "http://test"}
+    except ImportError:
+        client_kwargs = {"app": _get_app(), "base_url": "http://test"}
+    
     from app.core.config import settings
     from app.services.document_reader.store import InMemoryDocumentStore
     from app.services.document_reader.acl_checker import MockACLChecker
@@ -191,7 +205,6 @@ def k_app():
     acl = MockACLChecker()
     
     fastapi_app = _get_app()
-    client = TestClient(fastapi_app)
     
     # Monkey-patch the document endpoint to use test instances
     import app.api.v1.document as doc_module
@@ -201,11 +214,13 @@ def k_app():
     doc_module.store = store
     doc_module.acl_checker = acl
     
-    yield client, store, acl, fastapi_app
+    async with AsyncClient(**client_kwargs) as client:
+        yield client, store, acl, fastapi_app
     
     # Restore original instances
     doc_module.store = original_store
     doc_module.acl_checker = original_acl
+
 
 
 @pytest_asyncio.fixture
@@ -258,7 +273,7 @@ def l_app():
 # ---------------------------------------------------------------------------
 def make_bearer(tenant_id: str, principal_id: str, scopes: list = None) -> str:
     """
-    Create a test bearer token for authentication.
+    Create a test bearer token for authentication using RS256.
     
     Args:
         tenant_id: Tenant ID
@@ -266,22 +281,32 @@ def make_bearer(tenant_id: str, principal_id: str, scopes: list = None) -> str:
         scopes: List of scopes (default: ["read", "write"])
     
     Returns:
-        JWT token string
+        JWT token string signed with RSA private key
     """
     import jwt
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
+    from app.services.token_service import token_service
     
+    token_service._load_keys()
     if scopes is None:
         scopes = ["read", "write"]
     
+    now = datetime.now(timezone.utc)
     payload = {
+        "iss": token_service.issuer,
+        "sub": principal_id,
         "tenant_id": tenant_id,
         "principal_id": principal_id,
         "scopes": scopes,
-        "exp": datetime.utcnow() + timedelta(hours=1),
-        "iat": datetime.utcnow(),
+        "exp": now + timedelta(hours=1),
+        "iat": now,
+        "token_version": 0,
     }
     
-    # Use a test secret (matches app.services.token_service.TokenService)
-    secret = os.getenv("JWT_SECRET_KEY", "test-secret-key")
-    return jwt.encode(payload, secret, algorithm="HS256")
+    return jwt.encode(
+        payload,
+        token_service._private_key,
+        algorithm=token_service.algorithm,
+        headers={"kid": token_service._active_kid},
+    )
+

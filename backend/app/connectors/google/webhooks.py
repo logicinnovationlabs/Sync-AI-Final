@@ -15,6 +15,8 @@ from fastapi import APIRouter, Request, HTTPException, Header
 from typing import Optional
 import logging
 
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhooks/google", tags=["webhooks"])
@@ -75,8 +77,12 @@ async def drive_webhook(
         
         tenant_id = watch_info["tenant_id"]
         
-        # Enqueue Celery task
-        process_drive_notification.delay(tenant_id=tenant_id)
+        # Enqueue Celery task with trace context propagation (§2.4)
+        _otel_headers = {}
+        TraceContextTextMapPropagator().inject(_otel_headers)
+        process_drive_notification.apply_async(
+            args=[tenant_id], headers=_otel_headers
+        )
         
         logger.info(
             f"Drive notification accepted for tenant {tenant_id}, "
@@ -179,8 +185,12 @@ async def gmail_webhook(request: Request):
                 cursor=history_id,
             )
         
-        # Enqueue Celery task
-        process_gmail_notification.delay(tenant_id=tenant_id)
+        # Enqueue Celery task with trace context propagation (§2.4)
+        _otel_headers = {}
+        TraceContextTextMapPropagator().inject(_otel_headers)
+        process_gmail_notification.apply_async(
+            args=[tenant_id], headers=_otel_headers
+        )
         
         logger.info(
             f"Gmail notification accepted for tenant {tenant_id}, "

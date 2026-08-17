@@ -1,0 +1,10 @@
+# Grafana anonymous auth is OFF unless DEV_MODE=true (requirement §3.2).
+#
+#   docker compose up                         → anonymous OFF
+#   DEV_MODE=true docker compose up           → anonymous ON (local only)
+
+services:
+  grafana:
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: ${DEV_MODE:-false}
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer

@@ -51,6 +51,13 @@ async def test_tenant_resolver_cache_miss_then_hit(test_db, test_redis, mock_vau
     assert routing2.tenant_id == routing.tenant_id
     assert routing2.db_password == routing.db_password
 
+    from app.storage.redis_client import redis_client
+
+    cached = await redis_client.get_json(str(tenant_id), "routing")
+    assert cached is not None
+    assert "db_password" not in cached
+    assert cached.get("db_secret_key") == db_secret_key
+
 
 @pytest.mark.asyncio
 async def test_tenant_resolver_not_found():

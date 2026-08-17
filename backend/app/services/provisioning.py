@@ -8,7 +8,6 @@ from typing import Optional
 from enum import Enum
 
 from app.core.config import settings
-from app.storage.vault.vault_client import VaultClient
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +21,7 @@ class TenancyMode(str, Enum):
 def provision_tenant(
     tenant_id: str,
     db_client,
-    vault_client: VaultClient,
+    vault_client: object,
     tenancy_mode: TenancyMode = TenancyMode.ISOLATED_DB,
     migration_files: Optional[list] = None
 ) -> dict:

@@ -1,3 +1,0 @@
-"""
-Block E API package
-"""

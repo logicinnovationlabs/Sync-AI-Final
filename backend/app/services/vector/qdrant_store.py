@@ -7,10 +7,19 @@ import logging
 import uuid
 from typing import Any, Dict, List, Optional
 
+from opentelemetry import trace
+
 from app.core.config import settings
+from app.acl.filter import (
+    document_is_visible,
+    is_bypass,
+    is_fail_closed,
+    qdrant_must_not_acl,
+)
 from app.services.vector.store import VectorStore
 
 logger = logging.getLogger(__name__)
+_tracer = trace.get_tracer(__name__)
 
 
 def _point_id(chunk_id: str, model_version: str) -> str:
@@ -31,16 +40,22 @@ class QdrantVectorStore(VectorStore):
                 "qdrant-client is required for Qdrant backend"
             ) from exc
         
-        qdrant_url = getattr(settings, 'qdrant_url', None)
+        from app.storage.vault_client import PlatformSecretKeys, vault_client
+
+        qdrant_url = getattr(settings, "qdrant_url", None)
+        api_key = vault_client.get(PlatformSecretKeys.QDRANT_API_KEY) or None
+        if api_key in ("", "mock-secret"):
+            api_key = None
         if qdrant_url:
-            self._client = QdrantClient(url=qdrant_url)
+            self._client = QdrantClient(url=qdrant_url, api_key=api_key)
         else:
-            host = getattr(settings, 'qdrant_host', 'localhost')
-            port = getattr(settings, 'qdrant_port', 6333)
-            self._client = QdrantClient(host=host, port=port)
+            host = getattr(settings, "qdrant_host", "localhost")
+            port = getattr(settings, "qdrant_port", 6333)
+            self._client = QdrantClient(host=host, port=port, api_key=api_key)
         
         self.collection_prefix = getattr(settings, 'qdrant_collection_prefix', 'snyq')
         self.dimensions = settings.embedding_dimensions  # Use settings directly (default: 360)
+        self._ensured_collections: set[str] = set()
         logger.info(f"QdrantVectorStore initialized with prefix: {self.collection_prefix}, dimensions: {self.dimensions}")
     
     def _normalize_embedding(self, embedding: List[float]) -> List[float]:
@@ -64,28 +79,40 @@ class QdrantVectorStore(VectorStore):
     def _ensure_collection(self, tenant_id: str) -> None:
         """Ensure collection exists for tenant with correct dimensions."""
         name = self._collection_name(tenant_id)
+        if name in self._ensured_collections:
+            return
         
         try:
             collection_info = self._client.get_collection(collection_name=name)
-            # Check dimensions
-            vector_size = collection_info.config.params.vectors.size
-            if vector_size != self.dimensions:
+            # Check dimensions if vectors configuration is present
+            vectors_cfg = getattr(getattr(collection_info, "config", None), "params", None)
+            vectors_obj = getattr(vectors_cfg, "vectors", None)
+            vector_size = getattr(vectors_obj, "size", None)
+            if vector_size is not None and vector_size != self.dimensions:
                 logger.warning(f"Collection {name} has wrong dimensions ({vector_size} != {self.dimensions}), deleting and recreating...")
                 self._client.delete_collection(collection_name=name)
             else:
+                self._ensured_collections.add(name)
                 return  # Collection exists with correct dimensions
         except Exception as e:
-            # Collection doesn't exist or error - will create below
-            logger.debug(f"Collection check failed: {e}")
+            # Collection doesn't exist or check failed - attempt creation
+            logger.debug(f"Collection check on {name}: {e}")
         
         # Create collection
-        self._client.create_collection(
-            collection_name=name,
-            vectors_config=self.qm.VectorParams(
-                size=self.dimensions,
-                distance=self.qm.Distance.COSINE,
-            ),
-        )
+        try:
+            self._client.create_collection(
+                collection_name=name,
+                vectors_config=self.qm.VectorParams(
+                    size=self.dimensions,
+                    distance=self.qm.Distance.COSINE,
+                ),
+            )
+        except Exception as e:
+            # If already exists (409 Conflict), ignore
+            if "already exists" in str(e).lower() or "conflict" in str(e).lower() or "409" in str(e):
+                logger.debug(f"Collection {name} already created")
+            else:
+                raise e
         
         # Create payload indexes for filtering
         for field_name in ["acl_terms", "model_version", "document_id", "chunk_id", "tenant_id"]:
@@ -98,7 +125,9 @@ class QdrantVectorStore(VectorStore):
             except Exception as e:
                 logger.debug(f"Payload index {field_name} on {name}: {e}")
         
-        logger.info(f"Created Qdrant collection: {name} with dimensions {self.dimensions}")
+        self._ensured_collections.add(name)
+        logger.info(f"Created/verified Qdrant collection: {name} with dimensions {self.dimensions}")
+
     
     async def search(
         self,
@@ -109,71 +138,85 @@ class QdrantVectorStore(VectorStore):
         model_version: Optional[str] = None,
         score_threshold: Optional[float] = None,
     ) -> List[Dict[str, Any]]:
-        """Execute ANN search with ACL prefilter."""
-        self._ensure_collection(tenant_id)
-        name = self._collection_name(tenant_id)
-        
-        # Normalize query embedding dimensions
-        normalized_query = self._normalize_embedding(query_embedding)
-        
-        # Build filter
-        must_conditions = [
-            self.qm.FieldCondition(
-                key="tenant_id",
-                match=self.qm.MatchValue(value=tenant_id),
-            )
-        ]
-        
-        # ACL prefilter (fail-closed)
-        if not acl_terms:
-            return []
-        
-        must_conditions.append(
-            self.qm.FieldCondition(
-                key="acl_terms",
-                match=self.qm.MatchAny(any=acl_terms),
-            )
-        )
-        
-        # Model version filter
-        if model_version:
-            must_conditions.append(
+        """Execute ANN search with ACL prefilter (allow + explicit deny)."""
+        with _tracer.start_as_current_span("qdrant.query") as span:
+            span.set_attribute("db.system", "qdrant")
+            span.set_attribute("db.operation", "search")
+            span.set_attribute("tenant.id", tenant_id)
+
+            # Fail-closed
+            if is_fail_closed(acl_terms):
+                return []
+
+            self._ensure_collection(tenant_id)
+            name = self._collection_name(tenant_id)
+
+            normalized_query = self._normalize_embedding(query_embedding)
+
+            must_conditions = [
                 self.qm.FieldCondition(
-                    key="model_version",
-                    match=self.qm.MatchValue(value=model_version),
+                    key="tenant_id",
+                    match=self.qm.MatchValue(value=tenant_id),
                 )
-            )
-        
-        filter_obj = self.qm.Filter(must=must_conditions)
-        
-        # Execute search
-        try:
-            results = self._client.search(
-                collection_name=name,
-                query_vector=normalized_query,
-                query_filter=filter_obj,
-                limit=top_k,
-                score_threshold=score_threshold,
-            )
-        except Exception as e:
-            logger.error(f"Qdrant search failed: {e}")
-            return []
-        
-        # Parse results
-        output = []
-        for hit in results:
-            payload = hit.payload
-            output.append({
-                "chunk_id": payload.get("chunk_id", ""),
-                "document_id": payload.get("document_id", ""),
-                "score": hit.score,
-                "model_version": payload.get("model_version", ""),
-                "chunk_text": payload.get("chunk_text", ""),
-                "metadata": payload.get("metadata"),
-            })
-        
-        return output
-    
+            ]
+
+            if not is_bypass(acl_terms):
+                must_conditions.append(
+                    self.qm.FieldCondition(
+                        key="acl_terms",
+                        match=self.qm.MatchAny(any=list(acl_terms)),
+                    )
+                )
+
+            if model_version:
+                must_conditions.append(
+                    self.qm.FieldCondition(
+                        key="model_version",
+                        match=self.qm.MatchValue(value=model_version),
+                    )
+                )
+
+            must_not = []
+            deny_cond = qdrant_must_not_acl(self.qm, acl_terms) if not is_bypass(acl_terms) else None
+            if deny_cond is not None:
+                must_not.append(deny_cond)
+
+            filter_kwargs = {"must": must_conditions}
+            if must_not:
+                filter_kwargs["must_not"] = must_not
+            filter_obj = self.qm.Filter(**filter_kwargs)
+
+            fetch_k = top_k if is_bypass(acl_terms) else max(top_k * 3, top_k)
+            try:
+                results = self._client.search(
+                    collection_name=name,
+                    query_vector=normalized_query,
+                    query_filter=filter_obj,
+                    limit=fetch_k,
+                    score_threshold=score_threshold,
+                )
+            except Exception as e:
+                span.set_attribute("error", True)
+                logger.error(f"Qdrant search failed: {e}")
+                return []
+
+            output = []
+            for hit in results:
+                payload = hit.payload or {}
+                if not document_is_visible(acl_terms, payload.get("acl_terms") or []):
+                    continue
+                output.append({
+                    "chunk_id": payload.get("chunk_id", ""),
+                    "document_id": payload.get("document_id", ""),
+                    "score": hit.score,
+                    "model_version": payload.get("model_version", ""),
+                    "chunk_text": payload.get("chunk_text", ""),
+                    "metadata": payload.get("metadata"),
+                })
+                if len(output) >= top_k:
+                    break
+            return output
+
     async def upsert_chunk(
         self,
         tenant_id: str,

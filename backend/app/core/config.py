@@ -353,7 +353,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("NEO4J_USER", "neo4j_user"),
     )
     neo4j_password: str = Field(
-        default="password",
+        default="",
         validation_alias=AliasChoices("NEO4J_PASSWORD", "neo4j_password"),
     )
     neo4j_database_prefix: str = Field(
@@ -445,8 +445,8 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     storage_backend: str = Field(default="mock")  # "mock" | "minio"
     storage_endpoint: str = Field(default="localhost:9000")
-    storage_access_key: str = Field(default="minioadmin")
-    storage_secret_key: str = Field(default="minioadmin")
+    storage_access_key: str = Field(default="")
+    storage_secret_key: str = Field(default="")
     storage_bucket: str = Field(default="documents")
     storage_secure: bool = Field(default=False)
     stream_threshold_bytes: int = Field(default=10 * 1024 * 1024)  # 10MB

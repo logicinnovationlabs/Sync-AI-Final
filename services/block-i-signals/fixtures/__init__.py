@@ -1,1 +1,0 @@
-# Fixture package for generate_fixtures import from tests

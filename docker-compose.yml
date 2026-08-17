@@ -17,6 +17,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks: [snyq_network]
 
   redis:
     image: redis:7-alpine
@@ -30,6 +31,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    networks: [snyq_network]
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -40,6 +42,7 @@ services:
       - qdrant_data:/qdrant/storage
     environment:
       QDRANT__SERVICE__HTTP_PORT: 6333
+    networks: [snyq_network]
 
   opensearch:
     image: opensearchproject/opensearch:2.11.1
@@ -51,7 +54,7 @@ services:
       discovery.type: single-node
       plugins.security.disabled: "true"
       DISABLE_INSTALL_DEMO_CONFIG: "true"
-      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+      OPENSEARCH_JAVA_OPTS: "-Xms256m -Xmx256m"
     ulimits:
       memlock:
         soft: -1
@@ -59,10 +62,12 @@ services:
       nofile:
         soft: 65536
         hard: 65536
+    networks: [snyq_network]
 
   neo4j:
     image: neo4j:5.15.0
     container_name: snyq_neo4j
+    restart: unless-stopped
     ports:
       - "7474:7474"
       - "7687:7687"
@@ -70,16 +75,19 @@ services:
       NEO4J_AUTH: neo4j/password
       NEO4J_PLUGINS: '["apoc"]'
       NEO4J_dbms_security_procedures_unrestricted: apoc.*
-      NEO4J_dbms_memory_heap_initial__size: 512m
-      NEO4J_dbms_memory_heap_max__size: 1G
+      NEO4J_dbms_memory_heap_initial__size: 256m
+      NEO4J_dbms_memory_heap_max__size: 512m
+      # Prometheus metrics (`server.metrics.prometheus.*`) are Enterprise-only.
+      # Community 5.15 treats them as unrecognized and refuses to start.
     volumes:
       - neo4j_data:/data
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
-      interval: 15s
+      interval: 20s
       timeout: 10s
-      retries: 20
-      start_period: 60s
+      retries: 15
+      start_period: 180s
+    networks: [snyq_network]
 
   minio:
     image: minio/minio:latest
@@ -93,6 +101,7 @@ services:
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
+    networks: [snyq_network]
 
   vault:
     image: hashicorp/vault:1.15.6
@@ -105,6 +114,7 @@ services:
     cap_add:
       - IPC_LOCK
     command: server -dev
+    networks: [snyq_network]
 
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:v23.3.18
@@ -119,7 +129,7 @@ services:
       - --smp
       - "1"
       - --memory
-      - 512M
+      - 256M
       - --reserve-memory
       - 0M
       - --node-id
@@ -129,17 +139,76 @@ services:
       - PLAINTEXT://0.0.0.0:9092
       - --advertise-kafka-addr
       - PLAINTEXT://redpanda:9092
+    networks: [snyq_network]
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.96.0
     container_name: snyq_otel_collector
+    restart: unless-stopped
     ports:
       - "4318:4318"
       - "4317:4317"
+      - "8889:8889"
     command: ["--config=/etc/otel-config.yaml"]
     volumes:
       - ./otel-config.yaml:/etc/otel-config.yaml:ro
+    networks: [snyq_network]
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: snyq_prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/rules:/etc/prometheus/rules
+      - prometheus_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    networks: [snyq_network]
+
+  tempo:
+    image: grafana/tempo:latest
+    container_name: snyq_tempo
+    user: "0"
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo.yml"]
+    volumes:
+      - ./monitoring/tempo.yml:/etc/tempo.yml
+      - tempo_data:/var/tempo
+    ports:
+      - "3200:3200"
+    networks: [snyq_network]
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: snyq_grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      # Anonymous auth is NOT set here - see docker-compose.override.yml
+    volumes:
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+    ports:
+      - "3000:3000"
+    networks: [snyq_network]
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: snyq_alertmanager
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    ports:
+      - "9093:9093"
+    networks: [snyq_network]
+
+  # One-shots. Started by `docker compose up -d` but they must NOT block app.
+  # App already runs alembic itself. Seed is best-effort after Postgres is up.
   migrate:
     build:
       context: ./backend
@@ -147,11 +216,14 @@ services:
     container_name: snyq_migrate
     env_file:
       - .env.docker
+    healthcheck:
+      disable: true
+    restart: "no"
     depends_on:
       postgres:
         condition: service_healthy
-    command: >
-      sh -c "sleep 5 && python -m alembic upgrade head || (sleep 10 && python -m alembic upgrade head)"
+    command: python -m alembic upgrade head
+    networks: [snyq_network]
 
   seed:
     build:
@@ -160,12 +232,16 @@ services:
     container_name: snyq_seed
     env_file:
       - .env.docker
+    healthcheck:
+      disable: true
+    restart: "no"
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
       vault:
         condition: service_started
     command: python scripts/seed_tenants.py
+    networks: [snyq_network]
 
   seed_test_data:
     build:
@@ -186,6 +262,7 @@ services:
     command: python scripts/seed_test_data.py
     profiles:
       - test
+    networks: [snyq_network]
 
   app:
     build:
@@ -201,17 +278,26 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      seed:
-        condition: service_completed_successfully
       qdrant:
         condition: service_started
       opensearch:
         condition: service_started
       neo4j:
-        condition: service_healthy
+        condition: service_started
       vault:
         condition: service_started
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+      otel-collector:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    restart: unless-stopped
+    command: >
+      sh -c "python -m alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    networks: [snyq_network]
 
   celery_worker:
     build:
@@ -220,10 +306,16 @@ services:
     container_name: snyq_celery_worker
     env_file:
       - .env.docker
+    healthcheck:
+      disable: true
+    restart: unless-stopped
     depends_on:
-      app:
+      redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+    networks: [snyq_network]
 
   celery_beat:
     build:
@@ -232,10 +324,14 @@ services:
     container_name: snyq_celery_beat
     env_file:
       - .env.docker
+    healthcheck:
+      disable: true
+    restart: unless-stopped
     depends_on:
-      app:
+      redis:
         condition: service_healthy
     command: celery -A app.workers.celery_app beat --loglevel=info
+    networks: [snyq_network]
 
 volumes:
   postgres_data:
@@ -243,3 +339,9 @@ volumes:
   qdrant_data:
   neo4j_data:
   minio_data:
+  prometheus_data:
+  tempo_data:
+
+networks:
+  snyq_network:
+    driver: bridge

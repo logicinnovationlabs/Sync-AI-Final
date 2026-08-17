@@ -1,7 +1,0 @@
-Database Normalization Principles
-
-Database normalization is the process of organizing data in a database to reduce redundancy and improve data integrity. The process involves dividing large tables into smaller, more manageable tables and defining relationships between them. The goal is to ensure that each piece of data is stored in only one place.
-
-The first normal form requires that tables contain no repeating groups or multi-valued attributes. Each cell should contain a single value, and each record should be unique. The second normal form builds on the first by requiring that all non-key attributes be fully dependent on the primary key. This eliminates partial dependencies.
-
-Third normal form further refines the structure by requiring that all non-key attributes be directly dependent on the primary key, not on other non-key attributes. This eliminates transitive dependencies. Higher normal forms exist but are less commonly used in practice due to the complexity they introduce and the potential performance trade-offs.

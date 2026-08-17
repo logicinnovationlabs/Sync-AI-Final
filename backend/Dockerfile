@@ -14,8 +14,10 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements
 COPY requirements.txt requirements-dev.txt ./
 
-# Install Python dependencies (replace python-magic-bin with python-magic for Linux)
+# OpenTelemetry instrumentation still imports pkg_resources (setuptools < 80).
+# python:3.12-slim no longer ships it, so pin it explicitly for Celery/app boot.
 RUN pip install --upgrade pip && \
+    pip install --no-cache-dir "setuptools>=70,<72" && \
     sed -i 's/python-magic-bin==0.4.14/python-magic==0.4.27/' requirements.txt && \
     pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir -r requirements-dev.txt

@@ -6,11 +6,14 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
+from opentelemetry import trace
+
 from app.core.config import settings
 from app.services.graph.store import GraphStore
 from app.services.graph.neo4j_client import get_neo4j_manager
 
 logger = logging.getLogger(__name__)
+_tracer = trace.get_tracer(__name__)
 
 NODE_LABELS = [
     "Person",
@@ -99,35 +102,39 @@ class Neo4jGraphStore(GraphStore):
         source_id: str,
         properties: Dict[str, Any],
     ) -> None:
-        await self.ensure_tenant(tenant_id)
-        props = {k: v for k, v in properties.items() if v is not None}
-        props["tenant_id"] = tenant_id
-        props["source_id"] = source_id
-        props.setdefault("created_at", _now())
-        props["updated_at"] = props.get("updated_at") or _now()
-        safe_label = label if label.isidentifier() else "Entity"
-        cypher = f"""
-        MERGE (n {{tenant_id: $tenant, source_id: $source_id}})
-        ON CREATE SET n += $props
-        ON MATCH SET
-          n += CASE
-            WHEN $props.updated_at IS NOT NULL AND n.updated_at IS NOT NULL
-                 AND $props.updated_at < n.updated_at
-            THEN {{}}
-            ELSE $props
-          END
-        SET n:{safe_label}
-        """
-        session, _ = self._session(tenant_id)
-        try:
-            session.run(
-                cypher,
-                tenant=tenant_id,
-                source_id=source_id,
-                props=props,
-            )
-        finally:
-            session.close()
+        with _tracer.start_as_current_span("neo4j.upsert_node") as span:
+            span.set_attribute("db.system", "neo4j")
+            span.set_attribute("db.operation", "upsert_node")
+            span.set_attribute("tenant.id", tenant_id)
+            await self.ensure_tenant(tenant_id)
+            props = {k: v for k, v in properties.items() if v is not None}
+            props["tenant_id"] = tenant_id
+            props["source_id"] = source_id
+            props.setdefault("created_at", _now())
+            props["updated_at"] = props.get("updated_at") or _now()
+            safe_label = label if label.isidentifier() else "Entity"
+            cypher = f"""
+            MERGE (n {{tenant_id: $tenant, source_id: $source_id}})
+            ON CREATE SET n += $props
+            ON MATCH SET
+              n += CASE
+                WHEN $props.updated_at IS NOT NULL AND n.updated_at IS NOT NULL
+                     AND $props.updated_at < n.updated_at
+                THEN {{}}
+                ELSE $props
+              END
+            SET n:{safe_label}
+            """
+            session, _ = self._session(tenant_id)
+            try:
+                session.run(
+                    cypher,
+                    tenant=tenant_id,
+                    source_id=source_id,
+                    props=props,
+                )
+            finally:
+                session.close()
 
     async def upsert_edge(
         self,
@@ -193,104 +200,108 @@ class Neo4jGraphStore(GraphStore):
         depth: int,
         limit: int = 100,
     ) -> Dict[str, Any]:
-        depth = min(depth, settings.max_traversal_depth)
-        if relationship_types:
-            rel_union = "|".join(
-                "".join(c if c.isalnum() or c == "_" else "_" for c in t.upper())
-                for t in relationship_types
-            )
-            rel_pattern = f"[*0..{depth}]"
-            type_filter = f"ALL(rel IN relationships(path) WHERE type(rel) IN $types)"
-            types = [
-                "".join(c if c.isalnum() or c == "_" else "_" for c in t.upper())
-                for t in relationship_types
-            ]
-        else:
-            rel_pattern = f"[*0..{depth}]"
-            type_filter = "true"
-            types = []
+        with _tracer.start_as_current_span("neo4j.traverse") as span:
+            span.set_attribute("db.system", "neo4j")
+            span.set_attribute("db.operation", "traverse")
+            span.set_attribute("tenant.id", tenant_id)
+            depth = min(depth, settings.max_traversal_depth)
+            if relationship_types:
+                rel_union = "|".join(
+                    "".join(c if c.isalnum() or c == "_" else "_" for c in t.upper())
+                    for t in relationship_types
+                )
+                rel_pattern = f"[*0..{depth}]"
+                type_filter = f"ALL(rel IN relationships(path) WHERE type(rel) IN $types)"
+                types = [
+                    "".join(c if c.isalnum() or c == "_" else "_" for c in t.upper())
+                    for t in relationship_types
+                ]
+            else:
+                rel_pattern = f"[*0..{depth}]"
+                type_filter = "true"
+                types = []
 
-        cypher = f"""
-        MATCH (start {{tenant_id: $tenant, source_id: $start_id}})
-        OPTIONAL MATCH path = (start)-{rel_pattern}-(end)
-        WHERE end IS NULL OR (end.tenant_id = $tenant AND {type_filter})
-        WITH collect(path) AS paths
-        UNWIND paths AS path
-        WITH path WHERE path IS NOT NULL
-        WITH collect(DISTINCT path) AS paths2
-        UNWIND paths2 AS path
-        UNWIND nodes(path) AS n
-        WITH collect(DISTINCT n) AS ns, paths2
-        UNWIND paths2 AS path
-        UNWIND relationships(path) AS rel
-        WITH ns, collect(DISTINCT rel)[0..$limit] AS rs
-        RETURN ns AS nodes, rs AS rels
-        """
-        session, _ = self._session(tenant_id)
-        try:
-            result = session.run(
-                cypher,
-                tenant=tenant_id,
-                start_id=start_node_id,
-                types=types,
-                limit=limit,
-            )
-            row = result.single()
-            if not row or not row["nodes"]:
-                start = session.run(
-                    "MATCH (n {tenant_id:$tenant, source_id:$id}) RETURN n",
+            cypher = f"""
+            MATCH (start {{tenant_id: $tenant, source_id: $start_id}})
+            OPTIONAL MATCH path = (start)-{rel_pattern}-(end)
+            WHERE end IS NULL OR (end.tenant_id = $tenant AND {type_filter})
+            WITH collect(path) AS paths
+            UNWIND paths AS path
+            WITH path WHERE path IS NOT NULL
+            WITH collect(DISTINCT path) AS paths2
+            UNWIND paths2 AS path
+            UNWIND nodes(path) AS n
+            WITH collect(DISTINCT n) AS ns, paths2
+            UNWIND paths2 AS path
+            UNWIND relationships(path) AS rel
+            WITH ns, collect(DISTINCT rel)[0..$limit] AS rs
+            RETURN ns AS nodes, rs AS rels
+            """
+            session, _ = self._session(tenant_id)
+            try:
+                result = session.run(
+                    cypher,
                     tenant=tenant_id,
-                    id=start_node_id,
-                ).single()
-                if not start:
-                    return {"nodes": [], "relationships": []}
-                n = start["n"]
-                return {
-                    "nodes": [
+                    start_id=start_node_id,
+                    types=types,
+                    limit=limit,
+                )
+                row = result.single()
+                if not row or not row["nodes"]:
+                    start = session.run(
+                        "MATCH (n {tenant_id:$tenant, source_id:$id}) RETURN n",
+                        tenant=tenant_id,
+                        id=start_node_id,
+                    ).single()
+                    if not start:
+                        return {"nodes": [], "relationships": []}
+                    n = start["n"]
+                    return {
+                        "nodes": [
+                            {
+                                "source_id": n.get("source_id"),
+                                "labels": list(n.labels),
+                                "properties": dict(n),
+                            }
+                        ],
+                        "relationships": [],
+                    }
+
+                nodes_out = []
+                seen_n = set()
+                for n in row["nodes"] or []:
+                    sid = n.get("source_id")
+                    if sid in seen_n:
+                        continue
+                    seen_n.add(sid)
+                    nodes_out.append(
                         {
-                            "source_id": n.get("source_id"),
+                            "source_id": sid,
                             "labels": list(n.labels),
                             "properties": dict(n),
                         }
-                    ],
-                    "relationships": [],
-                }
+                    )
 
-            nodes_out = []
-            seen_n = set()
-            for n in row["nodes"] or []:
-                sid = n.get("source_id")
-                if sid in seen_n:
-                    continue
-                seen_n.add(sid)
-                nodes_out.append(
-                    {
-                        "source_id": sid,
-                        "labels": list(n.labels),
-                        "properties": dict(n),
-                    }
-                )
-
-            rels_out = []
-            seen_r = set()
-            for rel in row["rels"] or []:
-                start_node = rel.start_node
-                end_node = rel.end_node
-                key = (rel.type, start_node.get("source_id"), end_node.get("source_id"))
-                if key in seen_r:
-                    continue
-                seen_r.add(key)
-                rels_out.append(
-                    {
-                        "type": rel.type,
-                        "source_id": start_node.get("source_id"),
-                        "target_id": end_node.get("source_id"),
-                        "properties": dict(rel),
-                    }
-                )
-            return {"nodes": nodes_out, "relationships": rels_out[:limit]}
-        finally:
-            session.close()
+                rels_out = []
+                seen_r = set()
+                for rel in row["rels"] or []:
+                    start_node = rel.start_node
+                    end_node = rel.end_node
+                    key = (rel.type, start_node.get("source_id"), end_node.get("source_id"))
+                    if key in seen_r:
+                        continue
+                    seen_r.add(key)
+                    rels_out.append(
+                        {
+                            "type": rel.type,
+                            "source_id": start_node.get("source_id"),
+                            "target_id": end_node.get("source_id"),
+                            "properties": dict(rel),
+                        }
+                    )
+                return {"nodes": nodes_out, "relationships": rels_out[:limit]}
+            finally:
+                session.close()
 
     async def people_search(
         self,

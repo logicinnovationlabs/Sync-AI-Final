@@ -7,6 +7,9 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
+from app.acl.filter import is_fail_closed
+
+
 class UserContext(BaseModel):
     """Auth context from JWT."""
 
@@ -23,6 +26,8 @@ class UserContext(BaseModel):
             if t and t not in seen:
                 seen.add(t)
                 terms.append(t)
+        if is_fail_closed(terms):
+            return []
         return terms
 
 

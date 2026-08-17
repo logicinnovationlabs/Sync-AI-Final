@@ -19,6 +19,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 from app.services.assistant.core.graph import OrchestratorGraph, default_acl_from_claims
+from app.acl.filter import is_fail_closed
 from app.services.assistant.domain.models import BlobRef, OrchestratorRequest
 from app.services.assistant.infrastructure.memory_store import EpisodicMemoryStore
 from app.services.assistant.infrastructure.tools import SearchToolbox
@@ -167,6 +168,8 @@ async def orchestrator_chat(
         raise HTTPException(status_code=401, detail="tenant_id / principal_id missing")
 
     acl_terms = _as_list(current_user.get("acl_terms") or current_user.get("acl_filter_terms"))
+    if is_fail_closed(acl_terms):
+        acl_terms = [f"user:{user_id}"]
     if body.acl_compiled_filter_hex:
         acl_bytes = bytes.fromhex(body.acl_compiled_filter_hex)
     else:

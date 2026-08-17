@@ -1,1 +1,0 @@
-"""Per-block signoff tests."""

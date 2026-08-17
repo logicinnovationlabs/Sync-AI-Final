@@ -146,8 +146,8 @@ async def test_A6_secret_pointer_vault(test_db, mock_vault):
 async def test_A7_per_tenant_cache_isolation():
     """A7: tenant B's routing must never be reachable via tenant A's cache key."""
     tenant_a, tenant_b = str(uuid4()), str(uuid4())
-    routing_a = {"tenant_id": tenant_a, "db_host": "a.example.com", "db_password": "pw_a"}
-    routing_b = {"tenant_id": tenant_b, "db_host": "b.example.com", "db_password": "pw_b"}
+    routing_a = {"tenant_id": tenant_a, "db_host": "a.example.com", "db_secret_key": "kv/a/db_password"}
+    routing_b = {"tenant_id": tenant_b, "db_host": "b.example.com", "db_secret_key": "kv/b/db_password"}
     await redis_client.set_json(tenant_a, "routing", routing_a, ex=600)
     await redis_client.set_json(tenant_b, "routing", routing_b, ex=600)
     assert await redis_client.get_json(tenant_a, "routing") == routing_a

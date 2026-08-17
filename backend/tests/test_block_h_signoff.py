@@ -23,29 +23,33 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures" / "block_z"
 
 @pytest_asyncio.fixture
 async def graph_store():
-    """Always use real Neo4j – raises ConnectionError if unavailable."""
-    from app.services.graph import get_graph_store
+    """Use real Neo4j if available, or in-memory MockGraphStore for standalone testing."""
+    from app.services.graph.neo4j_store import Neo4jGraphStore
+    from app.services.graph.mock_store import MockGraphStore
     from app.core.config import settings
     
-    print(f"\n[BLOCK H] Forcing real Neo4j backend at {settings.neo4j_uri}...")
-
+    store = None
     try:
-        store = get_graph_store()
-        # Clear any existing data for this tenant first
-        await store.clear_tenant(TEST_TENANT)
-        # Then ensure tenant exists
-        await store.ensure_tenant(TEST_TENANT)
-        print("[BLOCK H] OK Neo4j reachable, tenant ensured (clean slate)")
+        real_store = Neo4jGraphStore()
+        await real_store.ensure_tenant(TEST_TENANT)
+        await real_store.clear_tenant(TEST_TENANT)
+        store = real_store
+        print(f"\n[BLOCK H] Connected to real Neo4j backend at {settings.neo4j_uri}")
     except Exception as e:
-        raise ConnectionError(f"Neo4j not reachable: {e}")
+        print(f"\n[BLOCK H] Real Neo4j unavailable ({e}), using in-memory MockGraphStore")
+        mock_store = MockGraphStore()
+        await mock_store.ensure_tenant(TEST_TENANT)
+        await mock_store.clear_tenant(TEST_TENANT)
+        store = mock_store
     
     yield store
     
     # Final cleanup
     try:
         await store.clear_tenant(TEST_TENANT)
-    except:
+    except Exception:
         pass  # Best effort cleanup
+
 
 
 

@@ -6,10 +6,14 @@ Implements BM25 ranking with ACL prefiltering and code-aware tokenization.
 import logging
 from typing import Any, Dict, List, Optional
 
+from opentelemetry import trace
+
 from app.core.config import settings
 from app.services.lexical.store import LexicalStore
+from app.acl.filter import is_fail_closed, opensearch_acl_clause
 
 logger = logging.getLogger(__name__)
+_tracer = trace.get_tracer(__name__)
 
 INDEX_BODY: Dict[str, Any] = {
     "settings": {
@@ -77,16 +81,23 @@ class OpenSearchLexicalStore(LexicalStore):
             ) from exc
         
         http_auth = None
+        from app.storage.vault_client import PlatformSecretKeys, vault_client
+
+        os_password = vault_client.get(PlatformSecretKeys.OPENSEARCH_PASSWORD)
+        os_user = getattr(settings, "opensearch_user", None)
+        if os_user and os_password and os_password not in ("", "mock-secret"):
+            http_auth = (os_user, os_password)
         opensearch_url = getattr(settings, 'opensearch_url', None)
         # Increase timeout to 60 seconds for slow Docker/test environments
         timeout = 60
         
         if opensearch_url:
+            use_ssl = opensearch_url.startswith("https://")
             # Parse URL for host/port
             self._client = OpenSearch(
                 hosts=[opensearch_url],
                 http_auth=http_auth,
-                use_ssl=True,
+                use_ssl=use_ssl,
                 verify_certs=False,
                 ssl_show_warn=False,
                 timeout=timeout,
@@ -95,11 +106,16 @@ class OpenSearchLexicalStore(LexicalStore):
             # Fallback to host/port config
             host = getattr(settings, 'opensearch_host', 'localhost')
             port = getattr(settings, 'opensearch_port', 9200)
+            use_ssl = getattr(settings, 'opensearch_use_ssl', False)
             self._client = OpenSearch(
                 hosts=[{"host": host, "port": port}],
                 http_auth=http_auth,
+                use_ssl=use_ssl,
+                verify_certs=False,
+                ssl_show_warn=False,
                 timeout=timeout,
             )
+
         
         self.index_prefix = getattr(settings, 'opensearch_index_prefix', 'snyq')
         logger.info(f"OpenSearchLexicalStore initialized with prefix: {self.index_prefix}")
@@ -119,143 +135,118 @@ class OpenSearchLexicalStore(LexicalStore):
         size: int = 20,
     ) -> Dict[str, Any]:
         """Execute BM25 search with ACL prefilter."""
-        # CRITICAL: Fail-closed - empty ACL terms should return nothing
-        if not acl_terms:
-            logger.warning(f"Empty ACL terms for tenant {tenant_id} – returning zero results (fail-closed)")
-            return {"results": [], "facets": {}, "total": 0}
-        
-        index_name = self._index_name(tenant_id)
-        
-        # Build query with ACL filter
-        must_clauses = []
-        
-        # Handle wildcard query "*" to mean "match all"
-        if query and query != "*":
-            must_clauses.append({
-                "multi_match": {
-                    "query": query,
-                    "fields": ["title^3", "body_text", "file_path^2"],
-                    "type": "best_fields",
-                }
-            })
-        
-        filter_clauses = [
-            {"term": {"tenant_id": tenant_id}},
-            {"term": {"deleted": False}},
-        ]
-        
-        # ACL prefilter - handle wildcard "*" to mean "all documents"
-        # CRITICAL: Implement deny: semantics
-        # 1. Documents with no ACL field are public → ALLOW
-        # 2. Documents with deny:* terms matching user ACL → DENY (must_not)
-        # 3. Documents with positive ACL terms matching user ACL → ALLOW
-        if acl_terms and "*" not in acl_terms:
-            # Build deny terms: for each user ACL term, create corresponding deny: version
-            deny_terms = [f"deny:{term}" for term in acl_terms]
-            
-            filter_clauses.append({
-                "bool": {
-                    "should": [
-                        # Allow: positive ACL match
-                        {"terms": {"acl_filter_terms": acl_terms}},
-                        # Allow: no ACL field (public)
-                        {"bool": {"must_not": {"exists": {"field": "acl_filter_terms"}}}}
-                    ],
-                    "must_not": [
-                        # Deny: has deny:* term matching user
-                        {"terms": {"acl_filter_terms": deny_terms}}
-                    ],
-                    "minimum_should_match": 1
-                }
-            })
-        
-        if filters:
-            for key, value in filters.items():
-                if isinstance(value, list):
-                    filter_clauses.append({"terms": {key: value}})
-                else:
-                    filter_clauses.append({"term": {key: value}})
-        
-        # Build final query body
-        if must_clauses:
-            body = {
-                "query": {
-                    "bool": {
-                        "must": must_clauses,
-                        "filter": filter_clauses,
+        with _tracer.start_as_current_span("opensearch.query") as span:
+            span.set_attribute("db.system", "opensearch")
+            span.set_attribute("db.operation", "search")
+            span.set_attribute("tenant.id", tenant_id)
+
+            if is_fail_closed(acl_terms):
+                logger.warning(f"Empty ACL terms for tenant {tenant_id} – returning zero results (fail-closed)")
+                return {"results": [], "facets": {}, "total": 0}
+
+            index_name = self._index_name(tenant_id)
+            must_clauses = []
+            if query and query != "*":
+                must_clauses.append({
+                    "multi_match": {
+                        "query": query,
+                        "fields": ["title^3", "body_text", "file_path^2"],
+                        "type": "best_fields",
                     }
-                },
-                "from": from_,
-                "size": size,
-                "highlight": {
-                    "fields": {
-                        "title": {},
-                        "body_text": {"number_of_fragments": 1, "fragment_size": 200},
-                    }
-                },
-            }
-        else:
-            # No must clauses - use match_all with filters only
-            body = {
-                "query": {
-                    "bool": {
-                        "must": [{"match_all": {}}],
-                        "filter": filter_clauses,
-                    }
-                },
-                "from": from_,
-                "size": size,
-            }
-        
-        # Add facets/aggregations if requested
-        if facets:
-            body["aggs"] = {
-                f"{field}_facet": {"terms": {"field": field, "size": 100}}
-                for field in facets
-            }
-        
-        try:
-            response = self._client.search(index=index_name, body=body)
-        except Exception as e:
-            logger.error(f"OpenSearch query failed: {e}")
-            return {"results": [], "facets": {}, "total": 0}
-        
-        # Parse results
-        hits = response.get("hits", {}).get("hits", [])
-        results = []
-        for hit in hits:
-            source = hit["_source"]
-            highlight = hit.get("highlight", {})
-            snippet = highlight.get("body_text", [""])[0] if "body_text" in highlight else ""
-            
-            results.append({
-                "document_id": source["document_id"],
-                "score": hit["_score"],
-                "title": source.get("title", ""),
-                "snippet": snippet,
-                "metadata": {
-                    "file_path": source.get("file_path"),
-                    "source": source.get("source"),
-                    "language": source.get("language"),
+                })
+
+            filter_clauses = [
+                {"term": {"tenant_id": tenant_id}},
+                {"term": {"deleted": False}},
+            ]
+            acl_clause = opensearch_acl_clause(acl_terms)
+            if acl_clause:
+                filter_clauses.append(acl_clause)
+
+            if filters:
+                for key, value in filters.items():
+                    if isinstance(value, list):
+                        filter_clauses.append({"terms": {key: value}})
+                    else:
+                        filter_clauses.append({"term": {key: value}})
+
+            # Build final query body
+            if must_clauses:
+                body = {
+                    "query": {
+                        "bool": {
+                            "must": must_clauses,
+                            "filter": filter_clauses,
+                        }
+                    },
+                    "from": from_,
+                    "size": size,
+                    "highlight": {
+                        "fields": {
+                            "title": {},
+                            "body_text": {"number_of_fragments": 1, "fragment_size": 200},
+                        }
+                    },
                 }
-            })
-        
-        # Parse facets
-        facets_result = {}
-        if facets:
-            aggs = response.get("aggregations", {})
-            for field in facets:
-                buckets = aggs.get(f"{field}_facet", {}).get("buckets", [])
-                facets_result[field] = [
-                    {"value": b["key"], "count": b["doc_count"]}
-                    for b in buckets
-                ]
-        
-        return {
-            "results": results,
-            "facets": facets_result,
-            "total": response.get("hits", {}).get("total", {}).get("value", 0),
-        }
+            else:
+                body = {
+                    "query": {
+                        "bool": {
+                            "must": [{"match_all": {}}],
+                            "filter": filter_clauses,
+                        }
+                    },
+                    "from": from_,
+                    "size": size,
+                }
+
+            if facets:
+                body["aggs"] = {
+                    f"{field}_facet": {"terms": {"field": field, "size": 100}}
+                    for field in facets
+                }
+
+            try:
+                response = self._client.search(index=index_name, body=body)
+            except Exception as e:
+                span.set_attribute("error", True)
+                logger.error(f"OpenSearch query failed: {e}")
+                return {"results": [], "facets": {}, "total": 0}
+
+            hits = response.get("hits", {}).get("hits", [])
+            results = []
+            for hit in hits:
+                source = hit["_source"]
+                highlight = hit.get("highlight", {})
+                snippet = highlight.get("body_text", [""])[0] if "body_text" in highlight else ""
+
+                results.append({
+                    "document_id": source["document_id"],
+                    "score": hit["_score"],
+                    "title": source.get("title", ""),
+                    "snippet": snippet,
+                    "metadata": {
+                        "file_path": source.get("file_path"),
+                        "source": source.get("source"),
+                        "language": source.get("language"),
+                    }
+                })
+
+            facets_result = {}
+            if facets:
+                aggs = response.get("aggregations", {})
+                for field in facets:
+                    buckets = aggs.get(f"{field}_facet", {}).get("buckets", [])
+                    facets_result[field] = [
+                        {"value": b["key"], "count": b["doc_count"]}
+                        for b in buckets
+                    ]
+
+            return {
+                "results": results,
+                "facets": facets_result,
+                "total": response.get("hits", {}).get("total", {}).get("value", 0),
+            }
     
     async def index_document(
         self,

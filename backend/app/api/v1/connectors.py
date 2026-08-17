@@ -26,6 +26,7 @@ from app.services.cursor_store import cursor_store
 from app.connectors.google.watch_manager import WatchManager
 from app.connectors.google.oauth import GoogleOAuthManager
 from app.core.config import settings
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
 
 router = APIRouter(prefix="/connectors", tags=["connectors"])
@@ -67,8 +68,12 @@ async def trigger_backfill(
     if not tenant_id or str(tenant.tenant_id) != tenant_id:
         raise HTTPException(status_code=403, detail="Cross-tenant execution rejected")
 
-    # Enqueue Celery task for backfill
-    task_result = backfill_tenant_source.delay(tenant_id=tenant_id, source_type=source_type)
+    # Enqueue Celery task for backfill with trace context propagation (§2.4)
+    _otel_headers = {}
+    TraceContextTextMapPropagator().inject(_otel_headers)
+    task_result = backfill_tenant_source.apply_async(
+        args=[tenant_id, source_type], headers=_otel_headers
+    )
 
     return {
         "status": "queued",

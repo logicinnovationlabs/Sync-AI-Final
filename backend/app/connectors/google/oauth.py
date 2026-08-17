@@ -240,11 +240,12 @@ def seed_token_store_from_env(
     Returns True if a refresh token was seeded; False if nothing to seed.
     Never logs the refresh token value.
     """
-    import os
-    from datetime import datetime, timedelta
+    rt = refresh_token
+    if not rt:
+        from app.storage.vault_client import PlatformSecretKeys, vault_client
 
-    rt = refresh_token or os.getenv("GOOGLE_REFRESH_TOKEN") or ""
-    rt = rt.strip()
+        rt = vault_client.get(PlatformSecretKeys.GOOGLE_REFRESH_TOKEN) or ""
+    rt = (rt or "").strip()
     if not rt:
         return False
 

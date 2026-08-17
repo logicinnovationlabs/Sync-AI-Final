@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.deps import get_current_user, require_scope
+from app.acl.filter import document_is_visible
 from app.core.config import settings
 from app.models.graph import (
     GraphNode,
@@ -98,6 +99,12 @@ async def traverse_graph(
             properties=dict(n.get("properties") or {}),
         )
         for n in raw.get("nodes") or []
+        if document_is_visible(
+            current_user.get("acl_terms")
+            or current_user.get("groups")
+            or ([str(current_user.get("sub"))] if current_user.get("sub") else []),
+            (n.get("properties") or {}).get("acl_terms") or n.get("acl_terms") or [],
+        )
     ]
     rels = [
         GraphRelationship(
