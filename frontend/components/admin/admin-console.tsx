@@ -27,7 +27,7 @@ export function AdminConsole() {
       <section>
         <h2 className="text-sm font-medium">Users</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          GET /api/v1/admin/users — Block N, require_admin
+          GET /admin/users — Block N, require_admin
         </p>
         {users.isFetching && (
           <p className="mt-3 text-sm text-muted-foreground">Loading users…</p>
@@ -58,7 +58,7 @@ export function AdminConsole() {
       <section>
         <h2 className="text-sm font-medium">Audit log</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          GET /api/v1/admin/audit — Block N
+          GET /admin/audit — Block N
         </p>
         {audit.isFetching && (
           <p className="mt-3 text-sm text-muted-foreground">Loading audit…</p>

@@ -223,6 +223,27 @@ class DriveClient:
         except HttpError as e:
             # Silently ignore errors (channel may already be stopped)
             pass
+
+    async def export_file(
+        self,
+        access_token: str,
+        file_id: str,
+        mime_type: str,
+    ) -> bytes:
+        """Export a Google-native file (Docs/Sheets/Slides) as the given MIME type."""
+        service = self._build_service(access_token)
+        try:
+            return service.files().export(fileId=file_id, mimeType=mime_type).execute()
+        except HttpError as e:
+            raise Exception(f"Drive export API error: {e}")
+
+    async def download_file(self, access_token: str, file_id: str) -> bytes:
+        """Download binary file bytes via files.get_media."""
+        service = self._build_service(access_token)
+        try:
+            return service.files().get_media(fileId=file_id).execute()
+        except HttpError as e:
+            raise Exception(f"Drive download API error: {e}")
     
     async def list_permissions(
         self,

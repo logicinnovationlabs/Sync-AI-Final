@@ -22,8 +22,7 @@ export type AssistantStreamEvent =
     }
 
 /**
- * POST /api/v1/assistant/orchestrator/chat — Block L NDJSON stream.
- * Not the contracts.yaml path `/api/v1/assistant/chat`.
+ * POST /assistant/orchestrator/chat — Block L NDJSON stream.
  */
 export async function streamAssistantChat(params: {
   token: string

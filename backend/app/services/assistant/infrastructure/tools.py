@@ -78,12 +78,12 @@ class SearchToolbox:
         acl_capture: Optional[AclCaptureHook] = None,
         client: Optional[httpx.AsyncClient] = None,
     ) -> None:
-        self.federator_url = (federator_url or os.getenv("QUERY_FEDERATOR_URL", "http://localhost:8000/api/v1")).rstrip("/")
-        self.graph_url = (graph_url or os.getenv("GRAPH_SERVICE_URL", "http://localhost:8000/api/v1")).rstrip("/")
+        self.federator_url = (federator_url or os.getenv("QUERY_FEDERATOR_URL", "http://localhost:8000")).rstrip("/")
+        self.graph_url = (graph_url or os.getenv("GRAPH_SERVICE_URL", "http://localhost:8000")).rstrip("/")
         self.document_reader_url = (
-            document_reader_url or os.getenv("DOCUMENT_READER_URL", "http://localhost:8000/api/v1")
+            document_reader_url or os.getenv("DOCUMENT_READER_URL", "http://localhost:8000")
         ).rstrip("/")
-        self.signals_url = (signals_url or os.getenv("SIGNALS_URL", "http://localhost:8000/api/v1")).rstrip("/")
+        self.signals_url = (signals_url or os.getenv("SIGNALS_URL", "http://localhost:8000")).rstrip("/")
         self.timeout_s = timeout_s
         self.acl_capture = acl_capture
         self._client = client
@@ -172,7 +172,7 @@ class SearchToolbox:
         authorization: Optional[str],
         tenant_id: Optional[str],
     ) -> ToolResult:
-        """Call Block J Query Federator POST /api/v1/search."""
+        """Call Block J Query Federator POST /search/federated."""
         acl = acl_bytes_for_transport(call.acl_compiled_filter)
         params = dict(call.query_params)
         body: Dict[str, Any] = {
@@ -188,13 +188,13 @@ class SearchToolbox:
         if tenant_id:
             body["tenant_id"] = tenant_id
         headers = self._acl_headers(acl, authorization)
-        self._record(call.tool_name, acl, {"url": f"{self.federator_url}/api/v1/search", "body": body, "headers": headers})
+        self._record(call.tool_name, acl, {"url": f"{self.federator_url}/search/federated", "body": body, "headers": headers})
 
         started = time.perf_counter()
         try:
             resp = await self._request(
                 "POST",
-                f"{self.federator_url}/api/v1/search",
+                f"{self.federator_url}/search/federated",
                 headers=headers,
                 json=body,
             )
@@ -227,7 +227,7 @@ class SearchToolbox:
         authorization: Optional[str] = None,
         tenant_id: Optional[str] = None,
     ) -> ToolResult:
-        """Call Block H POST /graph/traverse (or /api/v1/graph/traverse)."""
+        """Call Block H POST /search/graph/traverse."""
         acl = acl_bytes_for_transport(call.acl_compiled_filter)
         params = dict(call.query_params)
         body: Dict[str, Any] = {
@@ -239,7 +239,7 @@ class SearchToolbox:
         if tenant_id:
             body["tenant_id"] = tenant_id
         headers = self._acl_headers(acl, authorization)
-        url = f"{self.graph_url}/graph/traverse"
+        url = f"{self.graph_url}/search/graph/traverse"
         self._record(call.tool_name, acl, {"url": url, "body": body, "headers": headers})
 
         started = time.perf_counter()
@@ -273,13 +273,13 @@ class SearchToolbox:
         authorization: Optional[str] = None,
         tenant_id: Optional[str] = None,
     ) -> ToolResult:
-        """Call Block K GET /api/v1/document/{id}."""
+        """Call Block K GET /document/{id}."""
         acl = acl_bytes_for_transport(call.acl_compiled_filter)
         doc_id = str(call.query_params.get("document_id") or call.query_params.get("blob_id") or "")
         headers = self._acl_headers(acl, authorization)
         # Mechanical mirror for any gateway that reads body terms (K uses JWT ACL).
         headers["X-ACL-Terms-JSON"] = acl.decode("utf-8")
-        url = f"{self.document_reader_url}/api/v1/document/{doc_id}"
+        url = f"{self.document_reader_url}/document/{doc_id}"
         self._record(call.tool_name, acl, {"url": url, "headers": headers})
 
         started = time.perf_counter()

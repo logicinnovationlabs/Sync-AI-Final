@@ -26,7 +26,8 @@ async def verify_re_embed_trigger():
     print("COMPONENT 6 VERIFICATION: Re-embed Trigger on Model Version Bump")
     print("=" * 80)
     
-    ASYNC_DATABASE_URL = "postgresql+asyncpg://postgres:verify@localhost:5433/block_e_verify"
+    # Names match this block's docker-compose.yml: POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB, host port 5433.
+    ASYNC_DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5433/block_e"
     run_id = uuid.uuid4().hex[:8]
 
     print("\n[1] Creating test database...")

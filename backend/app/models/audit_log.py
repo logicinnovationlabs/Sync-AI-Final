@@ -28,8 +28,8 @@ class AuditLog(Base):
         default=uuid4,
         nullable=False,
     )
-    tenant_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
+    tenant_id: Mapped[str] = mapped_column(
+        String(255),
         nullable=False,
         index=True,
     )

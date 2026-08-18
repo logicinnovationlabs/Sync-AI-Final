@@ -32,8 +32,9 @@ except ImportError:
 
 
 MINIO_ENDPOINT = "http://localhost:9000"
-MINIO_ACCESS_KEY = "verify"
-MINIO_SECRET_KEY = "verifyverify"
+# Must match this block's docker-compose.yml MINIO_ROOT_USER / MINIO_ROOT_PASSWORD
+MINIO_ACCESS_KEY = "minioadmin"
+MINIO_SECRET_KEY = "minioadmin"
 MINIO_BUCKET = "block-d-verify"
 OBJECT_PREFIX = "tenant_d2_test_tenant/connector_d2/"
 

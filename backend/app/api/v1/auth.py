@@ -7,11 +7,12 @@ Provides:
 - GET /auth/sso/callback: handle OIDC callback, issue JWT
 """
 
-from typing import Optional
+from typing import Annotated, Optional
 from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, Depends
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel, EmailStr
+from pydantic import AfterValidator, BaseModel
+from email_validator import EmailNotValidError, validate_email
 import httpx
 
 from app.core.config import settings
@@ -25,10 +26,24 @@ from app.storage.tenant_db import tenant_db_manager
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+def _login_email(value: str) -> str:
+    """Accept reserved TLDs such as .test so seeded member@alpha.test can sign in."""
+    try:
+        result = validate_email(
+            value, check_deliverability=False, test_environment=True
+        )
+        return result.normalized
+    except EmailNotValidError as exc:
+        raise ValueError("Enter a valid email address.") from exc
+
+
+LoginEmail = Annotated[str, AfterValidator(_login_email)]
+
+
 class NativeLoginRequest(BaseModel):
     """Native login request with email and password."""
-    
-    email: EmailStr
+
+    email: LoginEmail
     password: str
     tenant_subdomain: str  # To resolve which tenant the user belongs to
 

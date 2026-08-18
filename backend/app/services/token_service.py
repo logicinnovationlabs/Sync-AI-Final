@@ -173,6 +173,31 @@ class TokenService:
         )
         return token
 
+    async def rotate_refresh_token(self, refresh_token: str) -> tuple[str, str]:
+        """
+        Exchange a refresh JWT for a new access+refresh pair and revoke the old jti.
+
+        Replay of the previous refresh token is rejected by validate_token (A13).
+        """
+        payload = await self.validate_token(refresh_token)
+        if payload.get("token_type") != "refresh":
+            raise InvalidTokenError("Invalid token type")
+        tenant_id = payload.get("tenant_id")
+        principal_id = payload.get("sub")
+        if not tenant_id or not principal_id:
+            raise InvalidTokenError("Refresh token missing identity")
+        jti = payload.get("jti")
+        if jti:
+            await redis_client.sadd(str(tenant_id), f"revoked:{jti}", jti)
+        access = await self.issue_access_token(
+            tenant_id=str(tenant_id),
+            principal_id=str(principal_id),
+            scopes=list(payload.get("scopes") or []),
+            role=payload.get("role"),
+        )
+        new_refresh = await self.issue_refresh_token(str(tenant_id), str(principal_id))
+        return access, new_refresh
+
     async def validate_token(self, token: str) -> Dict[str, Any]:
         """
         Validate and decode a JWT.

@@ -14,7 +14,7 @@ from datetime import datetime
 from app.core.config import settings
 from app.core.exceptions import SnyQException
 from app.core.errors import ErrorResponse, ErrorDetail
-from app.api.v1 import auth, oauth, me, connectors, scoped_probes, embed, signals as signals_routes
+from app.api.v1 import auth, oauth, me, scoped_probes, embed, signals as signals_routes
 from app.api.v1.admin import admin_router
 from app.api.v1.admin.tenant import router as tenant_bootstrap_router
 from app.api.v1 import identity as identity_routes
@@ -24,12 +24,16 @@ from app.api.v1.search import graph as graph_search
 from app.api.v1.search import federated as federated_search
 from app.services.assistant.api import routes as assistant_routes
 from app.api.v1 import document as document_routes
+from app.services.mcp_gateway import router as mcp_gateway_router
 from app.connectors.google.webhooks import router as webhooks_router
+from app.connectors.router import router as connectors_router
+from app.connectors.org import router as connectors_org_router
 
 from app.middleware.tenant_middleware import TenantMiddleware
 from app.storage.redis_client import redis_client
 from app.storage.control_plane_db import control_plane_engine
 from app.storage.tenant_db import tenant_db_manager
+from app.services.mcp_gateway.revocation import mcp_revocation_listener
 
 
 # Configure logging
@@ -49,11 +53,13 @@ async def lifespan(app: FastAPI):
     logger.info("SnyQ Backend starting up...")
     await redis_client.connect()
     logger.info("Connected to Redis")
-    
+    await mcp_revocation_listener.start()
+
     yield
-    
+
     # Shutdown
     logger.info("SnyQ Backend shutting down...")
+    await mcp_revocation_listener.stop()
     await redis_client.disconnect()
     await tenant_db_manager.close_all()
     await control_plane_engine.dispose()
@@ -119,44 +125,40 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-# Mount routers (both with /api/v1 prefix and root level for client compatibility)
-app.include_router(auth.router, prefix="/api/v1")
-app.include_router(oauth.router, prefix="/api/v1")
+# Mount routers at origin (no /api/v1 prefix).
+app.include_router(auth.router)
 app.include_router(oauth.router)
-app.include_router(me.router, prefix="/api/v1")
 app.include_router(me.router)
-# Block N: Glean-style admin console (users, connectors, audit, sessions)
-app.include_router(admin_router, prefix="/api/v1", tags=["admin"])
+# Block N: Glean-style admin console (users, audit, sessions)
+app.include_router(admin_router, tags=["admin"])
 # First-time tenant bootstrap at POST /admin/tenants (no JWT exists yet)
 app.include_router(tenant_bootstrap_router, prefix="/admin", tags=["admin"])
-app.include_router(connectors.router, prefix="/api/v1")
-app.include_router(connectors.router)
-app.include_router(scoped_probes.router, prefix="/api/v1")
+# Connect HTTP lives in app/connectors/.
+app.include_router(connectors_router)
+app.include_router(connectors_org_router)
 app.include_router(scoped_probes.router)
-app.include_router(webhooks_router, prefix="/api/v1")
+app.include_router(webhooks_router)
 # Block C: identity resolution + ACL debug endpoints
-app.include_router(identity_routes.router, prefix="/api/v1")
 app.include_router(identity_routes.router)
-app.include_router(acl_routes.router, prefix="/api/v1")
 app.include_router(acl_routes.router)
 # Block E: Chunking & Embeddings
-app.include_router(embed.router, prefix="/api/v1", tags=["embeddings"])
 app.include_router(embed.router, tags=["embeddings"])
 # Block F: Lexical Search
-app.include_router(lexical.router, prefix="/api/v1", tags=["search-lexical"])
 app.include_router(lexical.router, tags=["search-lexical"])
 # Block G: Vector Search
-app.include_router(vector.router, prefix="/api/v1", tags=["search-vector"])
+app.include_router(vector.router, tags=["search-vector"])
 # Block H: Graph Search
-app.include_router(graph_search.router, prefix="/api/v1", tags=["search-graph"])
+app.include_router(graph_search.router, tags=["search-graph"])
 # Block I: Activity Signals
-app.include_router(signals_routes.router, prefix="/api/v1", tags=["signals"])
+app.include_router(signals_routes.router, tags=["signals"])
 # Block J: Federated Search
-app.include_router(federated_search.router, prefix="/api/v1", tags=["search-federated"])
+app.include_router(federated_search.router, tags=["search-federated"])
 # Block K: Document Reader
-app.include_router(document_routes.router, prefix="/api/v1", tags=["document-reader"])
+app.include_router(document_routes.router, tags=["document-reader"])
 # Block L: Assistant Orchestrator
-app.include_router(assistant_routes.router, prefix="/api/v1/assistant", tags=["assistant"])
+app.include_router(assistant_routes.router, prefix="/assistant", tags=["assistant"])
+# Block M: MCP Gateway (same process, same port — §29)
+app.include_router(mcp_gateway_router)
 
 
 # Health check

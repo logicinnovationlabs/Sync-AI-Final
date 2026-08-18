@@ -7,7 +7,7 @@ import {
   AnimatedSidebarMenuItem,
   AnimatedSidebarMenuButton,
 } from "@/components/motion/animated-sidebar"
-import { useAuthStore } from "@/lib/auth/auth-store"
+import { useAuthHydrated, useAuthStore } from "@/lib/auth/auth-store"
 import { cn } from "@/lib/utils"
 
 const baseItems = [
@@ -48,8 +48,9 @@ const HOVER = "hover:bg-muted hover:text-foreground"
 export function SidebarNav() {
   const pathname = usePathname()
   const router = useRouter()
+  const hydrated = useAuthHydrated()
   const isAdmin = useAuthStore((s) => s.isAdmin())
-  const items = isAdmin ? [...baseItems, ...adminItems] : baseItems
+  const items = hydrated && isAdmin ? [...baseItems, ...adminItems] : baseItems
 
   return (
     <nav aria-label="Main" className="pt-1">

@@ -34,7 +34,10 @@ INDEX_BODY: Dict[str, Any] = {
             "tokenizer": {
                 "code_tokenizer": {
                     "type": "pattern",
+                    # group=1: emit capturing-group matches as tokens. Default
+                    # group=-1 treats the pattern as a delimiter and drops them.
                     "pattern": "([A-Z][a-z]+|[a-z]+|_+|[0-9]+)",
+                    "group": 1,
                 }
             },
         },
@@ -257,7 +260,10 @@ class OpenSearchLexicalStore(LexicalStore):
             body["aggs"] = {}
             for field in facets:
                 if field in FACET_FIELDS:
-                    body["aggs"][field] = {"terms": {"field": field, "size": 100}}
+                    # exclude="" matches mock compute_facets (skip empty/None)
+                    body["aggs"][field] = {
+                        "terms": {"field": field, "size": 100, "exclude": ""}
+                    }
 
         res = self._client.search(index=self._index_name(tenant_id), body=body)
         hits = res.get("hits", {})
@@ -304,6 +310,7 @@ class OpenSearchLexicalStore(LexicalStore):
             facet_out[field] = [
                 {"value": b["key"], "count": b["doc_count"]}
                 for b in agg.get("buckets", [])
+                if b.get("key") not in (None, "")
             ]
 
         return {"results": results, "facets": facet_out, "total": total_n}

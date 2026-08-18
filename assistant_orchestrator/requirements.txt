@@ -2,7 +2,9 @@ fastapi>=0.110
 uvicorn>=0.27
 httpx>=0.27
 pydantic>=2.0
-langgraph>=0.2
-langchain-core>=0.2
+# Compatible 0.2 pair (matches backend/pyproject.toml ^0.2.0). langgraph 1.2.x
+# requires langchain-core>=1.4 and calls Reviver(allowed_objects=...), which 0.2.x lacks.
+langgraph>=0.2.76,<0.3
+langchain-core>=0.2.43,<0.3
 psycopg[binary]>=3.1
 PyJWT>=2.8

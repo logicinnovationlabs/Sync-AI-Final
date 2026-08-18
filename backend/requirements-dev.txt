@@ -10,6 +10,7 @@ pytest-cov==6.0.0
 black==24.10.0
 ruff==0.8.0
 mypy==1.13.0
+import-linter==2.3
 
 # Additional HTTP client for tests
 httpx==0.28.0

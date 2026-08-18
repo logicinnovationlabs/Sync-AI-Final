@@ -14,19 +14,19 @@ Architecture PDF and `00-SHARED-CONTRACTS.md` remain absent from the tree (see P
 | Item | Result |
 |------|--------|
 | Env var | `NEXT_PUBLIC_API_BASE_URL` (already in `frontend/lib/api/client.ts`) |
-| Default | `http://localhost:8000/api/v1` — matches `docker-compose.yml` service `app` host port **8000** |
+| Default | `http://localhost:8000` — matches `docker-compose.yml` service `app` host port **8000** |
 | Per-block ports | None found; none introduced |
 | Fresh clone | `frontend/.env.example` added; `frontend/.gitignore` now un-ignores `.env.example` |
 
 `.env.example`:
 
 ```
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 NEXT_PUBLIC_DEFAULT_TENANT=alpha
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
-The `/api/v1` suffix is required. Frontend paths are `/auth/login`, `/me`, `/search/federated`, etc.
+Do not append `/api/v1`. Frontend paths are `/auth/login`, `/me`, `/search/federated`, `/connectors/...`. If an old env still has the suffix, `client.ts` strips it.
 
 ---
 

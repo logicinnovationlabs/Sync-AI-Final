@@ -92,39 +92,44 @@ async def read_document(
 
 
 def build_document_payload(
-    metadata: Dict[str, Any],
-    body: Optional[bytes],
-    structured: Optional[Dict[str, Any]],
+    *,
+    doc_id: str,
+    tenant_id: str,
+    visible_metadata: Dict[str, Any],
+    body: str,
+    structured_data: Optional[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    """K3: Preserve structure + metadata + body."""
-    payload = dict(metadata)
-    if body is not None:
-        try:
-            payload["body"] = body.decode("utf-8")
-        except UnicodeDecodeError:
-            payload["body_base64"] = body.hex()
-    if structured:
-        payload["structured_metadata"] = structured
+    """K3: Preserve structure + metadata + body as a single JSON object."""
+    payload = dict(visible_metadata)
+    payload["document_id"] = doc_id
+    payload["tenant_id"] = tenant_id
+    payload["body"] = body
+    payload["structured_metadata"] = structured_data or {}
     return payload
 
 
 async def stream_document_json(
-    metadata: Dict[str, Any],
-    stream: AsyncGenerator[bytes, None],
-    structured: Optional[Dict[str, Any]],
-) -> AsyncGenerator[str, None]:
-    """K2: Stream large documents as JSON chunks."""
-    # Start JSON
-    meta_copy = dict(metadata)
-    if structured:
-        meta_copy["structured_metadata"] = structured
+    store: DocumentStore,
+    object_key: str,
+    doc_id: str,
+    tenant_id: str,
+    visible_metadata: Dict[str, Any],
+    structured_data: Optional[Dict[str, Any]],
+) -> AsyncGenerator[bytes, None]:
+    """K2: Stream a complete JSON document without holding the full body.
 
-    yield json.dumps({"metadata": meta_copy, "body_chunks": []}) + "\n"
-
-    # Stream body chunks
-    async for chunk in stream:
-        try:
-            chunk_str = chunk.decode("utf-8")
-        except UnicodeDecodeError:
-            chunk_str = chunk.hex()
-        yield json.dumps({"chunk": chunk_str}) + "\n"
+    Chunks concatenate to one JSON object so HTTP clients can ``.json()`` it,
+    while the generator itself retains only the current chunk.
+    """
+    header = dict(visible_metadata)
+    header["document_id"] = doc_id
+    header["tenant_id"] = tenant_id
+    header["structured_metadata"] = structured_data or {}
+    header["body"] = ""
+    prefix = json.dumps(header, ensure_ascii=False)
+    # prefix ends with `"body": ""}` — keep the opening quote of body.
+    yield prefix[:-2].encode("utf-8")
+    async for raw in store.get_body_stream(object_key):
+        text = raw.decode("utf-8", errors="replace")
+        yield json.dumps(text, ensure_ascii=False)[1:-1].encode("utf-8")
+    yield b'"}'

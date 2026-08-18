@@ -3,7 +3,7 @@
 Example script demonstrating native authentication + Block N admin invite.
 
 Usage:
-  1. Bootstrap a tenant (one-time): POST /api/v1/admin/tenants with admin_email.
+  1. Bootstrap a tenant (one-time): POST /admin/tenants with admin_email.
   2. Set SNYQ_ADMIN_EMAIL / SNYQ_ADMIN_PASSWORD (the bootstrap temp password,
      or the password after /me/change-password).
   3. python scripts/demo_native_auth.py
@@ -15,7 +15,7 @@ import httpx
 from uuid import uuid4
 
 
-BASE_URL = os.getenv("SNYQ_API_URL", "http://localhost:8000/api/v1")
+BASE_URL = os.getenv("SNYQ_API_URL", "http://localhost:8000")
 ADMIN_EMAIL = os.getenv("SNYQ_ADMIN_EMAIL", "admin@example.com")
 ADMIN_PASSWORD = os.getenv("SNYQ_ADMIN_PASSWORD", "")
 TENANT_SUBDOMAIN = os.getenv("SNYQ_TENANT_SUBDOMAIN", "alpha")
@@ -33,7 +33,7 @@ async def demo_native_auth():
         if not ADMIN_PASSWORD:
             print("Set SNYQ_ADMIN_PASSWORD to an existing Full Admin password.")
             print("Unauthenticated POST /admin/users was removed in Block N.")
-            print("Bootstrap: POST /api/v1/admin/tenants with admin_email / admin_display_name.")
+            print("Bootstrap: POST /admin/tenants with admin_email / admin_display_name.")
             return
 
         print("Step 1: Logging in as tenant admin...")

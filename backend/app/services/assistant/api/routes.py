@@ -207,6 +207,9 @@ async def orchestrator_chat(
             "session_id": body.session_id,
             "tenant_id": tenant_id,
             "errors": result.get("errors") or [],
+            "llm_prompt": result.get("llm_prompt") or "",
+            "tool_call_rounds": result.get("tool_call_rounds") or 0,
+            "chat_provider_name": result.get("chat_provider_name") or "",
         }
         yield (json.dumps(final) + "\n").encode("utf-8")
 
@@ -252,8 +255,6 @@ async def health():
 def create_app() -> FastAPI:
     app = FastAPI(title="Block L: Assistant Orchestrator", version="0.1.0")
     app.include_router(router)
-    # Contract alias used by provisional tests.
-    app.include_router(router, prefix="/api/v1")
 
     @app.on_event("startup")
     def _startup() -> None:

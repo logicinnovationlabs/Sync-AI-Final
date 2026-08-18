@@ -21,6 +21,7 @@ import {
   useState,
 } from "react";
 import { SPRING_LAYOUT } from "@/lib/ease";
+import { useIsClient } from "@/lib/hooks/use-is-client";
 import { cn } from "@/lib/utils";
 
 export interface SharedLayoutBgProps
@@ -66,6 +67,7 @@ export const SharedLayoutBg = forwardRef<HTMLElement, SharedLayoutBgProps>(
   const [activeId, setActiveId] = useState<string | null>(null);
   const uid = useId();
   const reduce = useReducedMotion();
+  const isClient = useIsClient();
 
     const renderedChildren = Children.toArray(children)
       .filter(isValidElement)
@@ -125,12 +127,13 @@ export const SharedLayoutBg = forwardRef<HTMLElement, SharedLayoutBgProps>(
     };
 
     // layoutRoot scopes the pill's layout projection to this list, so fixed or
-    // scrolled ancestors can't smear scroll offsets into its movement.
+    // scrolled ancestors can't smear scroll offsets into its movement. Enable
+    // it only after hydration — MeasureLayout is a client-only tree.
     return as === "ul" ? (
       <motion.ul
         {...(props as HTMLMotionProps<"ul">)}
         ref={forwardedRef as Ref<HTMLUListElement>}
-        layoutRoot
+        layoutRoot={isClient || undefined}
         onMouseLeave={handleMouseLeave}
         className={cn("flex w-full flex-col", className)}
       >
@@ -140,7 +143,7 @@ export const SharedLayoutBg = forwardRef<HTMLElement, SharedLayoutBgProps>(
       <motion.div
         {...(props as HTMLMotionProps<"div">)}
         ref={forwardedRef as Ref<HTMLDivElement>}
-        layoutRoot
+        layoutRoot={isClient || undefined}
         onMouseLeave={handleMouseLeave}
         className={cn("flex w-full flex-col", className)}
       >

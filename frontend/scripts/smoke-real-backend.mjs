@@ -3,17 +3,18 @@
  * Uses the same paths as frontend/lib/api/* against NEXT_PUBLIC_API_BASE_URL.
  *
  * Usage (PowerShell):
- *   $env:NEXT_PUBLIC_API_BASE_URL = "http://localhost:8000/api/v1"
- *   $env:SMOKE_EMAIL = "admin@alpha.test"
+ *   $env:NEXT_PUBLIC_API_BASE_URL = "http://localhost:8000"
+ *   $env:SMOKE_EMAIL = "admin@synq.dev"
  *   $env:SMOKE_PASSWORD = "AlphaAdmin123!"
  *   $env:SMOKE_TENANT = "alpha"
  *   node scripts/smoke-real-backend.mjs
  */
-const BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1"
-const EMAIL = process.env.SMOKE_EMAIL ?? "admin@alpha.test"
+const BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000"
+const ORIGIN = BASE.replace(/\/api\/v1\/?$/, "")
+const EMAIL = process.env.SMOKE_EMAIL ?? "admin@synq.dev"
 const PASSWORD = process.env.SMOKE_PASSWORD ?? "AlphaAdmin123!"
 const TENANT = process.env.SMOKE_TENANT ?? "alpha"
-const MEMBER_EMAIL = process.env.SMOKE_MEMBER_EMAIL ?? "member@alpha.test"
+const MEMBER_EMAIL = process.env.SMOKE_MEMBER_EMAIL ?? "member@synq.dev"
 const MEMBER_PASSWORD = process.env.SMOKE_MEMBER_PASSWORD ?? "AlphaMember123!"
 
 function redactToken(value) {
@@ -32,8 +33,8 @@ function redact(obj) {
   return out
 }
 
-async function call(name, method, path, { token, body } = {}) {
-  const url = `${BASE}${path}`
+async function call(name, method, path, { token, body, base } = {}) {
+  const url = `${base ?? BASE}${path}`
   const headers = { "Content-Type": "application/json" }
   if (token) headers.Authorization = `Bearer ${token}`
   const res = await fetch(url, {
@@ -230,7 +231,7 @@ async function main() {
     "GET /connectors/google_drive/status",
     "GET",
     "/connectors/google_drive/status",
-    { token }
+    { token, base: ORIGIN }
   )
   results.push({
     name: "connectors",

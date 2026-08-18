@@ -49,7 +49,7 @@ export function AccountSettings() {
     <div className="mx-auto flex w-full max-w-lg flex-col gap-6 px-6 py-8">
       <section className="rounded-2xl border border-border-subtle p-4">
         <h2 className="text-sm font-medium">Session</h2>
-        <p className="mt-1 text-xs text-muted-foreground">GET /api/v1/me</p>
+        <p className="mt-1 text-xs text-muted-foreground">GET /me</p>
         {me.error && (
           <p role="alert" className="mt-2 text-sm text-destructive">
             {me.error instanceof ApiError ? me.error.message : "Could not load /me"}
@@ -89,7 +89,7 @@ export function AccountSettings() {
       >
         <h2 className="text-sm font-medium">Change password</h2>
         <p className="text-xs text-muted-foreground">
-          POST /api/v1/me/change-password
+          POST /me/change-password
         </p>
         <Input
           type="password"

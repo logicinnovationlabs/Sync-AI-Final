@@ -84,9 +84,9 @@ class MyClass:
     print("\n[4] Verifying chunk_id consistency across runs...")
     
     if chunk_ids_1 == chunk_ids_2 == chunk_ids_3:
-        print("   ✓ All three runs produced identical chunk_ids")
+        print("   OK All three runs produced identical chunk_ids")
     else:
-        print("   ✗ Chunk_ids differ across runs")
+        print("   FAIL Chunk_ids differ across runs")
         print(f"   Run 1: {sorted(chunk_ids_1)}")
         print(f"   Run 2: {sorted(chunk_ids_2)}")
         print(f"   Run 3: {sorted(chunk_ids_3)}")
@@ -94,9 +94,9 @@ class MyClass:
     
     # Verify chunk count is consistent
     if len(chunks_1) == len(chunks_2) == len(chunks_3):
-        print(f"   ✓ All three runs produced {len(chunks_1)} chunks (consistent)")
+        print(f"   OK All three runs produced {len(chunks_1)} chunks (consistent)")
     else:
-        print("   ✗ Chunk count differs across runs")
+        print("   FAIL Chunk count differs across runs")
         print(f"   Run 1: {len(chunks_1)} chunks")
         print(f"   Run 2: {len(chunks_2)} chunks")
         print(f"   Run 3: {len(chunks_3)} chunks")
@@ -106,9 +106,9 @@ class MyClass:
     print("\n[5] Verifying chunk content consistency across runs...")
     for i in range(len(chunks_1)):
         if chunks_1[i]['chunk_text'] != chunks_2[i]['chunk_text'] or chunks_1[i]['chunk_text'] != chunks_3[i]['chunk_text']:
-            print(f"   ✗ Chunk {i} content differs across runs")
+            print(f"   FAIL Chunk {i} content differs across runs")
             return False
-    print("   ✓ All chunk content is identical across runs")
+    print("   OK All chunk content is identical across runs")
     
     # Verify chunk_id changes when content changes
     print("\n[6] Verifying chunk_id changes when content changes...")
@@ -124,9 +124,9 @@ class MyClass:
     chunk_ids_modified = {c['chunk_id'] for c in chunks_modified}
     
     if chunk_ids_modified != chunk_ids_1:
-        print("   ✓ Chunk_ids changed when content changed (correct behavior)")
+        print("   OK Chunk_ids changed when content changed (correct behavior)")
     else:
-        print("   ✗ Chunk_ids did NOT change when content changed (incorrect)")
+        print("   FAIL Chunk_ids did NOT change when content changed (incorrect)")
         return False
     
     # Verify chunk_id changes when chunker_version changes
@@ -142,9 +142,9 @@ class MyClass:
     chunk_ids_version_2 = {c['chunk_id'] for c in chunks_version_2}
     
     if chunk_ids_version_2 != chunk_ids_1:
-        print("   ✓ Chunk_ids changed when chunker_version changed (correct behavior)")
+        print("   OK Chunk_ids changed when chunker_version changed (correct behavior)")
     else:
-        print("   ✗ Chunk_ids did NOT change when chunker_version changed (incorrect)")
+        print("   FAIL Chunk_ids did NOT change when chunker_version changed (incorrect)")
         return False
     
     print("\n" + "=" * 80)
@@ -166,7 +166,7 @@ if __name__ == "__main__":
         success = test_e4_idempotency()
         sys.exit(0 if success else 1)
     except Exception as e:
-        print(f"\n✗ Verification failed with exception: {e}")
+        print(f"\nFAIL Verification failed with exception: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

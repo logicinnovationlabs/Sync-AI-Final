@@ -1,8 +1,8 @@
 """Block L assistant orchestrator — real RS256 JWT + Docker Postgres session store.
 
 Hits the mounted routes on the monolith:
-  POST /api/v1/assistant/orchestrator/chat
-  GET  /api/v1/assistant/orchestrator/sessions/{id}
+  POST /assistant/orchestrator/chat
+  GET  /assistant/orchestrator/sessions/{id}
 
 Episodic memory uses ORCHESTRATOR_DATABASE_URL (conftest points it at
 Docker Postgres control_plane).
@@ -44,7 +44,7 @@ def l_client():
 
 @pytest.mark.asyncio
 async def test_l_health(l_client: TestClient):
-    resp = l_client.get("/api/v1/assistant/health")
+    resp = l_client.get("/assistant/health")
     assert resp.status_code == 200
     assert resp.json().get("service") == "assistant_orchestrator"
 
@@ -53,7 +53,7 @@ async def test_l_health(l_client: TestClient):
 async def test_l1_chat_requires_matching_tenant(l_client: TestClient):
     token = await _token(TENANT_A, USER_ALICE)
     resp = l_client.post(
-        "/api/v1/assistant/orchestrator/chat",
+        "/assistant/orchestrator/chat",
         json={
             "prompt": "Find documents about Python",
             "session_id": "sess-l1",
@@ -69,7 +69,7 @@ async def test_l2_chat_streams_ndjson(l_client: TestClient):
     token = await _token(TENANT_A, USER_ALICE)
     session_id = f"sess-{uuid4().hex[:8]}"
     resp = l_client.post(
-        "/api/v1/assistant/orchestrator/chat",
+        "/assistant/orchestrator/chat",
         json={"prompt": "Find Python tutorials", "session_id": session_id},
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -85,7 +85,7 @@ async def test_l3_cross_tenant_session_denied(l_client: TestClient):
     token_a = await _token(TENANT_A, USER_ALICE)
     session_id = f"sess-{uuid4().hex[:8]}"
     chat = l_client.post(
-        "/api/v1/assistant/orchestrator/chat",
+        "/assistant/orchestrator/chat",
         json={"prompt": "hello", "session_id": session_id},
         headers={"Authorization": f"Bearer {token_a}"},
     )
@@ -93,7 +93,7 @@ async def test_l3_cross_tenant_session_denied(l_client: TestClient):
 
     token_b = await _token(TENANT_B, USER_BOB)
     stolen = l_client.get(
-        f"/api/v1/assistant/orchestrator/sessions/{session_id}",
+        f"/assistant/orchestrator/sessions/{session_id}",
         headers={"Authorization": f"Bearer {token_b}"},
     )
     assert stolen.status_code in (403, 404)
@@ -107,7 +107,7 @@ async def test_l4_chat_persists_session_in_docker_postgres(l_client: TestClient)
     token = await _token(TENANT_A, USER_ALICE)
     session_id = f"sess-{uuid4().hex[:8]}"
     resp = l_client.post(
-        "/api/v1/assistant/orchestrator/chat",
+        "/assistant/orchestrator/chat",
         json={"prompt": "remember this session", "session_id": session_id},
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -124,7 +124,7 @@ async def test_l4_chat_persists_session_in_docker_postgres(l_client: TestClient)
 async def test_l_empty_prompt_rejected(l_client: TestClient):
     token = await _token(TENANT_A, USER_ALICE)
     resp = l_client.post(
-        "/api/v1/assistant/orchestrator/chat",
+        "/assistant/orchestrator/chat",
         json={"prompt": "", "session_id": "sess-empty"},
         headers={"Authorization": f"Bearer {token}"},
     )

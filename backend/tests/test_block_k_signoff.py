@@ -31,7 +31,7 @@ async def test_k1_allow_then_deny_after_revoke(k_app):
     client, store, acl, _app = k_app
     doc_id = "doc-acl-k1"
 
-    store.upsert(
+    await store.upsert(
         TENANT,
         doc_id,
         title="ACL Recheck Doc",
@@ -45,7 +45,7 @@ async def test_k1_allow_then_deny_after_revoke(k_app):
 
     # User A allowed
     resp_a = await client.get(
-        f"/api/v1/document/{doc_id}",
+        f"/document/{doc_id}",
         headers={"Authorization": f"Bearer {make_bearer(TENANT, USER_A)}"},
     )
     assert resp_a.status_code == 200, resp_a.text
@@ -54,7 +54,7 @@ async def test_k1_allow_then_deny_after_revoke(k_app):
 
     # User B denied
     resp_b = await client.get(
-        f"/api/v1/document/{doc_id}",
+        f"/document/{doc_id}",
         headers={"Authorization": f"Bearer {make_bearer(TENANT, USER_B)}"},
     )
     assert resp_b.status_code == 403
@@ -66,7 +66,7 @@ async def test_k1_allow_then_deny_after_revoke(k_app):
     denied = 0
     for _ in range(10):
         resp = await client.get(
-            f"/api/v1/document/{doc_id}",
+            f"/document/{doc_id}",
             headers={"Authorization": f"Bearer {make_bearer(TENANT, USER_A)}"},
         )
         if resp.status_code == 403:
@@ -89,7 +89,7 @@ async def test_k1_missing_token_401(k_app):
     settings.environment = "production"
     
     try:
-        resp = await client.get(f"/api/v1/document/{doc_id}")
+        resp = await client.get(f"/document/{doc_id}")
         assert resp.status_code == 401
     finally:
         settings.environment = prev
@@ -102,7 +102,7 @@ async def test_k1_not_found_404(k_app):
     
     acl.grant(TENANT, "missing-doc", USER_A)
     resp = await client.get(
-        "/api/v1/document/missing-doc",
+        "/document/missing-doc",
         headers={"Authorization": f"Bearer {make_bearer(TENANT, USER_A)}"},
     )
     assert resp.status_code == 404
@@ -127,7 +127,7 @@ async def test_k2_streams_large_document(k_app):
     body = ("A" * 1024) * (LARGE_SIZE // 1024)
     assert len(body) > 10 * 1024 * 1024
 
-    meta = store.upsert(
+    meta = await store.upsert(
         TENANT,
         doc_id,
         title="Large Streaming Doc",
@@ -145,7 +145,7 @@ async def test_k2_streams_large_document(k_app):
     acl.grant(TENANT, doc_id, USER_A)
 
     resp = await client.get(
-        f"/api/v1/document/{doc_id}",
+        f"/document/{doc_id}",
         headers={"Authorization": f"Bearer {make_bearer(TENANT, USER_A)}"},
     )
     assert resp.status_code == 200, resp.text
@@ -198,7 +198,7 @@ async def test_k2_small_document_not_streamed(k_app):
     """K2: Small documents are returned in full (not streamed)."""
     client, store, acl, _app = k_app
     
-    store.upsert(
+    await store.upsert(
         TENANT,
         "doc-small",
         title="Small",
@@ -208,7 +208,7 @@ async def test_k2_small_document_not_streamed(k_app):
     acl.grant(TENANT, "doc-small", USER_A)
 
     resp = await client.get(
-        "/api/v1/document/doc-small",
+        "/document/doc-small",
         headers={"Authorization": f"Bearer {make_bearer(TENANT, USER_A)}"},
     )
     assert resp.status_code == 200
@@ -253,7 +253,7 @@ async def test_k3_structure_fidelity(k_app, structured_doc):
     expected_structured = structured_doc["structured_metadata"]
     expected_body = structured_doc["body"]
 
-    store.upsert(
+    await store.upsert(
         tenant,
         doc_id,
         title=structured_doc["title"],
@@ -269,7 +269,7 @@ async def test_k3_structure_fidelity(k_app, structured_doc):
     acl.grant(tenant, doc_id, principal)
 
     resp = await client.get(
-        f"/api/v1/document/{doc_id}",
+        f"/document/{doc_id}",
         headers={"Authorization": f"Bearer {make_bearer(tenant, principal)}"},
     )
     assert resp.status_code == 200, resp.text
@@ -297,7 +297,7 @@ async def test_k3_redacts_hidden_fields_for_non_owner(k_app, structured_doc):
     owner = structured_doc["owner_principal_id"]
     reader = "user-reader"
 
-    store.upsert(
+    await store.upsert(
         tenant,
         doc_id,
         title="Redaction Doc",
@@ -316,7 +316,7 @@ async def test_k3_redacts_hidden_fields_for_non_owner(k_app, structured_doc):
     acl.grant(tenant, doc_id, reader)
 
     resp = await client.get(
-        f"/api/v1/document/{doc_id}",
+        f"/document/{doc_id}",
         headers={"Authorization": f"Bearer {make_bearer(tenant, reader)}"},
     )
     assert resp.status_code == 200

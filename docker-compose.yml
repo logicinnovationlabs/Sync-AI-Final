@@ -223,7 +223,7 @@ services:
     depends_on:
       app:
         condition: service_healthy
-    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 -Q celery,google
 
   celery_beat:
     build:

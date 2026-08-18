@@ -47,7 +47,16 @@ def build_opensearch_acl_filter(user_acl_terms: List[str]) -> Dict[str, Any]:
     terms = normalize_acl_terms(user_acl_terms)
     if not terms:
         return {"match_none": {}}
-    return {"terms": {"acl_filter_terms": terms}}
+    # Deny terms are stored on the document as "deny:<principal>". A terms
+    # overlap on the allow IDs is not enough — that would include docs the
+    # mock path (acl_allows) correctly hides. Exclude matching deny:* first.
+    deny_terms = [f"deny:{t}" for t in terms]
+    return {
+        "bool": {
+            "must": [{"terms": {"acl_filter_terms": terms}}],
+            "must_not": [{"terms": {"acl_filter_terms": deny_terms}}],
+        }
+    }
 
 
 def filter_results_by_acl(

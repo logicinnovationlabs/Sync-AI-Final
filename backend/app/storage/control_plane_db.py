@@ -9,6 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, create_async_engin
 
 from app.core.config import settings
 
+_connect_args = {}
+if settings.environment in ("development", "test"):
+    # asyncpg on Windows tries TLS against local Docker Postgres and hangs
+    # (WinError 121) unless SSL is explicitly disabled.
+    _connect_args["ssl"] = False
+
 # Control-plane engine (for tenants table only)
 control_plane_engine: AsyncEngine = create_async_engine(
     settings.control_plane_database_url,
@@ -16,6 +22,7 @@ control_plane_engine: AsyncEngine = create_async_engine(
     pool_pre_ping=True,
     pool_size=5,
     max_overflow=10,
+    connect_args=_connect_args,
 )
 
 # Session factory for control-plane operations

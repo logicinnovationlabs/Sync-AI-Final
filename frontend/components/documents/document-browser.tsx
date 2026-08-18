@@ -6,10 +6,11 @@ import { Search } from "lucide-react"
 import { DocumentUpload } from "@/components/documents/document-upload"
 import { federatedSearch, getDocument } from "@/lib/api/search"
 import { ApiError } from "@/lib/api/client"
-import { useAuthStore } from "@/lib/auth/auth-store"
+import { useAuthHydrated, useAuthStore } from "@/lib/auth/auth-store"
 import { hasScope, SCOPES } from "@/lib/auth/scopes"
 
 export function DocumentBrowser() {
+  const hydrated = useAuthHydrated()
   const token = useAuthStore((s) => s.accessToken)
   const authenticated = useAuthStore((s) => s.isAuthenticated())
   const canSearch = useAuthStore((s) =>
@@ -61,12 +62,12 @@ export function DocumentBrowser() {
         />
       </form>
 
-      {!authenticated && (
+      {hydrated && !authenticated && (
         <p className="text-sm text-muted-foreground">
-          Sign in to search Block J (POST /api/v1/search/federated).
+          Sign in to search Block J (POST /search/federated).
         </p>
       )}
-      {authenticated && !canSearch && (
+      {hydrated && authenticated && !canSearch && (
         <p className="text-sm text-destructive">
           This session is missing search.read — federated search will 403.
         </p>
@@ -125,7 +126,7 @@ export function DocumentBrowser() {
       {openId && (
         <div className="rounded-[1.25rem] border border-border bg-card p-4">
           <p className="text-xs font-medium text-muted-foreground">
-            GET /api/v1/document/{openId}
+            GET /document/{openId}
           </p>
           {document.isFetching && (
             <p className="mt-2 text-sm text-muted-foreground">Loading…</p>

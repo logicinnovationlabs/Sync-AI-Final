@@ -71,6 +71,10 @@ beautifulsoup4==4.12.0
 minio>=7.2.0
 
 # Block L - Assistant Orchestrator
-langgraph>=0.2
-langchain-core>=0.2
+# Compatible 0.2 pair (matches pyproject.toml ^0.2.0). langgraph 1.2.x requires
+# langchain-core>=1.4 and calls Reviver(allowed_objects=...), which 0.2.x lacks.
+langgraph>=0.2.76,<0.3
+langchain-core>=0.2.43,<0.3
 psycopg[binary]>=3.1
+# OpenAI-compatible client for OpenRouter/Qwen chat (Block L). 1.x uses httpx.
+openai>=1.54.0,<2

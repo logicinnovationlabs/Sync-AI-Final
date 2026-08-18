@@ -27,9 +27,15 @@ def compute_facets(
                 continue
             if field == "tags":
                 tags = value if isinstance(value, list) else [value]
+                seen = set()
                 for tag in tags:
-                    if tag:
-                        counters[field][str(tag)] += 1
+                    if not tag:
+                        continue
+                    key = str(tag)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    counters[field][key] += 1
             else:
                 counters[field][str(value)] += 1
 

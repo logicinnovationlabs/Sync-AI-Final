@@ -1,5 +1,6 @@
 "use client"
 
+import { useSyncExternalStore } from "react"
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import { decodeAccessToken, isExpired, type AccessTokenClaims } from "@/lib/auth/jwt"
@@ -87,3 +88,17 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 )
+
+/**
+ * Persist rehydration can finish in a microtask before React hydrates, so the
+ * first client render would see a logged-in admin while SSR saw an empty
+ * store. `getServerSnapshot` stays false so both trees match; the real
+ * session appears on the subsequent client render.
+ */
+export function useAuthHydrated() {
+  return useSyncExternalStore(
+    (onChange) => useAuthStore.persist.onFinishHydration(onChange),
+    () => useAuthStore.persist.hasHydrated(),
+    () => false
+  )
+}

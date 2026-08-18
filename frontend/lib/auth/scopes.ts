@@ -11,11 +11,9 @@ export function hasScope(scopes: string[], scope: string): boolean {
 }
 
 /**
- * Admin-vs-member is not a real field on the backend today — it's purely
- * derived from scopes. Native login currently always grants
- * ["search.read", "document.read"], so no login can produce an admin
- * session yet (see lib/auth/dev-overrides.ts for the local dev escape
- * hatch used to build/test the admin console ahead of that).
+ * Admin-vs-member follows JWT scopes issued from the persisted org role
+ * (Block N `scopes_for_role`). An admin login includes `connectors.write`
+ * and `admin.*`. Members only get search.read + document.read.
  */
 export function isAdmin(scopes: string[]): boolean {
   return (

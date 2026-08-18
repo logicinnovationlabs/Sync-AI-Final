@@ -4,7 +4,7 @@ uvicorn[standard]>=0.32.0
 python-multipart>=0.0.18
 pydantic>=2.9.0
 pydantic-settings>=2.6.0
-qdrant-client>=1.12.1
+qdrant-client==1.12.1
 redis[hiredis]>=5.2.0
 httpx>=0.28.0
 PyJWT>=2.9.0

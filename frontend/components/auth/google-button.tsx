@@ -14,7 +14,7 @@ import { EASE_OUT } from "@/lib/ease"
  *
  * It does not navigate yet, and can't be faked into working:
  *
- *   · `GET /api/v1/auth/sso/login` raises 500 unless OIDC is configured, and
+ *   · `GET /auth/sso/login` raises 500 unless OIDC is configured, and
  *     `sso_callback` ends at a stub that never issues a session
  *     (`backend/app/api/v1/auth.py:159`).
  *   · `GET /connectors/google/authorize` *does* work, but it is the connector

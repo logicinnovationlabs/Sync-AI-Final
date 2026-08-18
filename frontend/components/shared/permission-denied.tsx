@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { ShieldX } from "lucide-react"
+import { LocalAdminCredentials } from "@/components/auth/local-admin-credentials"
 import { Button } from "@/components/ui/button"
 
 export function PermissionDenied({
@@ -16,12 +17,23 @@ export function PermissionDenied({
           ? `This page requires the "${requiredScope}" scope, which your account doesn't have.`
           : "This page is restricted to tenant admins."}
       </p>
-      <Button
-        variant="outline"
-        size="sm"
-        nativeButton={false}
-        render={<Link href="/chat">Back to chat</Link>}
-      />
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          nativeButton={false}
+          render={<Link href="/login?next=/admin">Sign in as admin</Link>}
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          nativeButton={false}
+          render={<Link href="/chat">Back to chat</Link>}
+        />
+      </div>
+      <div className="mt-4 w-full max-w-sm">
+        <LocalAdminCredentials />
+      </div>
     </div>
   )
 }

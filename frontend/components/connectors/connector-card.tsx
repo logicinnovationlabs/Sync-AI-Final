@@ -13,7 +13,7 @@ import {
   type BackendSourceType,
 } from "@/lib/api/connectors"
 import { ApiError } from "@/lib/api/client"
-import { useAuthStore } from "@/lib/auth/auth-store"
+import { useAuthHydrated, useAuthStore } from "@/lib/auth/auth-store"
 import { hasScope, SCOPES } from "@/lib/auth/scopes"
 import type { ConnectorMeta } from "@/lib/connectors"
 import { EASE_OUT } from "@/lib/ease"
@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils"
  * The obvious tiles are "files indexed" and "last sync". We can't show either:
  * `GET /connectors/{source}/status` returns `cursor`, `watch_active` and
  * `details`, and there is no count and no timestamp anywhere in that response
- * (`backend/app/api/v1/connectors.py:81`). So the tiles report what the API
+ * (`backend/app/connectors/router.py`). So the tiles report what the API
  * actually knows — whether ingestion has started, and whether live updates are
  * on. A fabricated file count is the one thing this card must never show.
  *
@@ -62,6 +62,7 @@ function StatTile({ label, value, on }: { label: string; value: string; on: bool
 }
 
 function GoogleSource({ id, label }: { id: BackendSourceType; label: string }) {
+  const hydrated = useAuthHydrated()
   const token = useAuthStore((s) => s.accessToken)
   // Select the *boolean*, not the array. `effectiveScopes()` builds a new array
   // on every call, so a selector returning it changes identity every render and
@@ -77,7 +78,7 @@ function GoogleSource({ id, label }: { id: BackendSourceType; label: string }) {
   const status = useQuery({
     queryKey: ["connector-status", id],
     queryFn: () => getConnectorStatus(token!, id),
-    enabled: Boolean(token) && canRead,
+    enabled: hydrated && Boolean(token) && canRead,
     retry: false,
   })
 
@@ -93,8 +94,27 @@ function GoogleSource({ id, label }: { id: BackendSourceType; label: string }) {
     onSuccess: invalidate,
   })
 
-  const started = Boolean(status.data?.cursor)
+  const started = Boolean(status.data?.cursor) || ["active", "syncing"].includes(
+    String(status.data?.details?.connection_status || "")
+  )
   const watching = Boolean(status.data?.watch_active)
+  const connectionStatus = String(status.data?.details?.connection_status || "")
+  const filesIndexed = Number(status.data?.details?.files_indexed || 0)
+  const statusLabel = !hydrated
+    ? "Checking…"
+    : !canRead
+      ? "Needs connectors.read"
+      : status.isPending
+        ? "Checking…"
+        : connectionStatus === "syncing"
+          ? "Syncing"
+          : connectionStatus === "needs_reauth"
+            ? "Needs re-auth"
+            : connectionStatus === "error"
+              ? "Error"
+              : started || connectionStatus === "active"
+                ? "Connected"
+                : "Not connected"
 
   return (
     <div className="flex flex-col gap-2.5 rounded-[1rem] bg-surface p-3">
@@ -108,13 +128,7 @@ function GoogleSource({ id, label }: { id: BackendSourceType; label: string }) {
           </span>
         ) : (
           <span className="text-[0.75rem] text-muted-foreground">
-            {!canRead
-              ? "Needs connectors.read"
-              : status.isPending
-                ? "Checking…"
-                : started
-                  ? "Connected"
-                  : "Not connected"}
+            {statusLabel}
           </span>
         )}
       </div>
@@ -122,8 +136,16 @@ function GoogleSource({ id, label }: { id: BackendSourceType; label: string }) {
       <div className="flex gap-2">
         <StatTile
           label="Ingestion"
-          value={started ? "Started" : "Not started"}
-          on={started}
+          value={
+            connectionStatus === "syncing"
+              ? "Syncing"
+              : filesIndexed > 0
+                ? `${filesIndexed} indexed`
+                : started
+                  ? "Started"
+                  : "Not started"
+          }
+          on={started || connectionStatus === "syncing"}
         />
         <StatTile
           label="Live updates"
@@ -132,7 +154,7 @@ function GoogleSource({ id, label }: { id: BackendSourceType; label: string }) {
         />
       </div>
 
-      {canWrite && !status.error && (
+      {hydrated && canWrite && !status.error && (
         <div className="flex justify-end gap-1.5">
           <Button
             size="sm"
@@ -169,6 +191,7 @@ export function ConnectorCard({
   connector: ConnectorMeta
   index: number
 }) {
+  const hydrated = useAuthHydrated()
   const token = useAuthStore((s) => s.accessToken)
   const canWrite = useAuthStore((s) =>
     hasScope(s.effectiveScopes(), SCOPES.CONNECTORS_WRITE)
@@ -235,7 +258,7 @@ export function ConnectorCard({
           {connector.handshake} · {connector.cadence}
         </p>
         {live ? (
-          canWrite && (
+          hydrated && canWrite && (
             <Button
               size="sm"
               disabled={authorize.isPending}

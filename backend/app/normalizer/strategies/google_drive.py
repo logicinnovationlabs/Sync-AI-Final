@@ -41,9 +41,9 @@ class GoogleDriveNormalizer(NormalizerStrategy):
         # 3. For binary: call drive_client.download_file(file_id), then text_extractor.extract()
         # 4. Return extracted text
         
-        # Placeholder: return file name (tests will provide pre-extracted text)
+        # Placeholder: prefer connector-extracted text, then test injection, then name
         name = raw.get("name", "")
-        snippet = raw.get("_test_extracted_text", name)  # Tests can inject this
+        snippet = raw.get("_extracted_text") or raw.get("_test_extracted_text", name)
         return snippet
     
     def map_metadata(self, raw: Dict[str, Any]) -> Dict[str, Any]:

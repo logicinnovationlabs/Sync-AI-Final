@@ -1,12 +1,9 @@
 import { SCOPES } from "@/lib/auth/scopes"
 
 /**
- * Local-dev-only escape hatch: the backend has no code path today that
- * issues an admin-scoped JWT (native login hardcodes member scopes), so
- * the admin console can't be exercised end-to-end against a real session
- * yet. This lets development toggle a simulated admin session client-side
- * so the admin UI can be built and reviewed ahead of that backend work.
- * Must never run in production.
+ * Local-dev-only escape hatch. Prefer signing in as the seeded Alpha
+ * admin (see lib/dev-login.ts). This override remains for UI work when
+ * the backend is down. Must never run in production.
  */
 const DEV_ADMIN_OVERRIDE_KEY = "synq_dev_admin_override"
 

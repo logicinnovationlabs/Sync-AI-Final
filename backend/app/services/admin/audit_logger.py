@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,7 +26,7 @@ def client_ip(request: Optional[Request]) -> Optional[str]:
 async def write_audit_log(
     db_session: AsyncSession,
     *,
-    tenant_id: UUID,
+    tenant_id: Union[UUID, str],
     actor_id: UUID,
     action_type: str,
     target: Optional[Dict[str, Any]] = None,
@@ -35,9 +35,12 @@ async def write_audit_log(
     """
     Insert an audit row. Caller is responsible for committing (same transaction
     as the admin mutation).
+
+    ``audit_logs.tenant_id`` is VARCHAR(255) (004); callers may still pass a
+    UUID from ``users`` / routing. Coerce at this boundary so asyncpg binds a str.
     """
     entry = AuditLog(
-        tenant_id=tenant_id,
+        tenant_id=str(tenant_id),
         actor_id=actor_id,
         action_type=action_type,
         target_json=target,

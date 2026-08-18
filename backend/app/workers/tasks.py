@@ -25,6 +25,8 @@ from app.connectors.google.oauth import GoogleOAuthManager, seed_token_store_fro
 from app.connectors.google.watch_manager import WatchManager
 from app.connectors.google.services.drive_service import DriveConnector
 from app.connectors.google.services.gmail_service import GmailConnector
+from app.connectors.google.token_store import PersistentGoogleTokenStore
+from app.connectors.google import status_store
 from app.core.config import settings
 from app.storage.redis_client import TenantPartitionedRedisClient
 import asyncio
@@ -87,7 +89,7 @@ def _validate_tenant_auth(tenant_id: str):
 
 
 @celery_app.task(bind=True, max_retries=5, default_retry_delay=30)
-def backfill_tenant_source(self, tenant_id: str, source_type: str) -> dict:
+def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str = None, connector_id: str = None) -> dict:
     """
     One-time full backfill for a tenant/source.
     
@@ -109,24 +111,27 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str) -> dict:
         _validate_tenant_auth(tenant_id)
 
         
-        # Get connector config
-        config = {
-            "tenant_id": tenant_id,
-            "mailbox_email": f"user@example.com",  # TODO: Get from tenant config
-        }
-        
-        token_store = DummyTokenStore()
+        token_store = PersistentGoogleTokenStore(tenant_id)
         
         # Create OAuth manager for Google services
         oauth_manager = None
+        client_id = ""
+        client_secret = ""
         if source_type.startswith("google_"):
-            client_id = getattr(settings, "google_client_id", None) or getattr(settings, "GOOGLE_CLIENT_ID", "") or ""
-            client_secret = getattr(settings, "google_client_secret", None) or getattr(settings, "GOOGLE_CLIENT_SECRET", "") or ""
-            scopes = [
-                "https://www.googleapis.com/auth/drive.readonly",
-                "https://www.googleapis.com/auth/gmail.readonly",
-            ]
-            oauth_manager = GoogleOAuthManager(token_store, client_id, client_secret, scopes)
+            oauth_manager = GoogleOAuthManager(
+                token_store,
+                settings.google_client_id or "",
+                settings.google_client_secret or "",
+                [
+                    "https://www.googleapis.com/auth/drive.readonly",
+                    "https://www.googleapis.com/auth/gmail.readonly",
+                    "https://www.googleapis.com/auth/userinfo.email",
+                    "openid",
+                ],
+            )
+            client_id = settings.google_client_id or ""
+            client_secret = settings.google_client_secret or ""
+            status_store.set_status(tenant_id, source_type, connection_status="syncing", last_error="")
         seed_token_store_from_env(
             token_store,
             tenant_id,
@@ -134,6 +139,12 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str) -> dict:
             client_secret=client_secret,
             refresh_token=getattr(settings, "google_refresh_token", None),
         )
+        mailbox_email = _lookup_mailbox_email(tenant_id, token_store, oauth_manager)
+        config = {
+            "tenant_id": tenant_id,
+            "mailbox_email": mailbox_email or "user@example.com",
+            "connected_by": user_id or "",
+        }
         
         # Get connector instance
         connector = connector_registry.get_connector(source_type, config, token_store)
@@ -165,6 +176,7 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str) -> dict:
             since=since,
             cursor=resume_cursor,
             on_cursor_update=_persist_checkpoint,
+            extra_acl=_acl_terms_for_user(user_id),
         )
         
         # Store final cursor (may already match last per-page checkpoint)
@@ -173,7 +185,7 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str) -> dict:
             _run_async(cursor_store.update_cursor(tenant_id, source_type, final_cursor))
         
         # Register watch channel/subscription only after a completed crawl
-        webhook_base_url = getattr(settings, "WEBHOOK_BASE_URL", "http://localhost:8000/api/v1")
+        webhook_base_url = getattr(settings, "WEBHOOK_BASE_URL", "http://localhost:8000")
         watch_manager = WatchManager(oauth_manager, cursor_store, webhook_base_url)
         
         if source_type == "google_drive" and final_cursor:
@@ -189,17 +201,43 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str) -> dict:
             f"{result.get('indexed_count', 0)} indexed, {result.get('deleted_count', 0)} deleted, "
             f"{result.get('pages_processed', 0)} pages"
         )
+        status_store.set_status(
+            tenant_id,
+            source_type,
+            connection_status="active",
+            files_indexed=int(result.get("indexed_count") or 0),
+            last_error="",
+        )
         
         return result
     
     except Exception as e:
         logger.error(f"Backfill failed for tenant {tenant_id}, source {source_type}: {e}")
+        err = str(e)
+        conn_status = "needs_reauth" if "refresh" in err.lower() or "re-authorize" in err.lower() or "Unauthorized" in err else "error"
+        try:
+            status_store.set_status(
+                tenant_id, source_type, connection_status=conn_status, last_error=type(e).__name__
+            )
+        except Exception:
+            pass
         
         # Retry with exponential backoff on transient errors
         if "429" in str(e) or "quota" in str(e).lower():
             raise self.retry(exc=e, countdown=min(2 ** self.request.retries * 60, 3600))
         
         raise
+
+
+@celery_app.task(bind=True, max_retries=5, default_retry_delay=30)
+def backfill_source(self, tenant_id: str, source_type: str, user_id: str = None, connector_id: str = None) -> dict:
+    """OAuth-callback auto-sync entrypoint. Same crawl as backfill_tenant_source."""
+    return backfill_tenant_source.run(
+        tenant_id=tenant_id,
+        source_type=source_type,
+        user_id=user_id,
+        connector_id=connector_id,
+    )
 
 
 @celery_app.task(bind=True, max_retries=5, default_retry_delay=30)
@@ -230,16 +268,20 @@ def process_drive_notification(self, tenant_id: str) -> dict:
         
         # Create connector
         config = {"tenant_id": tenant_id}
-        token_store = DummyTokenStore()
+        token_store = PersistentGoogleTokenStore(tenant_id)
         
         # Create OAuth manager
-        client_id = getattr(settings, "google_client_id", None) or getattr(settings, "GOOGLE_CLIENT_ID", "") or ""
-        client_secret = getattr(settings, "google_client_secret", None) or getattr(settings, "GOOGLE_CLIENT_SECRET", "") or ""
-        scopes = [
-            "https://www.googleapis.com/auth/drive.readonly",
-            "https://www.googleapis.com/auth/gmail.readonly",
-        ]
-        oauth_manager = GoogleOAuthManager(token_store, client_id, client_secret, scopes)
+        oauth_manager = GoogleOAuthManager(
+            token_store,
+            settings.google_client_id or "",
+            settings.google_client_secret or "",
+            [
+                "https://www.googleapis.com/auth/drive.readonly",
+                "https://www.googleapis.com/auth/gmail.readonly",
+            ],
+        )
+        client_id = settings.google_client_id or ""
+        client_secret = settings.google_client_secret or ""
         # Seed refresh token from env into TokenStore (key google_oauth:{tenant_id})
         seed_token_store_from_env(
             token_store,
@@ -319,20 +361,23 @@ def process_gmail_notification(self, tenant_id: str) -> dict:
             return {"status": "no_cursor", "indexed_count": 0, "deleted_count": 0}
         
         # Create connector
+        token_store = PersistentGoogleTokenStore(tenant_id)
+        oauth_manager = GoogleOAuthManager(
+            token_store,
+            settings.google_client_id or "",
+            settings.google_client_secret or "",
+            [
+                "https://www.googleapis.com/auth/drive.readonly",
+                "https://www.googleapis.com/auth/gmail.readonly",
+            ],
+        )
+        client_id = settings.google_client_id or ""
+        client_secret = settings.google_client_secret or ""
+        mailbox_email = _lookup_mailbox_email(tenant_id, token_store, oauth_manager)
         config = {
             "tenant_id": tenant_id,
-            "mailbox_email": "user@example.com",  # TODO: Get from tenant config
+            "mailbox_email": mailbox_email or "user@example.com",
         }
-        token_store = DummyTokenStore()
-        
-        # Create OAuth manager
-        client_id = getattr(settings, "google_client_id", None) or getattr(settings, "GOOGLE_CLIENT_ID", "") or ""
-        client_secret = getattr(settings, "google_client_secret", None) or getattr(settings, "GOOGLE_CLIENT_SECRET", "") or ""
-        scopes = [
-            "https://www.googleapis.com/auth/drive.readonly",
-            "https://www.googleapis.com/auth/gmail.readonly",
-        ]
-        oauth_manager = GoogleOAuthManager(token_store, client_id, client_secret, scopes)
         seed_token_store_from_env(
             token_store,
             tenant_id,
@@ -398,16 +443,18 @@ def renew_watch_channels() -> dict:
         logger.info("Starting watch channel renewal")
         
         # Create OAuth manager and watch manager
-        client_id = getattr(settings, "GOOGLE_CLIENT_ID", "")
-        client_secret = getattr(settings, "GOOGLE_CLIENT_SECRET", "")
-        scopes = [
-            "https://www.googleapis.com/auth/drive.readonly",
-            "https://www.googleapis.com/auth/gmail.readonly",
-        ]
-        token_store = DummyTokenStore()
-        oauth_manager = GoogleOAuthManager(token_store, client_id, client_secret, scopes)
+        token_store = PersistentGoogleTokenStore()
+        oauth_manager = GoogleOAuthManager(
+            token_store,
+            settings.google_client_id or "",
+            settings.google_client_secret or "",
+            [
+                "https://www.googleapis.com/auth/drive.readonly",
+                "https://www.googleapis.com/auth/gmail.readonly",
+            ],
+        )
         
-        webhook_base_url = getattr(settings, "WEBHOOK_BASE_URL", "http://localhost:8000/api/v1")
+        webhook_base_url = getattr(settings, "WEBHOOK_BASE_URL", "http://localhost:8000")
         watch_manager = WatchManager(oauth_manager, cursor_store, webhook_base_url)
         
         # Renew expiring watches
@@ -425,3 +472,32 @@ def renew_watch_channels() -> dict:
     except Exception as e:
         logger.error(f"Watch renewal failed: {e}")
         raise
+
+
+@celery_app.task(name="app.workers.tasks.google_queue_ping")
+def google_queue_ping() -> dict:
+    """Harmless ping used to prove a worker is consuming the `google` queue."""
+    logger.info("google_queue_ping: pipeline=queue_ok queue=google")
+    return {"ok": True, "queue": "google"}
+
+
+def _acl_terms_for_user(user_id: Optional[str]) -> list:
+    principal = str(user_id or "")
+    if not principal:
+        return []
+    terms = [principal]
+    if not principal.startswith(("user:", "group:")):
+        terms.append(f"user:{principal}")
+    return terms
+
+
+def _lookup_mailbox_email(tenant_id: str, token_store, oauth_manager) -> str:
+    """Read mailbox email from the stored token blob (set at OAuth callback). No extra API call."""
+    if token_store is None:
+        return ""
+    try:
+        data = token_store.get_token(f"google_oauth:{tenant_id}") or {}
+        return str(data.get("mailbox_email") or "")
+    except Exception:
+        return ""
+

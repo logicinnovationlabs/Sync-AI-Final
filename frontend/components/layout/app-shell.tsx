@@ -24,7 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
-import { useAuthStore } from "@/lib/auth/auth-store"
+import { useAuthHydrated, useAuthStore } from "@/lib/auth/auth-store"
 
 /**
  * One sidebar, using beui's `AnimatedSidebar` as it ships.
@@ -76,12 +76,14 @@ function SidebarBrand() {
 function SidebarAccount() {
   const router = useRouter()
   const collapsed = useCollapsed()
+  const hydrated = useAuthHydrated()
   const email = useAuthStore((s) => s.email)
   const clearSession = useAuthStore((s) => s.clearSession)
 
   // No invented display name. /me and the JWT expose neither a name nor an
   // email, so the label is the address captured at login, or a generic role.
-  const label = email ?? "SynQ AI user"
+  // Wait for persist hydration so SSR's empty store matches the first client render.
+  const label = hydrated && email ? email : "SynQ AI user"
 
   function handleLogout() {
     clearSession()

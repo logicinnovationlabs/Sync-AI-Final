@@ -214,9 +214,34 @@ class Settings(BaseSettings):
 
     scim_token: Optional[str] = Field(default=None)
 
-    google_client_id: Optional[str] = Field(default=None)
-    google_client_secret: Optional[str] = Field(default=None)
-    google_redirect_uri: Optional[str] = Field(default=None)
+    google_client_id: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("GOOGLE_CLIENT_ID", "google_client_id"),
+    )
+    google_client_secret: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("GOOGLE_CLIENT_SECRET", "google_client_secret"),
+    )
+    google_redirect_uri: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("GOOGLE_REDIRECT_URI", "google_redirect_uri"),
+    )
+    frontend_url: str = Field(
+        default="http://localhost:3000",
+        validation_alias=AliasChoices("FRONTEND_URL", "frontend_url"),
+    )
+    celery_broker_url: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("CELERY_BROKER_URL", "celery_broker_url"),
+    )
+    celery_result_backend: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("CELERY_RESULT_BACKEND", "celery_result_backend"),
+    )
+    celery_task_always_eager: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("CELERY_TASK_ALWAYS_EAGER", "celery_task_always_eager"),
+    )
     # Optional env-seeded refresh token for local/real-source verification (7-day Testing apps).
     # Production path still expects tokens in TokenStore after OAuth exchange.
     google_refresh_token: Optional[str] = Field(
@@ -240,6 +265,21 @@ class Settings(BaseSettings):
     qwen_model: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("QWEN_MODEL", "qwen_model"),
+    )
+    # Chat LLM switch — independent of llm_provider (embeddings fake/gemini).
+    llm_chat_provider: str = Field(
+        default="fake",
+        validation_alias=AliasChoices("LLM_CHAT_PROVIDER", "llm_chat_provider"),
+    )
+    openrouter_base_url: str = Field(
+        default="https://openrouter.ai/api/v1",
+        validation_alias=AliasChoices("OPENROUTER_BASE_URL", "openrouter_base_url"),
+    )
+    llm_max_tool_call_rounds: int = Field(
+        default=2,
+        validation_alias=AliasChoices(
+            "LLM_MAX_TOOL_CALL_ROUNDS", "llm_max_tool_call_rounds"
+        ),
     )
 
     environment: str = Field(default="development")
@@ -452,7 +492,7 @@ class Settings(BaseSettings):
     stream_threshold_bytes: int = Field(default=10 * 1024 * 1024)  # 10MB
     stream_chunk_bytes: int = Field(default=8192)
     acl_backend: str = Field(default="mock")  # "mock" | "http"
-    acl_service_url: str = Field(default="http://localhost:8000/api/v1/acl")
+    acl_service_url: str = Field(default="http://localhost:8000/acl")
 
     @model_validator(mode="after")
     def _assemble_control_plane_url(self) -> "Settings":

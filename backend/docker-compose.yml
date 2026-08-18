@@ -114,7 +114,7 @@ services:
       GOOGLE_PUBSUB_TOPIC: ${GOOGLE_PUBSUB_TOPIC:-gmail-watch-notifications}
     volumes:
       - ./app:/app/app
-    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 -Q celery,google
 
   # Block B: Celery beat for periodic tasks (watch renewal)
   celery_beat:

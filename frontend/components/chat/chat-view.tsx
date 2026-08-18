@@ -9,7 +9,7 @@ import { SourceCard, type SourceCardData } from "@/components/chat/source-card"
 import { Loader } from "@/components/motion/loader"
 import { streamAssistantChat, type AssistantCitation } from "@/lib/api/assistant"
 import { ApiError } from "@/lib/api/client"
-import { useAuthStore } from "@/lib/auth/auth-store"
+import { useAuthHydrated, useAuthStore } from "@/lib/auth/auth-store"
 import { EASE_OUT } from "@/lib/ease"
 
 type Turn =
@@ -37,6 +37,7 @@ function citationsToSources(citations: AssistantCitation[]): SourceCardData[] {
 
 export function ChatView() {
   const reduce = useReducedMotion()
+  const hydrated = useAuthHydrated()
   const token = useAuthStore((s) => s.accessToken)
   const claims = useAuthStore((s) => s.claims)
   const authenticated = useAuthStore((s) => s.isAuthenticated())
@@ -140,12 +141,19 @@ export function ChatView() {
   const railSources = railTurn?.sources ?? []
   const empty = turns.length === 0
 
+  // Persist rehydrates from localStorage on the client only. SSR and the
+  // first client paint must share one tree (`useAuthHydrated` server
+  // snapshot is false) or logged-in users hydrate as "Sign in to chat".
+  if (!hydrated) {
+    return <div className="flex h-full min-h-0" />
+  }
+
   if (!authenticated) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
         <p className="text-lg font-medium">Sign in to chat</p>
         <p className="max-w-md text-sm text-muted-foreground">
-          Chat talks to Block L at POST /api/v1/assistant/orchestrator/chat. There
+          Chat talks to Block L at POST /assistant/orchestrator/chat. There
           is no scripted fallback in the product surface.
         </p>
         <Link
@@ -211,7 +219,7 @@ export function ChatView() {
               </p>
             )}
             <p className="mt-2 text-[0.6875rem] text-muted-foreground">
-              Live Block L — POST /api/v1/assistant/orchestrator/chat
+              Live Block L — POST /assistant/orchestrator/chat
             </p>
           </div>
         </div>

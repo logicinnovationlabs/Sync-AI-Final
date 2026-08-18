@@ -46,13 +46,15 @@ class TenantDatabaseManager:
         if tenant_id in self._engines:
             return self._engines[tenant_id]
 
-        database_url = f"postgresql+asyncpg://{db_user}:{db_password}@{db_host}/{db_name}"
+        host = db_host if ":" in db_host else f"{db_host}:5432"
+        database_url = f"postgresql+asyncpg://{db_user}:{db_password}@{host}/{db_name}"
         engine = create_async_engine(
             database_url,
             echo=False,  # Never log tenant DB URLs in prod
             pool_pre_ping=True,
             pool_size=5,
             max_overflow=10,
+            connect_args={"ssl": False},
         )
         self._engines[tenant_id] = engine
         return engine

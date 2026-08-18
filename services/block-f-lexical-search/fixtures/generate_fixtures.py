@@ -542,8 +542,11 @@ for field in facet_fields:
     for d in visible_docs:
         val = d.get(field)
         if field == "tags":
+            seen = set()
             for tag in val or []:
-                counter[tag] += 1
+                if tag and tag not in seen:
+                    seen.add(tag)
+                    counter[tag] += 1
         elif val:
             counter[str(val)] += 1
     ground[field] = [

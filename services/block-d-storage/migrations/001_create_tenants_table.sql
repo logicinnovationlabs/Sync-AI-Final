@@ -1,6 +1,8 @@
 -- Migration 001: Create tenants table
 -- This is the central table for tenant metadata in Block D
 
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE TABLE IF NOT EXISTS tenants (
     tenant_id VARCHAR(255) PRIMARY KEY,
     tenancy_mode VARCHAR(50) NOT NULL CHECK (tenancy_mode IN ('pooled', 'isolated_db', 'dedicated')),

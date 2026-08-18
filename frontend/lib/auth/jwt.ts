@@ -23,6 +23,6 @@ export function decodeAccessToken(token: string): AccessTokenClaims | null {
   }
 }
 
-export function isExpired(claims: { exp: number }): boolean {
-  return Date.now() >= claims.exp * 1000
+export function isExpired(claims: { exp: number }, skewMs = 0): boolean {
+  return Date.now() + skewMs >= claims.exp * 1000
 }

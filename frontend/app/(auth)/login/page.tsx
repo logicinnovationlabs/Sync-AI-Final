@@ -15,7 +15,8 @@ export default function LoginPage() {
         Sign in
       </h1>
       <p className="mt-2 text-center text-sm text-muted-foreground">
-        Every answer comes back with the record it came from.
+        Sign in to chat, documents, and the Admin, Audit, and Governance
+        console.
       </p>
 
       <div className="mt-8">

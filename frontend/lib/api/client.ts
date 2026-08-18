@@ -1,5 +1,16 @@
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1"
+import { decodeAccessToken, isExpired } from "@/lib/auth/jwt"
+import { useAuthStore } from "@/lib/auth/auth-store"
+
+function normalizeApiBase(raw: string): string {
+  return raw.replace(/\/api\/v1\/?$/, "").replace(/\/$/, "")
+}
+
+const API_BASE_URL = normalizeApiBase(
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000"
+)
+
+/** Refresh 30s before exp so Connectors /status never sends a dead JWT. */
+const ACCESS_SKEW_MS = 30_000
 
 export class ApiError extends Error {
   status: number
@@ -14,6 +25,54 @@ export class ApiError extends Error {
 interface ApiFetchOptions extends Omit<RequestInit, "body"> {
   token?: string | null
   body?: unknown
+  /** Skip refresh (login / refresh itself). */
+  skipAuthRefresh?: boolean
+}
+
+let refreshInFlight: Promise<string | null> | null = null
+
+async function exchangeRefreshToken(): Promise<string | null> {
+  if (refreshInFlight) return refreshInFlight
+  refreshInFlight = (async () => {
+    const { refreshToken, email } = useAuthStore.getState()
+    if (!refreshToken) return null
+    const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    })
+    if (!res.ok) {
+      useAuthStore.getState().clearSession()
+      return null
+    }
+    const data = (await res.json()) as {
+      access_token?: string
+      refresh_token?: string
+    }
+    if (!data.access_token || !data.refresh_token) {
+      useAuthStore.getState().clearSession()
+      return null
+    }
+    useAuthStore.getState().setSession({
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      email: email ?? "",
+    })
+    return data.access_token
+  })().finally(() => {
+    refreshInFlight = null
+  })
+  return refreshInFlight
+}
+
+async function resolveAccessToken(passed: string | null | undefined): Promise<string | null> {
+  const store = useAuthStore.getState()
+  const candidate = store.accessToken || passed || null
+  if (!candidate) return passed ?? null
+  const claims = decodeAccessToken(candidate)
+  if (claims && !isExpired(claims, ACCESS_SKEW_MS)) return candidate
+  if (!store.refreshToken) return candidate
+  return (await exchangeRefreshToken()) ?? candidate
 }
 
 /**
@@ -26,19 +85,31 @@ export async function apiFetch<T>(
   path: string,
   options: ApiFetchOptions = {}
 ): Promise<T> {
-  const { token, body, headers, ...rest } = options
+  const { token, body, headers, skipAuthRefresh, ...rest } = options
+
+  const access = skipAuthRefresh ? token ?? null : await resolveAccessToken(token)
 
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...rest,
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(access ? { Authorization: `Bearer ${access}` } : {}),
       ...headers,
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
 
   if (!res.ok) {
+    const expiredAccess =
+      !skipAuthRefresh &&
+      res.status === 401 &&
+      Boolean(useAuthStore.getState().refreshToken)
+    if (expiredAccess) {
+      const renewed = await exchangeRefreshToken()
+      if (renewed) {
+        return apiFetch<T>(path, { ...options, token: renewed, skipAuthRefresh: true })
+      }
+    }
     let message = res.statusText
     try {
       const data = await res.json()

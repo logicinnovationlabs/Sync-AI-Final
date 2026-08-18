@@ -1,11 +1,11 @@
 import { apiFetch } from "@/lib/api/client"
 
 /**
- * The connector endpoints are real — `backend/app/api/v1/connectors.py` mounts
- * all four and guards them with `require_scope`. Note the backend's notion of a
- * source is finer-grained than the UI's: Google Workspace is two source types,
- * `google_drive` and `google_gmail`, each with its own cursor and watch.
+ * Connect HTTP lives on the connector tree (`backend/app/connectors/router.py`)
+ * at `/connectors/...`. Guarded with `require_scope`.
+ * Google Workspace is two source types, `google_drive` and `google_gmail`.
  */
+
 export type BackendSourceType = "google_drive" | "google_gmail"
 
 export interface ConnectorStatus {
@@ -14,7 +14,14 @@ export interface ConnectorStatus {
   /** Sync cursor. Null or empty means nothing has been ingested yet. */
   cursor: string | null
   watch_active: boolean
-  details: Record<string, unknown>
+  details: {
+    connection_status?: "not_connected" | "syncing" | "active" | "error" | "needs_reauth"
+    files_indexed?: number
+    last_sync_at?: string | null
+    last_error?: string | null
+    token_present?: boolean
+    watch_info?: Record<string, unknown>
+  } & Record<string, unknown>
 }
 
 export function getConnectorStatus(token: string, source: BackendSourceType) {

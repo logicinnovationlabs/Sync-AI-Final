@@ -13,7 +13,7 @@
         "total_views": null,
         "distinct_viewers": null,
         "last_viewed": null,
-        "updated_at": "2026-08-07T23:44:10.131423Z",
+        "updated_at": "2026-08-16T15:06:29.734342Z",
         "window_days": 30
       }
     },
@@ -29,7 +29,7 @@
         "total_views": null,
         "distinct_viewers": null,
         "last_viewed": null,
-        "updated_at": "2026-08-07T23:44:10.449513Z",
+        "updated_at": "2026-08-16T15:06:30.081203Z",
         "window_days": 30
       }
     },
@@ -45,7 +45,7 @@
         "total_views": 5,
         "distinct_viewers": 5,
         "last_viewed": "2026-07-29T12:00:00Z",
-        "updated_at": "2026-08-07T23:44:10.972993Z",
+        "updated_at": "2026-08-16T15:06:30.534704Z",
         "window_days": 30
       }
     },
@@ -61,7 +61,7 @@
         "total_views": 10,
         "distinct_viewers": 10,
         "last_viewed": "2026-07-29T12:00:00Z",
-        "updated_at": "2026-08-07T23:44:11.820170Z",
+        "updated_at": "2026-08-16T15:06:31.413167Z",
         "window_days": 30
       }
     }

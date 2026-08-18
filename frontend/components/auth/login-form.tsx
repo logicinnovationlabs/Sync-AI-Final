@@ -7,9 +7,11 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { Input } from "@/components/motion/input"
 import { StatefulButton } from "@/components/motion/button/stateful"
+import { LocalAdminCredentials } from "@/components/auth/local-admin-credentials"
 import { getMe, login } from "@/lib/api/auth"
 import { ApiError } from "@/lib/api/client"
 import { useAuthStore } from "@/lib/auth/auth-store"
+import { isAdmin as scopesIsAdmin } from "@/lib/auth/scopes"
 import { tenantFromHost } from "@/lib/auth/tenant"
 
 const loginSchema = z.object({
@@ -43,11 +45,12 @@ export function LoginForm() {
   const {
     control,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
-    // Stays empty on purpose — pre-filled demo credentials are flagged in
-    // PRODUCT.md as a hardening issue.
+    // Fields stay empty; development shows fillable local admin and member
+    // hints so seeded Alpha accounts can be used without guessing passwords.
     defaultValues: { email: "", password: "" },
   })
 
@@ -73,11 +76,17 @@ export function LoginForm() {
         refreshToken: res.refresh_token,
         email: values.email,
       })
+      const admin =
+        res.role === "admin" ||
+        me.role === "admin" ||
+        scopesIsAdmin(me.scopes ?? [])
       const next =
         searchParams.get("next") ??
         (me.must_change_password || res.must_change_password
           ? "/settings/account"
-          : "/chat")
+          : admin
+            ? "/admin"
+            : "/chat")
       router.push(next)
     } catch (err) {
       setFormError(
@@ -146,6 +155,16 @@ export function LoginForm() {
       >
         Sign in
       </StatefulButton>
+
+      <div className="mt-6">
+        <LocalAdminCredentials
+          includeMember
+          onUse={({ email, password }) => {
+            setValue("email", email, { shouldValidate: true })
+            setValue("password", password, { shouldValidate: true })
+          }}
+        />
+      </div>
     </form>
   )
 }

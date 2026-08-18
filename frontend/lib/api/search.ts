@@ -23,7 +23,7 @@ export interface FederatedSearchResponse {
   query?: string | null
 }
 
-/** POST /api/v1/search/federated — Block J. Live path, not contracts.yaml `/api/v1/search`. */
+/** POST /search/federated — Block J. Live path, not contracts.yaml `/api/v1/search`. */
 export function federatedSearch(token: string, query: string) {
   return apiFetch<FederatedSearchResponse>("/search/federated", {
     method: "POST",
@@ -46,7 +46,7 @@ export interface DocumentPayload {
   [key: string]: unknown
 }
 
-/** GET /api/v1/document/{doc_id} — Block K. Live path, not contracts.yaml POST `/api/v1/read`. */
+/** GET /document/{doc_id} — Block K. Live path, not contracts.yaml POST `/api/v1/read`. */
 export function getDocument(token: string, docId: string) {
   return apiFetch<DocumentPayload>(`/document/${encodeURIComponent(docId)}`, {
     token,

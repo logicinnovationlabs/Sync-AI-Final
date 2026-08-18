@@ -19,13 +19,23 @@ export function login(payload: LoginPayload) {
   return apiFetch<LoginResponse>("/auth/login", {
     method: "POST",
     body: payload,
+    skipAuthRefresh: true,
+  })
+}
+
+/** Mint a new access token. Must not send the expired access JWT. */
+export function refreshSession(refreshToken: string) {
+  return apiFetch<LoginResponse>("/auth/refresh", {
+    method: "POST",
+    body: { refresh_token: refreshToken },
+    skipAuthRefresh: true,
   })
 }
 
 /**
  * Self-serve signup is not a Block A/N contract.
  *
- * On suhani, `POST /api/v1/admin/users` accepted `{ tenant_subdomain, email,
+ * On suhani, `POST /admin/users` accepted `{ tenant_subdomain, email,
  * password, display_name }` with no auth. On Pratham, that route is
  * `Depends(require_admin)` and the body is `{ email, display_name, role? }`
  * with a server-generated temporary password. Calling the old shape would

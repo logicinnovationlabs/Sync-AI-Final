@@ -6,7 +6,7 @@ import Link from "next/link"
  * Self-serve register is blocked — not disabled silently.
  *
  * Block N's live contract is authenticated admin invite:
- * POST /api/v1/admin/users with Bearer admin JWT, body
+ * POST /admin/users with Bearer admin JWT, body
  * `{ email, display_name, role? }`, server-generated password.
  * The suhani form posted `{ tenant_subdomain, email, password, display_name }`
  * with no auth. That is a contract mismatch; we do not shim it and we do not

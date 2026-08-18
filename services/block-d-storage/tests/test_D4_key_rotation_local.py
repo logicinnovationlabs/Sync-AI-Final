@@ -59,6 +59,8 @@ class TestD4KeyRotationLocal:
         """
         print(f"\nD4 Schema Setup:")
         print(f"  Creating isolated schema: d4_test")
+
+        db_client.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
         
         # Create isolated schema
         db_client.execute("DROP SCHEMA IF EXISTS d4_test CASCADE")

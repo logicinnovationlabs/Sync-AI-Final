@@ -32,6 +32,7 @@ import {
   SPRING_LAYOUT,
   SPRING_PRESS,
 } from "@/lib/ease";
+import { useIsClient } from "@/lib/hooks/use-is-client";
 import { cn } from "@/lib/utils";
 
 type SidebarState = "expanded" | "collapsed";
@@ -822,11 +823,12 @@ export const AnimatedSidebarMenuItem = forwardRef<
   HTMLLIElement,
   HTMLMotionProps<"li">
 >(function AnimatedSidebarMenuItem({ className, ...props }, forwardedRef) {
+  const isClient = useIsClient();
   return (
     <motion.li
       {...props}
       ref={forwardedRef}
-      layout="position"
+      layout={isClient ? "position" : false}
       transition={SPRING_LAYOUT}
       data-slot="sidebar-menu-item"
       className={cn("relative", className)}

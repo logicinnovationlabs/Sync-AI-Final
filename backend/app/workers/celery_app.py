@@ -12,8 +12,8 @@ from app.core.config import settings
 # Create Celery app
 celery_app = Celery(
     "snyq_backend",
-    broker=getattr(settings, "CELERY_BROKER_URL", "redis://redis:6379/1"),
-    backend=getattr(settings, "CELERY_RESULT_BACKEND", "redis://redis:6379/1"),
+    broker=getattr(settings, "celery_broker_url", None) or "redis://redis:6379/1",
+    backend=getattr(settings, "celery_result_backend", None) or "redis://redis:6379/1",
 )
 
 # Configuration
@@ -28,6 +28,14 @@ celery_app.conf.update(
     task_soft_time_limit=3000,  # 50 minutes soft limit
     task_acks_late=True,
     worker_prefetch_multiplier=1,
+    task_routes={
+        "app.workers.tasks.backfill_tenant_source": {"queue": "google"},
+        "app.workers.tasks.backfill_source": {"queue": "google"},
+        "app.workers.tasks.process_drive_notification": {"queue": "google"},
+        "app.workers.tasks.process_gmail_notification": {"queue": "google"},
+        "app.workers.tasks.renew_watch_channels": {"queue": "google"},
+        "app.workers.tasks.google_queue_ping": {"queue": "google"},
+    },
 )
 
 # Test mode: synchronous execution
@@ -35,7 +43,7 @@ import os
 import sys
 
 task_always_eager = (
-    getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False)
+    getattr(settings, "celery_task_always_eager", False)
     or os.getenv("CELERY_TASK_ALWAYS_EAGER", "").lower() in ("true", "1")
     or "pytest" in sys.modules
     or "PYTEST_CURRENT_TEST" in os.environ
