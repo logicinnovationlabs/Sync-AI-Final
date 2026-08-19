@@ -108,7 +108,7 @@ class ConnectorRegistry:
         
         # Second pass: discover connector classes
         for file_path in connectors_path.rglob("*.py"):
-            if file_path.name.startswith("_"):
+            if file_path.name.startswith("_") or file_path.name in ("router.py", "org.py"):
                 continue
             
             # Import the module

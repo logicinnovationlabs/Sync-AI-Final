@@ -215,6 +215,14 @@ class GmailClient:
             # Silently ignore errors (watch may already be stopped)
             pass
     
+    async def get_profile(self, access_token: str) -> Dict[str, Any]:
+        """Return the authenticated user's Gmail profile (emailAddress, historyId)."""
+        service = self._build_service(access_token)
+        try:
+            return service.users().getProfile(userId=self.USER_ID).execute()
+        except HttpError as e:
+            raise Exception(f"Gmail getProfile API error: {e}")
+
     def decode_message_body(self, payload: Dict[str, Any]) -> str:
         """
         Decode message body from Gmail API payload.

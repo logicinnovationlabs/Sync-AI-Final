@@ -11,8 +11,10 @@ from uuid import uuid4
 import jwt
 from pathlib import Path
 
+from app.core.backends import mock_backends_allowed
 from app.core.config import settings
 from app.core.exceptions import InvalidTokenError, RevokedTokenError, UnauthorizedError
+from app.core.startup import StartupConfigurationError
 from app.storage.redis_client import redis_client
 
 
@@ -35,13 +37,18 @@ class TokenService:
         self._active_kid: str = settings.jwt_active_kid
 
     def _load_keys(self):
-        """Load RSA keys from disk (lazy loading)."""
+        """Load RSA keys from disk. Ephemeral generation is dev/test only."""
+        private_key_path = Path(settings.jwt_private_key_path)
+        public_key_path = Path(settings.jwt_public_key_path)
+
         if self._private_key is None:
-            private_key_path = Path(settings.jwt_private_key_path)
-            if private_key_path.exists():
+            if private_key_path.is_file():
                 self._private_key = private_key_path.read_text()
+            elif not mock_backends_allowed():
+                raise StartupConfigurationError(
+                    f"JWT private key missing at {private_key_path}"
+                )
             else:
-                # Generate keys on the fly for dev (not production!)
                 from cryptography.hazmat.primitives.asymmetric import rsa
                 from cryptography.hazmat.primitives import serialization
 
@@ -52,16 +59,19 @@ class TokenService:
                     encryption_algorithm=serialization.NoEncryption(),
                 ).decode("utf-8")
 
-                public_key = private_key.public_key()
-                self._public_key = public_key.public_bytes(
+                generated_public = private_key.public_key()
+                self._public_key = generated_public.public_bytes(
                     encoding=serialization.Encoding.PEM,
                     format=serialization.PublicFormat.SubjectPublicKeyInfo,
                 ).decode("utf-8")
-        
+
         if self._public_key is None:
-            public_key_path = Path(settings.jwt_public_key_path)
-            if public_key_path.exists():
+            if public_key_path.is_file():
                 self._public_key = public_key_path.read_text()
+            elif not mock_backends_allowed():
+                raise StartupConfigurationError(
+                    f"JWT public key missing at {public_key_path}"
+                )
 
         # Register active public key under kid for rotation-aware verify
         if self._public_key and self._active_kid not in self._public_keys_by_kid:
@@ -172,6 +182,31 @@ class TokenService:
             headers={"kid": self._active_kid},
         )
         return token
+
+    async def rotate_refresh_token(self, refresh_token: str) -> tuple[str, str]:
+        """
+        Exchange a refresh JWT for a new access+refresh pair and revoke the old jti.
+
+        Replay of the previous refresh token is rejected by validate_token (A13).
+        """
+        payload = await self.validate_token(refresh_token)
+        if payload.get("token_type") != "refresh":
+            raise InvalidTokenError("Invalid token type")
+        tenant_id = payload.get("tenant_id")
+        principal_id = payload.get("sub")
+        if not tenant_id or not principal_id:
+            raise InvalidTokenError("Refresh token missing identity")
+        jti = payload.get("jti")
+        if jti:
+            await redis_client.sadd(str(tenant_id), f"revoked:{jti}", jti)
+        access = await self.issue_access_token(
+            tenant_id=str(tenant_id),
+            principal_id=str(principal_id),
+            scopes=list(payload.get("scopes") or []),
+            role=payload.get("role"),
+        )
+        new_refresh = await self.issue_refresh_token(str(tenant_id), str(principal_id))
+        return access, new_refresh
 
     async def validate_token(self, token: str) -> Dict[str, Any]:
         """

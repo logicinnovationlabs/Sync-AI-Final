@@ -31,17 +31,13 @@ _METRICS = {
 
 
 def get_activity_store() -> ActivityStore:
-    """Factory to get activity store instance."""
-    from app.core.config import settings
+    """Process-level activity store (singleton mock in development/test)."""
+    from app.services.signals import get_activity_store as _factory
 
-    if settings.signals_backend == "postgres":
-        from app.services.signals.postgres_store import PostgresActivityStore
-
-        return PostgresActivityStore()
-    else:
-        from app.services.signals.mock_store import MockActivityStore
-
-        return MockActivityStore()
+    try:
+        return _factory()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 # ==================== Ingestion ====================

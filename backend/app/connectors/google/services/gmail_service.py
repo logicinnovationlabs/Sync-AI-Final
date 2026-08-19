@@ -13,6 +13,7 @@ Methods:
 
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+import asyncio
 import re
 import html
 
@@ -25,6 +26,17 @@ from app.core.base_connector import (
 )
 from app.connectors.google.oauth import GoogleOAuthManager
 from app.connectors.google.clients.gmail_client import GmailClient
+
+
+_GMAIL_BACKFILL_QUERY = (
+    "-category:promotions -category:social -category:forums -in:spam -in:trash"
+)
+_OTP_SUBJECT = re.compile(
+    r"\b(otp|one[ -]?time (code|password|passcode)|verification code|security code)\b",
+    re.IGNORECASE,
+)
+_OTP_BODY_SHORT = re.compile(r"\b\d{4,8}\b")
+_FETCH_CONCURRENCY = 8
 
 
 class GmailConnector(BaseConnector):
@@ -88,24 +100,19 @@ class GmailConnector(BaseConnector):
         """
         token = await self.get_valid_token()
         
-        # List message IDs
         response = await self.gmail_client.list_messages(
             access_token=token,
             page_size=100,
             page_token=cursor,
+            query=_GMAIL_BACKFILL_QUERY,
         )
         
         message_ids = [msg["id"] for msg in response.get("messages", [])]
-        
-        # Fetch full messages
-        messages = []
-        for msg_id in message_ids:
-            try:
-                message = await self.gmail_client.get_message(token, msg_id)
-                messages.append(message)
-            except Exception:
-                # Skip messages that can't be fetched
-                continue
+        messages = await self._fetch_messages_bounded(token, message_ids)
+        messages = [m for m in messages if m and not self._is_otp_or_promo(m)]
+        if self.mailbox_email:
+            for m in messages:
+                m["_mailbox_email"] = self.mailbox_email
         
         next_page_token = response.get("nextPageToken")
         
@@ -135,13 +142,7 @@ class GmailConnector(BaseConnector):
         # If no cursor, get current history ID from a watch call
         # (or we could list one message and use its historyId)
         if not cursor:
-            # Get latest historyId by watching (then immediately stopping)
-            watch_response = await self.gmail_client.watch(
-                access_token=token,
-                topic_name=f"projects/dummy/topics/dummy",  # Dummy topic
-            )
-            cursor = watch_response.get("historyId")
-            await self.gmail_client.stop(token)
+            return DeletionResult(deleted_ids=[], next_cursor=None, has_more=False)
         
         response = await self.gmail_client.list_history(
             access_token=token,
@@ -208,14 +209,12 @@ class GmailConnector(BaseConnector):
                 if msg_id:
                     deleted_ids.append(msg_id)
         
-        # Fetch full messages
-        messages = []
-        for msg_id in message_ids:
-            try:
-                message = await self.gmail_client.get_message(token, msg_id)
-                messages.append(message)
-            except Exception:
-                continue
+        # Fetch full messages with a bounded pool
+        messages = await self._fetch_messages_bounded(token, list(message_ids))
+        messages = [m for m in messages if m and not self._is_otp_or_promo(m)]
+        if self.mailbox_email:
+            for m in messages:
+                m["_mailbox_email"] = self.mailbox_email
         
         new_history_id = response.get("historyId", history_id)
         
@@ -285,9 +284,8 @@ class GmailConnector(BaseConnector):
                 "message_size_bytes": message.get("sizeEstimate", 0),
             }
             
-            # Permissions: always user:{mailbox_email}
-            # Gmail has no group-sharing model
-            permissions = [f"user:{self.mailbox_email}"] if self.mailbox_email else ["user:*"]
+            # Permissions: always user:{mailbox_email}; no user:* fallback (P0-5)
+            permissions = [f"user:{self.mailbox_email}"] if self.mailbox_email else []
             
             # Timestamps
             internal_date_ms = int(message.get("internalDate", 0))
@@ -347,6 +345,42 @@ class GmailConnector(BaseConnector):
         """
         _ = since
         return []
+
+    async def _fetch_messages_bounded(
+        self, token: str, message_ids: List[str]
+    ) -> List[Dict[str, Any]]:
+        semaphore = asyncio.Semaphore(_FETCH_CONCURRENCY)
+
+        async def _one(msg_id: str) -> Optional[Dict[str, Any]]:
+            async with semaphore:
+                try:
+                    return await self.gmail_client.get_message(token, msg_id)
+                except Exception:
+                    return None
+
+        if not message_ids:
+            return []
+        results = await asyncio.gather(*[_one(mid) for mid in message_ids])
+        return [m for m in results if m]
+
+    def _is_otp_or_promo(self, message: Dict[str, Any]) -> bool:
+        labels = {str(x) for x in (message.get("labelIds") or [])}
+        if labels & {"CATEGORY_PROMOTIONS", "CATEGORY_SOCIAL", "SPAM", "TRASH"}:
+            return True
+        subject = self.gmail_client.extract_header(message, "Subject") or ""
+        if not isinstance(subject, str):
+            subject = str(subject)
+        if _OTP_SUBJECT.search(subject):
+            return True
+        snippet = message.get("snippet") or ""
+        if (
+            isinstance(snippet, str)
+            and len(snippet) < 160
+            and _OTP_BODY_SHORT.search(snippet)
+            and _OTP_SUBJECT.search(snippet + " " + subject)
+        ):
+            return True
+        return False
     
     def _has_attachments(self, payload: Dict[str, Any]) -> bool:
         """

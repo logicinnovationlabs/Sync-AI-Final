@@ -25,6 +25,14 @@ from app.models.oauth_client import OAuthClient, RefreshToken
 from app.models.scope import ScopeRegistry
 from app.models.audit_log import AuditLog  # noqa: F401 — Block N metadata
 from app.models.tenant_connector import TenantConnector  # noqa: F401
+from app.models.canonical import (  # noqa: F401 — Block C metadata
+    CanonicalDocumentRow,
+    IdentityPrincipalRow,
+    IdentityGroupRow,
+    ACLEntryRow,
+    ContainerACLEntryRow,
+    ContainerEdgeRow,
+)
 from app.services.cursor_store import SyncCursor
 from app.storage.vault_client import MockVaultClient
 from app.storage.redis_client import TenantPartitionedRedisClient
@@ -57,11 +65,6 @@ TEST_DB_URL = os.getenv(
 
 # ---------------------------------------------------------------------------
 # Per-test Redis reconnect  (fixes "Event loop is closed" in pytest-asyncio 0.24)
-#
-# pytest-asyncio 0.24 creates a NEW event loop for every async test by default.
-# A global redis_client._client socket is bound to the PREVIOUS loop, so any
-# subsequent test that touches it gets "Future attached to a different loop".
-# Solution: disconnect + reconnect the global singleton at the start of every test.
 # ---------------------------------------------------------------------------
 @pytest_asyncio.fixture(autouse=True)
 async def redis_for_tests():
@@ -110,8 +113,7 @@ async def test_db() -> AsyncGenerator[AsyncSession, None]:
     Fixture for test database session.
 
     Creates a fresh schema for each test (drop_all then create_all).
-    Uses NullPool to prevent asyncpg from reusing connections across event loops,
-    which causes 'Future attached to a different loop' errors in pytest-asyncio 0.24.
+    Uses NullPool to prevent asyncpg from reusing connections across event loops.
     """
     from sqlalchemy.pool import NullPool
 
@@ -174,85 +176,149 @@ def test_client() -> TestClient:
     return TestClient(_get_app())
 
 
-# ---------------------------------------------------------------------------
-# Block K: Document Reader Fixtures
-# ---------------------------------------------------------------------------
+# Block D verify compose (FIX_PASS_D-E-G Phase 2): host ports only.
+_K_PHASE2_PG_DSN = "postgresql+asyncpg://postgres:verify@localhost:5435/block_d_verify"
+_K_PHASE2_MINIO_ENDPOINT = "localhost:9000"
+_K_PHASE2_MINIO_ACCESS = "minioadmin"
+_K_PHASE2_MINIO_SECRET = "minioadmin"
+_K_PHASE2_BUCKET = "documents"
+
+
+async def _k_phase2_store(settings):
+    """Construct MinioDocumentStore against Block D verify Postgres+MinIO.
+
+    Raises if the factory still returns the in-memory double.
+    """
+    from pathlib import Path
+    import json as _json
+    from app.services.document_reader.store import (
+        MinioDocumentStore,
+        create_document_store,
+    )
+
+    saved = {
+        "storage_backend": settings.storage_backend,
+        "storage_endpoint": settings.storage_endpoint,
+        "storage_access_key": settings.storage_access_key,
+        "storage_secret_key": settings.storage_secret_key,
+        "storage_bucket": settings.storage_bucket,
+        "storage_secure": settings.storage_secure,
+        "control_plane_database_url": settings.control_plane_database_url,
+    }
+    settings.storage_backend = "minio"
+    settings.storage_endpoint = _K_PHASE2_MINIO_ENDPOINT
+    settings.storage_access_key = _K_PHASE2_MINIO_ACCESS
+    settings.storage_secret_key = _K_PHASE2_MINIO_SECRET
+    settings.storage_bucket = _K_PHASE2_BUCKET
+    settings.storage_secure = False
+    settings.control_plane_database_url = _K_PHASE2_PG_DSN
+
+    store = create_document_store(settings)
+    if not isinstance(store, MinioDocumentStore):
+        raise RuntimeError(
+            f"K Phase 2 fixture expected MinioDocumentStore, got {type(store).__name__}"
+        )
+    await store.connect()
+
+    async with store.db_pool.acquire() as conn:
+        n_before = await conn.fetchval("SELECT COUNT(*) FROM documents")
+    print(
+        f"[BLOCK K] Phase 2 store={type(store).__name__} "
+        f"minio={_K_PHASE2_MINIO_ENDPOINT} pg=localhost:5435/block_d_verify "
+        f"rows_before_seed={n_before}"
+    )
+
+    if int(n_before or 0) == 0:
+        z_path = Path(__file__).parent / "fixtures" / "block_z" / "corpus_docs.json"
+        if z_path.exists():
+            z_data = _json.loads(z_path.read_text(encoding="utf-8"))
+            for doc in z_data.get("documents") or []:
+                await store.upsert(
+                    str(doc.get("tenant_id") or "tenant_f_test"),
+                    str(doc["document_id"]),
+                    title=str(doc.get("title") or ""),
+                    body=str(doc.get("body_text") or ""),
+                    owner_principal_id=str(doc.get("owner") or ""),
+                    structured_metadata={
+                        "language": doc.get("language"),
+                        "tags": doc.get("tags") or [],
+                    },
+                    created_at=doc.get("updated_at"),
+                    updated_at=doc.get("updated_at"),
+                )
+            async with store.db_pool.acquire() as conn:
+                n_after = await conn.fetchval("SELECT COUNT(*) FROM documents")
+            print(f"[BLOCK K] seeded Block Z corpus; rows_after_seed={n_after}")
+
+    return store, saved
+
+
+def _k_restore_settings(settings, saved: dict) -> None:
+    for key, value in saved.items():
+        setattr(settings, key, value)
+
+
 @pytest_asyncio.fixture
 async def k_app():
     """
-    Fixture for Block K (Document Reader) tests.
-    
-    Returns tuple: (client, store, acl, app)
-    - client: httpx.AsyncClient with async support for ASGI
-    - store: In-memory document store
-    - acl: Mock ACL checker
-    - app: FastAPI app instance
+    Fixture for Block K (Document Reader) tests — Phase 2.
+
+    Document store is MinIO + Block D verify Postgres (not InMemoryDocumentStore).
+    ACL remains MockACLChecker so K1 can grant/revoke/count (Block C is out of scope).
     """
-    from httpx import AsyncClient
-    try:
-        from httpx import ASGITransport
-        transport = ASGITransport(app=_get_app())
-        client_kwargs = {"transport": transport, "base_url": "http://test"}
-    except ImportError:
-        client_kwargs = {"app": _get_app(), "base_url": "http://test"}
-    
+    from httpx import ASGITransport, AsyncClient
     from app.core.config import settings
-    from app.services.document_reader.store import InMemoryDocumentStore
     from app.services.document_reader.acl_checker import MockACLChecker
-    
-    # Create test instances
-    store = InMemoryDocumentStore(settings)
+
+    store, saved = await _k_phase2_store(settings)
     acl = MockACLChecker()
-    
+
     fastapi_app = _get_app()
-    
-    # Monkey-patch the document endpoint to use test instances
+
     import app.api.v1.document as doc_module
     original_store = doc_module.store
     original_acl = doc_module.acl_checker
-    
+
     doc_module.store = store
     doc_module.acl_checker = acl
-    
-    async with AsyncClient(**client_kwargs) as client:
-        yield client, store, acl, fastapi_app
-    
-    # Restore original instances
-    doc_module.store = original_store
-    doc_module.acl_checker = original_acl
 
+    transport = ASGITransport(app=fastapi_app)
+    try:
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            yield client, store, acl, fastapi_app
+    finally:
+        doc_module.store = original_store
+        doc_module.acl_checker = original_acl
+        await store.close()
+        _k_restore_settings(settings, saved)
 
 
 @pytest_asyncio.fixture
 async def k_app_async():
-    """
-    Async fixture for Block K tests that need async client.
-    
-    Returns tuple: (client, store, acl, app)
-    """
+    """Async fixture for Block K — same Phase 2 store as k_app."""
     from httpx import AsyncClient
     from app.core.config import settings
-    from app.services.document_reader.store import InMemoryDocumentStore
     from app.services.document_reader.acl_checker import MockACLChecker
-    
-    store = InMemoryDocumentStore(settings)
+
+    store, saved = await _k_phase2_store(settings)
     acl = MockACLChecker()
-    
-    # Monkey-patch
+
     import app.api.v1.document as doc_module
     original_store = doc_module.store
     original_acl = doc_module.acl_checker
-    
+
     doc_module.store = store
     doc_module.acl_checker = acl
-    
+
     fastapi_app = _get_app()
-    async with AsyncClient(app=fastapi_app, base_url="http://test") as client:
-        yield client, store, acl, fastapi_app
-    
-    # Restore
-    doc_module.store = original_store
-    doc_module.acl_checker = original_acl
+    try:
+        async with AsyncClient(app=fastapi_app, base_url="http://test") as client:
+            yield client, store, acl, fastapi_app
+    finally:
+        doc_module.store = original_store
+        doc_module.acl_checker = original_acl
+        await store.close()
+        _k_restore_settings(settings, saved)
 
 
 # ---------------------------------------------------------------------------
@@ -262,7 +328,7 @@ async def k_app_async():
 def l_app():
     """
     Fixture for Block L (Assistant Orchestrator) tests.
-    
+
     Returns TestClient configured for assistant endpoints.
     """
     return TestClient(_get_app())
@@ -272,41 +338,32 @@ def l_app():
 # Helper Functions
 # ---------------------------------------------------------------------------
 def make_bearer(tenant_id: str, principal_id: str, scopes: list = None) -> str:
-    """
-    Create a test bearer token for authentication using RS256.
-    
-    Args:
-        tenant_id: Tenant ID
-        principal_id: User/principal ID
-        scopes: List of scopes (default: ["read", "write"])
-    
-    Returns:
-        JWT token string signed with RSA private key
-    """
+    """Issue a test JWT that matches TokenService (RS256 + same key material)."""
     import jwt
     from datetime import datetime, timedelta, timezone
+    from uuid import uuid4
+
     from app.services.token_service import token_service
-    
-    token_service._load_keys()
+
     if scopes is None:
         scopes = ["read", "write"]
-    
+
+    token_service._load_keys()
     now = datetime.now(timezone.utc)
     payload = {
         "iss": token_service.issuer,
         "sub": principal_id,
-        "tenant_id": tenant_id,
         "principal_id": principal_id,
+        "tenant_id": tenant_id,
         "scopes": scopes,
-        "exp": now + timedelta(hours=1),
         "iat": now,
+        "exp": now + timedelta(hours=1),
+        "jti": str(uuid4()),
         "token_version": 0,
     }
-    
     return jwt.encode(
         payload,
         token_service._private_key,
         algorithm=token_service.algorithm,
         headers={"kid": token_service._active_kid},
     )
-

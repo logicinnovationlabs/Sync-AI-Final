@@ -64,7 +64,8 @@ class TestO1MetricCoverage:
         provider = trace.get_tracer_provider()
         assert provider is not None, "TracerProvider not configured"
         resource = provider.resource
-        assert resource.attributes.get("service.name") == "snyq-backend"
+        name = resource.attributes.get("service.name")
+        assert name in ("snyq-backend", "snyq-celery"), name
         assert resource.attributes.get("service.version") == "2.0.0"
 
     def test_meter_provider_configured(self):

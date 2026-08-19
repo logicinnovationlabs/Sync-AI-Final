@@ -14,7 +14,7 @@ Fail-closed: empty caller ACL → no documents.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Mapping
 
 DENY_PREFIX = "deny:"
 
@@ -85,3 +85,41 @@ def qdrant_must_not_acl(qm: Any, user_acl: Sequence[str], field: str = "acl_term
     if not deny:
         return None
     return qm.FieldCondition(key=field, match=qm.MatchAny(any=deny))
+
+
+def acl_terms_from_jwt(payload: Mapping[str, Any]) -> List[str]:
+    """Build caller ACL from JWT claims only. Never from a request body.
+
+    ``*`` is stripped even if present on the token — HTTP search must not
+    honor the test/ops bypass. Store-level signoff harnesses still pass
+    ``acl_terms`` directly into OpenSearch/Qdrant.
+    """
+    terms: List[str] = []
+    seen: set[str] = set()
+
+    def _add(raw: Any) -> None:
+        value = str(raw).strip() if raw is not None else ""
+        if not value or value == "*" or value in seen:
+            return
+        seen.add(value)
+        terms.append(value)
+
+    claimed = payload.get("acl_terms") or payload.get("acl_filter_terms") or []
+    if isinstance(claimed, (list, tuple)):
+        for item in claimed:
+            _add(item)
+
+    principal = payload.get("sub") or payload.get("principal_id") or payload.get("user_id")
+    if principal:
+        _add(principal)
+        _add(f"user:{principal}")
+
+    groups = payload.get("groups") or []
+    if isinstance(groups, (list, tuple)):
+        for group in groups:
+            _add(group)
+            group_str = str(group)
+            if group_str and not group_str.startswith("group:"):
+                _add(f"group:{group_str}")
+
+    return terms

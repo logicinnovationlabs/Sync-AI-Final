@@ -33,7 +33,7 @@ def redact_fields(metadata: Dict[str, Any], principal_id: str) -> Dict[str, Any]
     Intra-tenant redaction based on visibility_mode / hidden_fields.
 
     Owners see all fields. Non-owners lose keys listed in hidden_fields
-    (plus known sensitive keys when visibility_mode == ''redacted'').
+    (plus known sensitive keys when visibility_mode == 'redacted').
     """
     visible = dict(metadata)
     owner = str(visible.get("owner_principal_id") or "")
@@ -92,93 +92,43 @@ async def read_document(
 
 
 def build_document_payload(
-    doc_id: Optional[str] = None,
-    tenant_id: Optional[str] = None,
-    visible_metadata: Optional[Dict[str, Any]] = None,
-    body: Optional[str | bytes] = None,
-    structured_data: Optional[Dict[str, Any]] = None,
-    metadata: Optional[Dict[str, Any]] = None,
-    structured: Optional[Dict[str, Any]] = None,
-    **kwargs: Any,
+    *,
+    doc_id: str,
+    tenant_id: str,
+    visible_metadata: Dict[str, Any],
+    body: str,
+    structured_data: Optional[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    """K3: Preserve structure + metadata + body."""
-    payload = dict(visible_metadata or metadata or {})
-    if doc_id:
-        payload["document_id"] = doc_id
-    if tenant_id:
-        payload["tenant_id"] = tenant_id
-
-    if body is not None:
-        if isinstance(body, bytes):
-            try:
-                payload["body"] = body.decode("utf-8")
-            except UnicodeDecodeError:
-                payload["body_base64"] = body.hex()
-        else:
-            payload["body"] = str(body)
-
-    struct = structured_data if structured_data is not None else structured
-    if struct is not None:
-        payload["structured_metadata"] = struct
+    """K3: Preserve structure + metadata + body as a single JSON object."""
+    payload = dict(visible_metadata)
+    payload["document_id"] = doc_id
+    payload["tenant_id"] = tenant_id
+    payload["body"] = body
+    payload["structured_metadata"] = structured_data or {}
     return payload
 
 
 async def stream_document_json(
-    store_or_meta: Any,
-    object_key_or_stream: Any = None,
-    doc_id: Optional[str] = None,
-    tenant_id: Optional[str] = None,
-    visible_metadata: Optional[Dict[str, Any]] = None,
-    structured_data: Optional[Dict[str, Any]] = None,
-) -> AsyncGenerator[str, None]:
+    store: DocumentStore,
+    object_key: str,
+    doc_id: str,
+    tenant_id: str,
+    visible_metadata: Dict[str, Any],
+    structured_data: Optional[Dict[str, Any]],
+) -> AsyncGenerator[bytes, None]:
+    """K2: Stream a complete JSON document without holding the full body.
+
+    Chunks concatenate to one JSON object so HTTP clients can ``.json()`` it,
+    while the generator itself retains only the current chunk.
     """
-    K2: Stream large documents as valid JSON with bounded memory (<5MB).
-    Yields progressive JSON text: {"document_id": "...", ..., "body": "AAAA..."}
-    """
-    if hasattr(store_or_meta, "get_body_stream"):
-        store = store_or_meta
-        object_key = object_key_or_stream
-        meta = dict(visible_metadata or {})
-        if doc_id:
-            meta["document_id"] = doc_id
-        if tenant_id:
-            meta["tenant_id"] = tenant_id
-        if structured_data is not None:
-            meta["structured_metadata"] = structured_data
-
-        # Serialize metadata fields
-        meta_items = [f"{json.dumps(k)}: {json.dumps(v)}" for k, v in meta.items()]
-        prefix = "{" + ", ".join(meta_items) + (", " if meta_items else "") + '"body": "'
-        yield prefix
-
-        async for chunk_bytes in store.get_body_stream(object_key):
-            try:
-                chunk_str = chunk_bytes.decode("utf-8")
-            except UnicodeDecodeError:
-                chunk_str = chunk_bytes.hex()
-            # Escape chunk characters for JSON string body
-            escaped_chunk = json.dumps(chunk_str)[1:-1]
-            yield escaped_chunk
-
-        yield '"}'
-    else:
-        meta = dict(store_or_meta or {})
-        stream = object_key_or_stream
-        if doc_id and isinstance(doc_id, dict):
-            meta["structured_metadata"] = doc_id
-
-        meta_items = [f"{json.dumps(k)}: {json.dumps(v)}" for k, v in meta.items()]
-        prefix = "{" + ", ".join(meta_items) + (", " if meta_items else "") + '"body": "'
-        yield prefix
-
-        if stream:
-            async for chunk_bytes in stream:
-                if isinstance(chunk_bytes, bytes):
-                    chunk_str = chunk_bytes.decode("utf-8", errors="replace")
-                else:
-                    chunk_str = str(chunk_bytes)
-                escaped_chunk = json.dumps(chunk_str)[1:-1]
-                yield escaped_chunk
-
-        yield '"}'
-
+    header = dict(visible_metadata)
+    header["document_id"] = doc_id
+    header["tenant_id"] = tenant_id
+    header["structured_metadata"] = structured_data or {}
+    header["body"] = ""
+    prefix = json.dumps(header, ensure_ascii=False)
+    yield prefix[:-2].encode("utf-8")
+    async for raw in store.get_body_stream(object_key):
+        text = raw.decode("utf-8", errors="replace")
+        yield json.dumps(text, ensure_ascii=False)[1:-1].encode("utf-8")
+    yield b'"}'

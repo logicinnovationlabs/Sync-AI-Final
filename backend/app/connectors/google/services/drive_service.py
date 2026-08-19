@@ -13,6 +13,7 @@ Methods:
 
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+import asyncio
 import re
 
 from app.core.base_connector import (
@@ -24,6 +25,7 @@ from app.core.base_connector import (
 )
 from app.connectors.google.oauth import GoogleOAuthManager
 from app.connectors.google.clients.drive_client import DriveClient
+from app.connectors.google.content import SKIP_MIME_TYPES, extract_drive_text
 
 
 class DriveConnector(BaseConnector):
@@ -84,8 +86,16 @@ class DriveConnector(BaseConnector):
         """
         token = await self.get_valid_token()
         
-        # Build query to filter by modified time
-        query = f"modifiedTime > '{since.isoformat()}'"
+        # Full bootstrap crawl lists non-trashed files. Time filter is only
+        # applied when the caller passes a recent `since` (incremental-style).
+        query = "trashed = false"
+        if since and since.year > 1971:
+            # Keep a time bound for true delta-from-timestamp callers.
+            from datetime import timezone as _tz
+            aware = since if since.tzinfo else since.replace(tzinfo=_tz.utc)
+            age_days = (datetime.utcnow().replace(tzinfo=_tz.utc) - aware).days
+            if age_days < 360:
+                query = f"trashed = false and modifiedTime > '{since.isoformat()}'"
         
         response = await self.drive_client.list_files(
             access_token=token,
@@ -94,7 +104,12 @@ class DriveConnector(BaseConnector):
             query=query,
         )
         
-        files = response.get("files", [])
+        files = [
+            f for f in response.get("files", [])
+            if f.get("mimeType") not in SKIP_MIME_TYPES
+        ]
+        files = await self._hydrate_files(token, files)
+        
         next_page_token = response.get("nextPageToken")
         
         return DeltaResult(
@@ -178,7 +193,12 @@ class DriveConnector(BaseConnector):
             if change.get("removed"):
                 deleted_ids.append(change.get("fileId"))
             elif change.get("file"):
-                files.append(change["file"])
+                file_obj = change["file"]
+                if file_obj.get("mimeType") not in SKIP_MIME_TYPES:
+                    files.append(file_obj)
+        
+        if files:
+            files = await self._hydrate_files(token, files)
         
         next_page_token = response.get("newStartPageToken") or response.get("nextPageToken")
         
@@ -235,9 +255,8 @@ class DriveConnector(BaseConnector):
                 "size_bytes": size_bytes,
             }
             
-            # Content: for Google Docs, we can't get content via API without export
-            # For now, just use file name as content (real impl would export as text)
-            content = file.get("name", "")
+            # Content: prefer text extracted during fetch (_extracted_text).
+            content = file.get("_extracted_text") or file.get("name", "")
             
             unified_doc = UnifiedDocument(
                 id=file_id,
@@ -313,6 +332,31 @@ class DriveConnector(BaseConnector):
         token = await self.get_valid_token()
         _ = (since, token)
         return []
+    
+    async def _hydrate_files(
+        self, access_token: str, files: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Fetch missing ACLs and extract text (bounded worker pool)."""
+        semaphore = asyncio.Semaphore(5)
+
+        async def _one(file: Dict[str, Any]) -> Dict[str, Any]:
+            async with semaphore:
+                if not file.get("permissions"):
+                    try:
+                        perms = await self.drive_client.list_permissions(
+                            access_token, file.get("id", "")
+                        )
+                        if perms:
+                            file["permissions"] = perms
+                    except Exception:
+                        pass
+                text = await extract_drive_text(self.drive_client, access_token, file)
+                file["_extracted_text"] = text
+                return file
+
+        if not files:
+            return files
+        return list(await asyncio.gather(*[_one(f) for f in files]))
     
     def _parse_timestamp(self, timestamp_str: Optional[str]) -> datetime:
         """

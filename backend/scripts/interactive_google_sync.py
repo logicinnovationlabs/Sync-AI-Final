@@ -191,7 +191,7 @@ async def run_sync_demo():
     )
     redirect_uri = (
         getattr(settings, "google_redirect_uri", None)
-        or os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/v1/connectors/google/callback")
+        or os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/connectors/google/callback")
     )
 
     if not client_id or not client_secret:

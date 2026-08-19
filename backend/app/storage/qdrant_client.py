@@ -17,6 +17,7 @@ from qdrant_client.models import (
     Filter,
     FieldCondition,
     MatchValue,
+    HasIdCondition,
 )
 import logging
 
@@ -180,25 +181,42 @@ class QdrantClient:
     async def delete_by_ids(
         self,
         ids: List[str],
+        tenant_id: str,
     ) -> None:
         """
-        Delete documents by IDs.
-        
+        Delete documents by IDs, scoped to a tenant payload filter.
+
         Args:
             ids: List of document IDs to delete
+            tenant_id: Tenant UUID — required so a colliding ID cannot
+                delete another tenant's points.
         """
         if not ids:
             return
-        
+        if not tenant_id:
+            raise ValueError("tenant_id is required for vector deletes")
+
         qdrant_ids = [_to_qdrant_id(i) for i in ids]
         try:
             self.client.delete(
                 collection_name=self.collection_name,
-                points_selector=qdrant_ids,
+                points_selector=Filter(
+                    must=[
+                        FieldCondition(
+                            key="tenant_id",
+                            match=MatchValue(value=str(tenant_id)),
+                        ),
+                        HasIdCondition(has_id=qdrant_ids),
+                    ]
+                ),
             )
-            logger.info(f"Deleted {len(ids)} documents from Qdrant")
+            logger.info(
+                "Deleted %s documents from Qdrant for tenant %s",
+                len(ids),
+                tenant_id,
+            )
         except Exception as e:
-            logger.error(f"Failed to delete documents from Qdrant: {e}")
+            logger.error("Failed to delete documents from Qdrant: %s", e)
             raise
     
     async def search(

@@ -1,11 +1,14 @@
-"""First-time tenant bootstrap (unauthenticated by design)."""
+"""First-time tenant bootstrap (gated by TENANT_BOOTSTRAP_TOKEN)."""
 
+import secrets
+from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.audit_log import AuditLog  # noqa: F401 — register metadata
 from app.models.base import Base
 from app.models.tenant import Tenant
@@ -44,17 +47,28 @@ class CreateTenantResponse(BaseModel):
     temporary_password: str
 
 
+def _bootstrap_token_ok(provided: Optional[str]) -> bool:
+    """Require X-SnyQ-Setup-Token to match TENANT_BOOTSTRAP_TOKEN."""
+    expected = (settings.tenant_bootstrap_token or "").strip()
+    if not expected or not provided or len(expected) != len(provided):
+        return False
+    return secrets.compare_digest(provided, expected)
+
+
 @router.post("/tenants", response_model=CreateTenantResponse)
 async def create_tenant(
     request: CreateTenantRequest,
     session: AsyncSession = Depends(get_control_plane_session),
+    x_snyq_setup_token: Optional[str] = Header(default=None, alias="X-SnyQ-Setup-Token"),
 ):
     """
-    First-time tenant bootstrap (dev/test and initial setup).
+    First-time tenant bootstrap.
 
-    Unauthenticated on purpose: no admin JWT exists until the tenant and
-    first admin are created (chicken-and-egg).
+    Gated by TENANT_BOOTSTRAP_TOKEN (header X-SnyQ-Setup-Token). Chicken-and-egg
+    still applies — there is no admin JWT yet — but the route is not public.
     """
+    if not _bootstrap_token_ok(x_snyq_setup_token):
+        raise HTTPException(status_code=403, detail="Tenant bootstrap is not authorized")
     tenant_id = uuid4()
     db_secret_key = f"kv/tenant-{tenant_id}/db_password"
 

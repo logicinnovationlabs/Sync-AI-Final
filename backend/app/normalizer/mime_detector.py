@@ -6,10 +6,17 @@ magic bytes to detect spoofed/mismatched files.
 """
 
 import logging
-import magic
 from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+try:
+    import magic as _magic
+except ImportError:
+    _magic = None
+    logger.warning(
+        "python-magic/libmagic not available; MIME detection will trust source-stated type"
+    )
 
 
 def detect_mime(raw_bytes: bytes, source_stated_mime: Optional[str]) -> Tuple[str, bool]:
@@ -37,8 +44,10 @@ def detect_mime(raw_bytes: bytes, source_stated_mime: Optional[str]) -> Tuple[st
         return source_stated_mime or "application/octet-stream", False
     
     try:
+        if _magic is None:
+            return source_stated_mime or "application/octet-stream", False
         # Use python-magic to detect from magic bytes
-        detected_mime = magic.from_buffer(raw_bytes, mime=True)
+        detected_mime = _magic.from_buffer(raw_bytes, mime=True)
     except Exception as e:
         logger.error(f"MIME detection failed: {e}")
         # Fall back to source-stated if detection fails

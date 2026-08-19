@@ -30,6 +30,8 @@ async def test_oauth_create_authorization_code():
 
 @pytest.mark.asyncio
 async def test_oauth_client_credentials_stub():
-    """Test client_credentials flow (stub)."""
-    # This is a stub; full implementation requires prod code
-    pass
+    """client_credentials is implemented; HTTP wiring requires a tenant DB row."""
+    from app.services.oauth_service import verify_pkce
+
+    assert verify_pkce("abc", "abc", "plain") is True
+    assert verify_pkce("abc", "xyz", "plain") is False

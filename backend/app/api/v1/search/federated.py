@@ -9,14 +9,13 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.api.deps import get_current_user, require_scope
-from app.acl.filter import is_fail_closed
+from app.api.deps import require_scope
+from app.acl.filter import acl_terms_from_jwt, is_fail_closed
 from app.models.federated import (
     BackendStatus,
     FederatedSearchRequest,
     FederatedSearchResponse,
     ResultItem,
-    UserContext,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,17 +31,18 @@ async def _safe_call_lexical(
     
     try:
         # Import locally to avoid circular dependency
-        from app.services.lexical.opensearch_store import OpenSearchStore
+        from app.services.lexical.opensearch_store import OpenSearchLexicalStore
         from app.core.config import settings
         
         if settings.opensearch_url:
-            store = OpenSearchStore()
-            results = await store.search(
+            store = OpenSearchLexicalStore()
+            payload = await store.search(
                 tenant_id=tenant_id,
                 query=query,
                 acl_terms=acl_terms,
                 size=size * 2,  # Over-fetch for fusion
             )
+            results = payload.get("results", []) if isinstance(payload, dict) else list(payload or [])
             status.ok = True
             status.hit_count = len(results)
             return results, status
@@ -63,17 +63,24 @@ async def _safe_call_vector(
     status = BackendStatus(name="vector", ok=False)
     
     try:
+        from app.services.embedding import embedding_service
         from app.services.vector.qdrant_store import QdrantVectorStore
         from app.core.config import settings
         
         if settings.qdrant_url:
+            query_embedding = await embedding_service.embed_text(query)
+            if not query_embedding:
+                raise ValueError("embedding service returned an empty vector")
             store = QdrantVectorStore()
             results = await store.search(
                 tenant_id=tenant_id,
-                query_vector=[],  # Would need embedding service
+                query_embedding=query_embedding,
                 acl_terms=acl_terms,
-                limit=size * 2,
+                top_k=size * 2,
             )
+            for doc in results:
+                if not doc.get("snippet"):
+                    doc["snippet"] = doc.get("chunk_text") or ""
             status.ok = True
             status.hit_count = len(results)
             return results, status
@@ -160,14 +167,7 @@ async def federated_search(
     if body.tenant_id and body.tenant_id != tenant_id:
         raise HTTPException(status_code=403, detail="Tenant mismatch")
     
-    # Build ACL terms from user context
-    user_ctx = UserContext(
-        tenant_id=tenant_id,
-        principal_id=str(current_user.get("sub") or current_user.get("principal_id", "")),
-        groups=current_user.get("groups", []),
-        scopes=current_user.get("scopes", []),
-    )
-    acl_terms = user_ctx.build_acl_terms()
+    acl_terms = acl_terms_from_jwt(current_user)
     if is_fail_closed(acl_terms):
         return FederatedSearchResponse(
             results=[],

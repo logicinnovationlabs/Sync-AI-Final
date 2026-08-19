@@ -46,15 +46,15 @@ def test_AB1_unauthenticated_connector_rejection(api_client):
     Assert: HTTP 401/403 returned when Authorization header is missing.
     """
     # 1. Backfill endpoint
-    response = api_client.post("/api/v1/connectors/google_drive/backfill")
+    response = api_client.post("/connectors/google_drive/backfill")
     assert response.status_code in (401, 403), f"Expected 401/403, got {response.status_code}"
 
     # 2. Status endpoint
-    response = api_client.get("/api/v1/connectors/google_drive/status")
+    response = api_client.get("/connectors/google_drive/status")
     assert response.status_code in (401, 403), f"Expected 401/403, got {response.status_code}"
 
     # 3. OAuth Authorize endpoint
-    response = api_client.get("/api/v1/connectors/google/authorize")
+    response = api_client.get("/connectors/google/authorize")
     assert response.status_code in (401, 403), f"Expected 401/403, got {response.status_code}"
 
     print("✓ AB1 PASS: Unauthenticated connector API calls rejected with HTTP 401/403")
@@ -88,7 +88,7 @@ async def test_AB2_missing_scope_rejection(api_client):
         mock_resolve.return_value = MagicMock(tenant_id=tenant_id)
         
         response = api_client.post(
-            "/api/v1/connectors/google_drive/backfill",
+            "/connectors/google_drive/backfill",
             headers=headers,
         )
 
@@ -122,20 +122,23 @@ async def test_AB3_cross_tenant_connector_rejection(api_client):
     headers = {"Authorization": f"Bearer {token_a}"}
 
     with patch("app.api.deps.tenant_resolver.resolve") as mock_resolve, \
-         patch("app.api.v1.connectors.backfill_tenant_source.delay") as mock_task:
+         patch("app.connectors.router.backfill_tenant_source.delay") as mock_task:
         
         # Mock tenant resolution returning Tenant A
         mock_resolve.return_value = MagicMock(tenant_id=tenant_a_id)
         mock_task.return_value = MagicMock(id="task_ab3_123")
 
         response = api_client.post(
-            "/api/v1/connectors/google_drive/backfill",
+            "/connectors/google_drive/backfill",
             headers=headers,
         )
 
         assert response.status_code == 200
-        # Assert task was enqueued ONLY for tenant_a_id
-        mock_task.assert_called_once_with(tenant_id=tenant_a_id, source_type="google_drive")
+        mock_task.assert_called_once()
+        args, kwargs = mock_task.call_args
+        assert kwargs.get("args") == [tenant_a_id, "google_drive"] or (
+            args and args[0] == [tenant_a_id, "google_drive"]
+        )
         print("✓ AB3 PASS: Connector execution strictly bound to JWT tenant_id (cross-tenant rejected)")
 
 
@@ -170,7 +173,7 @@ async def test_AB4_revoked_token_session_rejection(api_client):
 
     # Attempt API request with revoked token
     response = api_client.get(
-        "/api/v1/connectors/google_drive/status",
+        "/connectors/google_drive/status",
         headers=headers,
     )
 
@@ -244,7 +247,7 @@ async def test_AB6_end_to_end_authenticated_flow(api_client):
         mock_cursor.return_value = None
 
         response = api_client.post(
-            "/api/v1/connectors/google_drive/backfill",
+            "/connectors/google_drive/backfill",
             headers=headers,
         )
 

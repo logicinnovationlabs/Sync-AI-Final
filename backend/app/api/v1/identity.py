@@ -6,9 +6,11 @@ POST /identity/resolve - manually resolve an identity hint
 
 import logging
 from uuid import UUID
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_user, get_tenant_session
 from app.core.models import IdentityHint, ResolvedIdentity
 from app.identity.resolver import IdentityResolver
 from app.identity.matchers.email_matcher import EmailMatcher
@@ -32,27 +34,31 @@ class ResolveIdentityResponse(BaseModel):
 
 
 @router.post("/resolve", response_model=ResolveIdentityResponse)
-async def resolve_identity(request: ResolveIdentityRequest):
+async def resolve_identity(
+    request: ResolveIdentityRequest,
+    current_user: dict = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_tenant_session),
+):
     """
     Manually resolve an identity hint (debug/manual endpoint).
-    
-    Args:
-        request: ResolveIdentityRequest with tenant_id and hint
-        
-    Returns:
-        ResolvedIdentity with principal and match metadata
+
+    Requires a JWT whose tenant_id matches the request tenant.
     """
+    token_tenant = str(current_user.get("tenant_id") or "")
+    if token_tenant != str(request.tenant_id):
+        raise HTTPException(status_code=403, detail="Tenant ID mismatch")
+
     try:
-        # Initialize resolver
-        canonical_repo = CanonicalRepo(use_memory=True)
+        canonical_repo = CanonicalRepo(use_memory=False, session=db_session)
         matchers = [EmailMatcher(), UsernameMatcher()]
         resolver = IdentityResolver(matchers, canonical_repo)
-        
-        # Resolve
+
         resolved = await resolver.resolve(request.hint, request.tenant_id)
-        
+
         return ResolveIdentityResponse(resolved=resolved)
-    
+
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Identity resolution failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Identity resolution failed: %s", e)
+        raise HTTPException(status_code=500, detail="Identity resolution failed") from e

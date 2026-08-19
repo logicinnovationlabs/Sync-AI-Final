@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.acl.filter import document_is_visible, is_fail_closed
+from app.acl.filter import acl_terms_from_jwt, document_is_visible, is_fail_closed
 from app.services.vector.mock_store import MockVectorStore
 
 
@@ -28,6 +28,26 @@ def test_explicit_deny_wins_over_group_allow():
 
 def test_bypass_star():
     assert document_is_visible(["*"], ["deny:user:bob", "group:eng"])
+
+
+def test_acl_terms_from_jwt_ignores_star_and_uses_sub():
+    terms = acl_terms_from_jwt(
+        {
+            "sub": "alice",
+            "acl_terms": ["*", "user:eve"],
+            "groups": ["eng"],
+        }
+    )
+    assert "*" not in terms
+    assert "alice" in terms
+    assert "user:alice" in terms
+    assert "user:eve" in terms
+    assert "eng" in terms
+    assert "group:eng" in terms
+
+
+def test_acl_terms_from_jwt_empty_payload_is_fail_closed():
+    assert is_fail_closed(acl_terms_from_jwt({}))
 
 
 @pytest.mark.asyncio

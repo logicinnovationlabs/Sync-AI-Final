@@ -14,12 +14,22 @@ Endpoints:
 from fastapi import APIRouter, Request, HTTPException, Header
 from typing import Optional
 import logging
+import secrets
 
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhooks/google", tags=["webhooks"])
+
+
+def gmail_verification_ok(expected: Optional[str], provided: Optional[str]) -> bool:
+    """Fail-closed Pub/Sub token check. Empty expected or provided is a reject."""
+    exp = (expected or "").strip()
+    got = (provided or "").strip()
+    if not exp or not got or len(exp) != len(got):
+        return False
+    return secrets.compare_digest(got, exp)
 
 
 @router.post("/drive")
@@ -69,10 +79,7 @@ async def drive_webhook(
         
         stored_token = watch_info["watch_data"].get("channel_token")
         if stored_token != x_goog_channel_token:
-            logger.warning(
-                f"Invalid channel token for channel {x_goog_channel_id}: "
-                f"expected {stored_token}, got {x_goog_channel_token}"
-            )
+            logger.warning("Invalid channel token for channel %s", x_goog_channel_id)
             raise HTTPException(status_code=403, detail="Invalid channel token")
         
         tenant_id = watch_info["tenant_id"]
@@ -153,16 +160,21 @@ async def gmail_webhook(request: Request):
     if not email_address:
         logger.warning("Gmail webhook missing emailAddress")
         raise HTTPException(status_code=400, detail="Missing emailAddress")
-    
-    # Optional: Validate verification token
-    # (If configured, check a custom header or data field)
-    verification_token = getattr(settings, "GOOGLE_PUBSUB_VERIFICATION_TOKEN", None)
-    if verification_token:
-        # Check if token matches (could be in headers or data)
-        provided_token = request.headers.get("X-Verification-Token") or data.get("token")
-        if provided_token != verification_token:
-            logger.warning(f"Invalid Pub/Sub verification token")
-            raise HTTPException(status_code=403, detail="Invalid verification token")
+
+    expected_token = (
+        getattr(settings, "google_pubsub_verification_token", None)
+        or getattr(settings, "GOOGLE_PUBSUB_VERIFICATION_TOKEN", None)
+        or ""
+    )
+    provided_token = (
+        request.headers.get("X-Goog-Channel-Token")
+        or request.headers.get("X-Verification-Token")
+        or data.get("token")
+        or ""
+    )
+    if not gmail_verification_ok(str(expected_token), str(provided_token)):
+        logger.warning("Gmail webhook rejected: missing or invalid verification token")
+        raise HTTPException(status_code=403, detail="Invalid verification token")
     
     # Resolve tenant from email address
     try:

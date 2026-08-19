@@ -10,11 +10,14 @@ One tenant + one Google account = one token with combined scopes.
 
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
+import logging
 import httpx
 from urllib.parse import urlencode
 
 from app.core.base_connector import TokenStore
 from app.core.exceptions import UnauthorizedError
+
+logger = logging.getLogger(__name__)
 
 
 class GoogleOAuthManager:
@@ -193,6 +196,23 @@ class GoogleOAuthManager:
             )
             
             if response.status_code != 200:
+                try:
+                    from app.connectors.google.status_store import set_status
+
+                    set_status(
+                        tenant_id,
+                        "google_drive",
+                        connection_status="needs_reauth",
+                        last_error="token_refresh_failed",
+                    )
+                    set_status(
+                        tenant_id,
+                        "google_gmail",
+                        connection_status="needs_reauth",
+                        last_error="token_refresh_failed",
+                    )
+                except Exception:
+                    pass
                 raise UnauthorizedError(
                     f"Token refresh failed for tenant {tenant_id}: {response.text}"
                 )
@@ -249,6 +269,13 @@ def seed_token_store_from_env(
     if not rt:
         return False
 
+    existing = token_store.get_token(f"google_oauth:{tenant_id}") or {}
+    if existing.get("refresh_token") or existing.get("access_token"):
+        logger.info(
+            "seed_token_store_from_env: skip, token already stored for tenant (will not clobber)"
+        )
+        return False
+
     # Expire access immediately so get_valid_token() refreshes on first use.
     token_store.set_token(
         f"google_oauth:{tenant_id}",
@@ -260,4 +287,19 @@ def seed_token_store_from_env(
         },
     )
     return True
+
+
+def google_oauth_from_settings(token_store: TokenStore) -> "GoogleOAuthManager":
+    """Build a GoogleOAuthManager from app settings + manifest scopes."""
+    from app.core.config import settings
+
+    client_id = settings.google_client_id or ""
+    client_secret = settings.google_client_secret or ""
+    scopes = [
+        "https://www.googleapis.com/auth/drive.readonly",
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/userinfo.email",
+        "openid",
+    ]
+    return GoogleOAuthManager(token_store, client_id, client_secret, scopes)
 

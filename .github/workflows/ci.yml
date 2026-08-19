@@ -1,0 +1,89 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main, master, develop]
+    paths:
+      - "backend/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/ci.yml"
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: control_plane
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      ENVIRONMENT: test
+      OTEL_SDK_DISABLED: "true"
+      CONTROL_PLANE_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/control_plane
+      REDIS_URL: redis://localhost:6379
+      SESSION_STORE_REDIS_URL: redis://localhost:6379
+      CELERY_BROKER_URL: redis://localhost:6379/1
+      CELERY_RESULT_BACKEND: redis://localhost:6379/1
+      CELERY_TASK_ALWAYS_EAGER: "true"
+      STORAGE_BACKEND: mock
+      GRAPH_BACKEND: mock
+      SIGNALS_BACKEND: mock
+      ACL_BACKEND: mock
+      TENANT_BOOTSTRAP_TOKEN: ci-bootstrap-token-min-16-chars
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Ruff
+        run: ruff check app tests
+
+      - name: Pytest (P0–P2 security + ops)
+        run: >
+          pytest -c pyproject.toml
+          tests/test_p0_security.py
+          tests/test_p1_security.py
+          tests/test_p2_ops.py
+          tests/test_acl_filter.py
+          tests/test_oauth.py
+          tests/test_normalizer_google_drive.py
+          -q --tb=short

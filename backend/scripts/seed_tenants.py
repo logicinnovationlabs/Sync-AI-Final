@@ -12,6 +12,10 @@ from uuid import uuid4
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import text
 
+# Local Postgres on Windows often fails the asyncpg SSL handshake unless
+# SSL is explicitly off (same as tenant_db.py).
+_ENGINE_CONNECT = {"ssl": False}
+
 # Add backend directory to Python path so we can import app modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -31,17 +35,30 @@ from app.models.oauth_client import OAuthClient, RefreshToken
 from app.models.scope import ScopeRegistry
 from app.models.audit_log import AuditLog  # noqa: F401 — Block N metadata
 from app.models.tenant_connector import TenantConnector  # noqa: F401
+from app.models.canonical import (  # noqa: F401
+    CanonicalDocumentRow,
+    IdentityPrincipalRow,
+    IdentityGroupRow,
+    ACLEntryRow,
+    ContainerACLEntryRow,
+    ContainerEdgeRow,
+)
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.services.native_auth import native_auth_service
 from app.storage.control_plane_db import ControlPlaneSessionLocal
 from app.storage.vault_client import vault_client
 
-# Known passwords for Postman / live API against Docker-seeded Alpha
-ALPHA_ADMIN_EMAIL = "admin@alpha.test"
+# Known passwords for Postman / live API / frontend against Docker-seeded Alpha.
+# admin@synq.dev stays EmailStr-safe. member@alpha.test is the documented
+# read-only employee account; login accepts the reserved .test TLD.
+ALPHA_ADMIN_EMAIL = "admin@synq.dev"
 ALPHA_ADMIN_PASSWORD = "AlphaAdmin123!"
 ALPHA_MEMBER_EMAIL = "member@alpha.test"
 ALPHA_MEMBER_PASSWORD = "AlphaMember123!"
+# Kept so older docs / filled forms still authenticate.
+ALPHA_MEMBER_EMAIL_LEGACY = "member@synq.dev"
+ALPHA_SUBDOMAIN = "alpha"
 
 
 async def create_dev_tenant(session, name: str, subdomain: str, db_name: str, db_password: str):
@@ -66,7 +83,8 @@ async def create_dev_tenant(session, name: str, subdomain: str, db_name: str, db
         print(f"  [INFO] Tenant record already exists: {subdomain}")
         # Ensure tenant database tables exist
         tenant_engine = create_async_engine(
-            f"postgresql+asyncpg://postgres:postgres@{DB_HOST}:5432/{db_name}"
+            f"postgresql+asyncpg://postgres:postgres@{DB_HOST}:5432/{db_name}",
+            connect_args=_ENGINE_CONNECT,
         )
         async with tenant_engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -96,6 +114,7 @@ async def create_dev_tenant(session, name: str, subdomain: str, db_name: str, db
     engine = create_async_engine(
         f"postgresql+asyncpg://postgres:postgres@{DB_HOST}:5432/postgres",
         isolation_level="AUTOCOMMIT",
+        connect_args=_ENGINE_CONNECT,
     )
     
     async with engine.begin() as conn:
@@ -117,7 +136,8 @@ async def create_dev_tenant(session, name: str, subdomain: str, db_name: str, db
     # Note: db_password is the Vault secret for a future dedicated DB user;
     # for dev we use the postgres superuser to create tables.
     tenant_engine = create_async_engine(
-        f"postgresql+asyncpg://postgres:postgres@{DB_HOST}:5432/{db_name}"
+        f"postgresql+asyncpg://postgres:postgres@{DB_HOST}:5432/{db_name}",
+        connect_args=_ENGINE_CONNECT,
     )
     
     async with tenant_engine.begin() as conn:
@@ -156,7 +176,8 @@ async def seed_block_n_users(tenant):
         return
     print("\nSeeding Block N native users on tenant alpha...")
     tenant_engine = create_async_engine(
-        f"postgresql+asyncpg://postgres:postgres@{DB_HOST}:5432/{tenant.db_name}"
+        f"postgresql+asyncpg://postgres:postgres@{DB_HOST}:5432/{tenant.db_name}",
+        connect_args=_ENGINE_CONNECT,
     )
     SessionLocal = async_sessionmaker(tenant_engine, class_=AsyncSession, expire_on_commit=False)
     async with SessionLocal() as session:
@@ -171,6 +192,14 @@ async def seed_block_n_users(tenant):
         await _ensure_user(
             session,
             email=ALPHA_MEMBER_EMAIL,
+            password=ALPHA_MEMBER_PASSWORD,
+            display_name="Alpha Member",
+            tenant_id=tenant.tenant_id,
+            role="member",
+        )
+        await _ensure_user(
+            session,
+            email=ALPHA_MEMBER_EMAIL_LEGACY,
             password=ALPHA_MEMBER_PASSWORD,
             display_name="Alpha Member",
             tenant_id=tenant.tenant_id,
@@ -223,10 +252,10 @@ async def seed_tenants():
     print(f"  2. {tenant_b.name} ({tenant_b.subdomain})")
     print(f"  3. {tenant_c.name} ({tenant_c.subdomain})")
     print("\nBlock N live login (Postman / curl) against tenant alpha:")
-    print(f"  POST /api/v1/auth/login")
+    print(f"  POST /auth/login")
     print(f"  admin:  {ALPHA_ADMIN_EMAIL} / {ALPHA_ADMIN_PASSWORD}")
     print(f"  member: {ALPHA_MEMBER_EMAIL} / {ALPHA_MEMBER_PASSWORD}")
-    print(f"  tenant_subdomain: alpha")
+    print(f"  tenant_subdomain: {ALPHA_SUBDOMAIN}")
 
 
 if __name__ == "__main__":

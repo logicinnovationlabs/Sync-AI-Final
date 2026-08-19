@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 from app.core.config import settings
 from app.api.deps import get_current_user, require_scope
-from app.acl.filter import is_fail_closed
+from app.acl.filter import acl_terms_from_jwt, is_fail_closed
 from app.services.vector.qdrant_store import QdrantVectorStore
 
 logger = logging.getLogger(__name__)
@@ -23,9 +23,12 @@ router = APIRouter()
 class VectorSearchRequest(BaseModel):
     """Vector search request."""
     query_embedding: List[float] = Field(..., description="Query vector embedding")
-    tenant_id: str = Field(..., description="Tenant identifier")
-    user_id: str = Field(..., description="User identifier for ACL")
-    acl_terms: List[str] = Field(default_factory=list, description="ACL filter terms")
+    tenant_id: str = Field(..., description="Tenant identifier (must match JWT)")
+    user_id: str = Field(..., description="User identifier (ignored for ACL; JWT is source of truth)")
+    acl_terms: List[str] = Field(
+        default_factory=list,
+        description="Ignored. ACL is derived from the JWT, never from the body.",
+    )
     top_k: int = Field(10, ge=1, le=100, description="Number of results")
     model_version: Optional[str] = Field(None, description="Filter by embedding model version")
     score_threshold: Optional[float] = Field(None, ge=0.0, le=1.0, description="Minimum similarity score")
@@ -95,11 +98,15 @@ async def search_vector(
             status_code=400,
             detail=f"Query embedding must have {expected_dims} dimensions, got {len(request.query_embedding)}"
         )
+
+    acl_terms = acl_terms_from_jwt(current_user)
     
     # Fail-closed if no ACL terms
-    if is_fail_closed(request.acl_terms):
+    if is_fail_closed(acl_terms):
         logger.warning(
-            f"ACL empty for user={request.user_id} tenant={request.tenant_id} — fail-closed"
+            "ACL empty for user=%s tenant=%s — fail-closed",
+            current_user.get("sub") or request.user_id,
+            request.tenant_id,
         )
         return VectorSearchResponse(results=[], model_versions_used=[], took_ms=0.0)
     
@@ -109,7 +116,7 @@ async def search_vector(
         raw = await store.search(
             tenant_id=request.tenant_id,
             query_embedding=request.query_embedding,
-            acl_terms=request.acl_terms,
+            acl_terms=acl_terms,
             top_k=request.top_k,
             model_version=request.model_version,
             score_threshold=request.score_threshold,

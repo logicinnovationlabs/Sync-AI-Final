@@ -14,10 +14,14 @@ without duplicates or missing objects (upsert semantics + page-token resume).
 
 from datetime import datetime, timezone
 from typing import Callable, List, Optional
+import logging
 
 from app.core.base_connector import BaseConnector
 from app.services.registry import connector_registry
 from app.services.indexer import indexer
+from app.connectors.google.token_store import google_credential_ref
+
+logger = logging.getLogger(__name__)
 
 
 # Callback invoked after each successfully indexed/deleted page with the next cursor.
@@ -44,6 +48,7 @@ class SyncOrchestrator:
         last_sync: Optional[datetime] = None,
         resume_cursor: Optional[str] = None,
         on_cursor_update: Optional[CursorUpdateCallback] = None,
+        extra_acl: Optional[List[str]] = None,
     ) -> dict:
         """
         Run a full two-pass sync for a source.
@@ -60,7 +65,8 @@ class SyncOrchestrator:
         Returns:
             Dict with sync stats (deleted, indexed, errors).
         """
-        stats = {"deleted": 0, "indexed": 0, "errors": 0, "final_cursor": None}
+        stats = {"deleted": 0, "indexed": 0, "errors": 0, "final_cursor": None, "pipeline": None}
+        extra_acl = extra_acl or _acl_from_config(config)
         
         # Get connector from registry (blind - no name imports)
         connector = connector_registry.get_connector(source_type, config, token_store)
@@ -77,6 +83,11 @@ class SyncOrchestrator:
                 # Source doesn't support deletion tracking
                 break
             except Exception:
+                logger.exception(
+                    "fetch_deleted_ids failed tenant=%s source=%s",
+                    tenant_id,
+                    source_type,
+                )
                 stats["errors"] += 1
                 break
             
@@ -97,17 +108,62 @@ class SyncOrchestrator:
             try:
                 result = await connector.fetch_delta(last_sync, cursor)
             except Exception:
+                logger.exception(
+                    "fetch_delta failed tenant=%s source=%s",
+                    tenant_id,
+                    source_type,
+                )
                 stats["errors"] += 1
                 break
-            
+
             if result.documents:
-                # Transform to UnifiedDocument
+                _publish_raw_page(tenant_id, connector.source_type, result.documents)
+                # Transform to UnifiedDocument (Block B contract)
                 docs = await connector.transform(result.documents)
-                
-                if docs:
-                    await indexer.bulk_index(docs, tenant_id)
-                    stats["indexed"] += len(docs)
-            
+                try:
+                    from app.connectors.google.pipeline_bridge import process_raw_batch
+
+                    piped = await process_raw_batch(
+                        result.documents, connector.source_type, tenant_id
+                    )
+                    if piped:
+                        docs = piped
+                        stats["pipeline"] = "block_c"
+                        logger.info(
+                            "pipeline=block_c n=%s source=%s tenant=%s",
+                            len(piped),
+                            connector.source_type,
+                            tenant_id,
+                        )
+                    else:
+                        stats["pipeline"] = "fallback_transform"
+                        logger.warning(
+                            "pipeline=fallback_transform n=%s source=%s tenant=%s "
+                            "(process_raw_batch returned empty; using connector.transform)",
+                            len(docs) if docs else 0,
+                            connector.source_type,
+                            tenant_id,
+                        )
+                except Exception as exc:
+                    stats["pipeline"] = "fallback_transform"
+                    logger.warning(
+                        "pipeline=fallback_transform n=%s source=%s tenant=%s "
+                        "exc_type=%s exc=%s",
+                        len(docs) if docs else 0,
+                        connector.source_type,
+                        tenant_id,
+                        type(exc).__name__,
+                        exc,
+                    )
+
+                    if docs:
+                        await indexer.bulk_index(
+                            docs,
+                            tenant_id,
+                            extra_acl=extra_acl,
+                        )
+                        stats["indexed"] += len(docs)
+
             if result.next_cursor:
                 stats["final_cursor"] = result.next_cursor
                 if on_cursor_update:
@@ -128,6 +184,7 @@ class SyncOrchestrator:
         since: Optional[datetime] = None,
         cursor: Optional[str] = None,
         on_cursor_update: Optional[CursorUpdateCallback] = None,
+        extra_acl: Optional[List[str]] = None,
     ) -> dict:
         """
         Run a two-pass sync (called synchronously or from Celery tasks):
@@ -151,6 +208,7 @@ class SyncOrchestrator:
                 "final_cursor": cursor,
                 "pages_processed": 0,
                 "indexed_ids": [],
+                "pipeline": None,
             }
 
             # Pass 1: Deletions first (do not reuse backfill page-token as deletion cursor)
@@ -161,6 +219,11 @@ class SyncOrchestrator:
                 except NotImplementedError:
                     break
                 except Exception:
+                    logger.exception(
+                        "fetch_deleted_ids failed tenant=%s source=%s",
+                        tenant_id,
+                        connector.source_type,
+                    )
                     break
 
                 if hasattr(del_res, "deleted_ids") and del_res.deleted_ids:
@@ -185,13 +248,56 @@ class SyncOrchestrator:
                 try:
                     delta_res = await connector.fetch_delta(since=since, cursor=delta_cursor)
                 except Exception:
+                    logger.exception(
+                        "fetch_delta failed tenant=%s source=%s",
+                        tenant_id,
+                        connector.source_type,
+                    )
                     break
 
                 page_ids: List[str] = []
                 if hasattr(delta_res, "documents") and delta_res.documents:
+                    _publish_raw_page(tenant_id, connector.source_type, delta_res.documents)
                     docs = await connector.transform(delta_res.documents)
+                    try:
+                        from app.connectors.google.pipeline_bridge import process_raw_batch
+
+                        piped = await process_raw_batch(
+                            delta_res.documents, connector.source_type, tenant_id
+                        )
+                        if piped:
+                            docs = piped
+                            stats["pipeline"] = "block_c"
+                            logger.info(
+                                "pipeline=block_c n=%s source=%s tenant=%s",
+                                len(piped),
+                                connector.source_type,
+                                tenant_id,
+                            )
+                        else:
+                            stats["pipeline"] = "fallback_transform"
+                            logger.warning(
+                                "pipeline=fallback_transform n=%s source=%s tenant=%s "
+                                "(process_raw_batch returned empty; using connector.transform)",
+                                len(docs) if docs else 0,
+                                connector.source_type,
+                                tenant_id,
+                            )
+                    except Exception as exc:
+                        stats["pipeline"] = "fallback_transform"
+                        logger.warning(
+                            "pipeline=fallback_transform n=%s source=%s tenant=%s "
+                            "exc_type=%s exc=%s",
+                            len(docs) if docs else 0,
+                            connector.source_type,
+                            tenant_id,
+                            type(exc).__name__,
+                            exc,
+                        )
                     if docs:
-                        await indexer.bulk_index(docs, tenant_id)
+                        await indexer.bulk_index(
+                            docs, tenant_id, extra_acl=extra_acl
+                        )
                         page_ids = [d.id for d in docs]
                         stats["indexed_count"] += len(docs)
                         stats["indexed_ids"].extend(page_ids)
@@ -226,3 +332,34 @@ class SyncOrchestrator:
 
 # Global orchestrator instance
 sync_orchestrator = SyncOrchestrator()
+
+
+def _acl_from_config(config: Optional[dict]) -> List[str]:
+    principal = str((config or {}).get("connected_by") or "")
+    if not principal:
+        return []
+    terms = [principal]
+    if not principal.startswith(("user:", "group:")):
+        terms.append(f"user:{principal}")
+    return terms
+
+
+def _publish_raw_page(tenant_id: str, source_type: str, documents: List) -> None:
+    try:
+        from app.services.ingest.publisher import publish_google_item
+
+        instance_id = google_credential_ref(tenant_id)
+        for item in documents:
+            publish_google_item(
+                tenant_id=tenant_id,
+                source_type=source_type,
+                source_instance_id=instance_id,
+                item=item,
+            )
+    except Exception:
+        logger.exception(
+            "ingest.raw.v1 publish failed tenant=%s source=%s n=%s",
+            tenant_id,
+            source_type,
+            len(documents) if documents else 0,
+        )

@@ -16,6 +16,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 import os
 
+from app.core.backends import mock_backends_allowed
 from app.core.config import settings
 from app.core.exceptions import VaultError
 
@@ -193,7 +194,8 @@ class MockVaultClient(VaultClient):
             self._in_memory_store[key_name] = boot
             return boot
         if settings.environment in ("development", "test") and "db_password" in key_name:
-            return "postgres"
+            if mock_backends_allowed():
+                return "postgres"
         raise VaultError(
             f"Secret '{key_name}' not found. Set env var {self._env_key(key_name)} or call set_secret()."
         )
@@ -212,10 +214,7 @@ class MockVaultClient(VaultClient):
         self._in_memory_store[key_name] = value
 
     def get(self, key_name: str) -> str:
-        try:
-            return self._lookup(key_name)
-        except VaultError:
-            return ""
+        return self._lookup(key_name)
 
 
 def get_vault_client() -> VaultClient:
@@ -242,7 +241,10 @@ def get_vault_client() -> VaultClient:
             client_secret=settings.vault_client_secret,
         )
     else:
-        # Mock Vault for dev/test
+        if not mock_backends_allowed():
+            raise VaultError(
+                "VAULT_URL is not configured; MockVaultClient is not allowed outside development/test"
+            )
         return MockVaultClient()
 
 

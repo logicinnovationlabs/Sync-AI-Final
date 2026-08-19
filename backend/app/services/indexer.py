@@ -9,13 +9,14 @@ Block B implementation:
 The indexer NEVER imports specific connectors by name.
 """
 
-from typing import List
+from typing import List, Optional
 import logging
 
 from app.core.base_connector import UnifiedDocument
 from app.services.registry import connector_registry
 from app.services.embedding import embedding_service
 from app.storage.qdrant_client import qdrant_client
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,7 @@ class Indexer:
         self,
         documents: List[UnifiedDocument],
         tenant_id: str,
+        extra_acl: Optional[List[str]] = None,
     ) -> None:
         """
         Index a batch of documents.
@@ -79,7 +81,7 @@ class Indexer:
                 "content": doc.content,
                 "source_type": doc.source_type,
                 "url": doc.url,
-                "permissions": doc.permissions,
+                "permissions": list(doc.permissions) + list(extra_acl or []),
                 "created_at": doc.created_at.isoformat(),
                 "updated_at": doc.updated_at.isoformat(),
                 "source_updated_at": doc.source_updated_at.isoformat(),
@@ -92,10 +94,109 @@ class Indexer:
         texts = [f"{doc['title']} {doc['content']}" for doc in processed_docs]
         vectors = await self.embedding_service.embed_texts(texts)
         
-        # Index to Qdrant
+        # Index to Qdrant (Block B collection)
         await self.qdrant.upsert_documents(processed_docs, vectors)
+
+        await self._fanout_search_pipeline(processed_docs, vectors, tenant_id, extra_acl or [])
         
         logger.info(f"Successfully indexed {len(documents)} documents for tenant {tenant_id}")
+
+    async def _fanout_search_pipeline(
+        self,
+        processed_docs: List[dict],
+        vectors: List[List[float]],
+        tenant_id: str,
+        extra_acl: List[str],
+    ) -> None:
+        """Write Block E chunks + F lexical + G vector + K document store + local index."""
+        from app.services.ingest.local_index import local_ingest_index
+        from app.services.chunking.prose import ProseChunker
+
+        chunker = ProseChunker()
+        model_version = (
+            getattr(settings, "embedding_model_version", None)
+            or getattr(settings, "model_version", None)
+            or "default"
+        )
+        lexical_docs = []
+        vector_chunks = []
+
+        for doc, vector in zip(processed_docs, vectors):
+            doc_id = str(doc["id"])
+            acl_terms = _acl_terms(doc.get("permissions") or [], extra_acl)
+            body = doc.get("content") or ""
+            title = doc.get("title") or ""
+            local_ingest_index.upsert(
+                tenant_id,
+                {
+                    "document_id": doc_id,
+                    "title": title,
+                    "body_text": body,
+                    "content": body,
+                    "acl_terms": acl_terms,
+                    "source": doc.get("source_type"),
+                },
+            )
+            lexical_docs.append(
+                {
+                    "document_id": doc_id,
+                    "title": title,
+                    "body_text": body,
+                    "source": doc.get("source_type"),
+                    "acl_filter_terms": acl_terms,
+                    "deleted": False,
+                }
+            )
+            pieces = chunker.chunk(f"{title}\n{body}") or [
+                {"id": "0", "content": f"{title}\n{body}"[:2000]}
+            ]
+            for piece in pieces:
+                vector_chunks.append(
+                    {
+                        "chunk_id": f"{doc_id}:{piece.get('id') or '0'}",
+                        "document_id": doc_id,
+                        "embedding": vector,
+                        "model_version": str(model_version),
+                        "acl_terms": acl_terms,
+                        "chunk_text": piece.get("content") or "",
+                        "metadata": {"source_type": doc.get("source_type"), "title": title},
+                    }
+                )
+            try:
+                from app.services.document_reader.store import get_shared_document_store
+
+                store = get_shared_document_store()
+                if hasattr(store, "upsert"):
+                    await store.upsert(
+                        tenant_id,
+                        doc_id,
+                        title=title,
+                        body=body,
+                        structured_metadata=doc.get("structured_metadata") or {},
+                        owner_principal_id=next(
+                            (p.split(":", 1)[-1] for p in acl_terms if ":" in str(p)),
+                            "",
+                        ),
+                        created_at=doc.get("created_at"),
+                        updated_at=doc.get("updated_at"),
+                        acl_entries=acl_terms,
+                    )
+            except Exception:
+                logger.warning("document store upsert failed id=%s", doc_id, exc_info=True)
+
+        try:
+            from app.services.lexical.opensearch_store import OpenSearchLexicalStore
+
+            await OpenSearchLexicalStore().index_batch(tenant_id, lexical_docs)
+        except Exception:
+            logger.warning("lexical index fan-out skipped", exc_info=True)
+
+        try:
+            from app.services.vector.qdrant_store import QdrantVectorStore
+
+            await QdrantVectorStore().upsert_batch(tenant_id, vector_chunks)
+        except Exception:
+            logger.warning("vector index fan-out skipped", exc_info=True)
 
     async def delete_by_ids(
         self,
@@ -119,7 +220,7 @@ class Indexer:
         )
         
         # Delete from Qdrant
-        await self.qdrant.delete_by_ids(document_ids)
+        await self.qdrant.delete_by_ids(document_ids, tenant_id=tenant_id)
         
         logger.info(
             f"Successfully deleted {len(document_ids)} documents for tenant {tenant_id}"
@@ -128,3 +229,20 @@ class Indexer:
 
 # Global indexer instance
 indexer = Indexer()
+
+
+def _acl_terms(permissions: List[str], extra_acl: Optional[List[str]] = None) -> List[str]:
+    terms = []
+    seen = set()
+    for raw in list(permissions or []) + list(extra_acl or []):
+        value = str(raw)
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        terms.append(value)
+        if value.startswith("user:") or value.startswith("group:"):
+            bare = value.split(":", 1)[-1]
+            if bare and bare not in seen:
+                seen.add(bare)
+                terms.append(bare)
+    return terms

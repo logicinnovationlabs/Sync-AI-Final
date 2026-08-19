@@ -6,45 +6,90 @@ Handles Google-native formats (Docs/Sheets/Slides) via Drive export API.
 """
 
 import logging
-from typing import Dict, Any, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
 from app.normalizer.base import NormalizerStrategy
 from app.core.models import IdentityHint, PermissionLevel
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+GOOGLE_NATIVE_EXPORT = {
+    "application/vnd.google-apps.document": "text/plain",
+    "application/vnd.google-apps.spreadsheet": "text/csv",
+    "application/vnd.google-apps.presentation": "text/plain",
+}
 
 
 class GoogleDriveNormalizer(NormalizerStrategy):
     """
     Normalizer for Google Drive files.
-    
+
     Handles both Google-native formats (export to text) and binary formats
-    (download and extract via TextExtractor).
+    (download and extract via TextExtractor). Tests may inject
+    ``_test_extracted_text``; that path always wins so signoff stays stable.
     """
-    
+
+    def __init__(self, drive_client=None, text_extractor=None):
+        self.drive_client = drive_client
+        self.text_extractor = text_extractor
+
     def get_source_type(self) -> str:
         return "google_drive"
-    
+
+    def _bound(self, text: str) -> str:
+        max_chars = int(getattr(settings, "max_extracted_chars", 500000) or 500000)
+        if text and len(text) > max_chars:
+            return text[:max_chars]
+        return text or ""
+
     async def extract_text(self, raw: Dict[str, Any]) -> str:
         """
         Extract text from Drive file.
-        
-        For Google-native formats (Docs/Sheets/Slides), export via Drive API.
-        For binary formats (PDF/DOCX/etc.), download and route through TextExtractor.
-        
-        NOTE: This is a simplified implementation. Real implementation would need
-        access to DriveClient and TextExtractor, which should be injected via
-        constructor. For now, we return file name as placeholder (tests will mock).
+
+        Order:
+        1. Test injection ``_test_extracted_text``
+        2. Inline content fields already present on the payload
+        3. Drive export/download when a client + access token are available
+        4. Filename placeholder (existing signoff expectation)
         """
-        # In real implementation, this would:
-        # 1. Check mime_type
-        # 2. For Google-native: call drive_client.export_file(file_id, mime_type="text/plain")
-        # 3. For binary: call drive_client.download_file(file_id), then text_extractor.extract()
-        # 4. Return extracted text
-        
-        # Placeholder: return file name (tests will provide pre-extracted text)
-        name = raw.get("name", "")
-        snippet = raw.get("_test_extracted_text", name)  # Tests can inject this
-        return snippet
+        injected = raw.get("_test_extracted_text")
+        if isinstance(injected, str) and injected:
+            return self._bound(injected)
+
+        for key in ("extractedText", "fullText", "content", "body"):
+            value = raw.get(key)
+            if isinstance(value, str) and value.strip():
+                return self._bound(value)
+
+        name = raw.get("name", "") or ""
+        file_id = raw.get("id")
+        access_token = raw.get("_access_token") or raw.get("access_token")
+        mime_type = raw.get("mimeType") or raw.get("mime_type") or ""
+        if self.drive_client and file_id and access_token:
+            try:
+                export_mime = GOOGLE_NATIVE_EXPORT.get(mime_type)
+                if export_mime:
+                    data = await self.drive_client.export_file(
+                        access_token, file_id, mime_type=export_mime
+                    )
+                    text = data.decode("utf-8", errors="replace") if isinstance(data, bytes) else str(data)
+                    return self._bound(text)
+                data = await self.drive_client.download_file(access_token, file_id)
+                if self.text_extractor is not None:
+                    extracted = await self.text_extractor.extract(
+                        data,
+                        mime_type,
+                        file_extension=raw.get("fileExtension"),
+                    )
+                    return self._bound(extracted)
+                if isinstance(data, bytes):
+                    return self._bound(data.decode("utf-8", errors="replace"))
+                return self._bound(str(data))
+            except Exception as exc:
+                logger.warning("Drive text extraction failed for file %s: %s", file_id, exc)
+
+        return self._bound(name)
     
     def map_metadata(self, raw: Dict[str, Any]) -> Dict[str, Any]:
         """

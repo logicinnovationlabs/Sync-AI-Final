@@ -27,21 +27,28 @@ class OpenTelemetryLogFilter(logging.Filter):
 
 
 def setup_otel_logging() -> None:
-    """Register the log filter and update the root logger format.
+    """Register the log filter on the root logger and every handler.
 
-    Safe to call multiple times – idempotent.
+    Safe to call multiple times – idempotent. Filters must live on handlers
+    as well as the root logger: child loggers propagate records to root
+    handlers without running the root logger's filters.
     """
     root = logging.getLogger()
+    existing = None
     for f in root.filters:
         if isinstance(f, OpenTelemetryLogFilter):
-            return  # already installed
-
-    root.addFilter(OpenTelemetryLogFilter())
+            existing = f
+            break
+    otel_filter = existing or OpenTelemetryLogFilter()
+    if existing is None:
+        root.addFilter(otel_filter)
 
     for handler in root.handlers:
+        if not any(isinstance(f, OpenTelemetryLogFilter) for f in handler.filters):
+            handler.addFilter(otel_filter)
         if handler.formatter:
             fmt = handler.formatter._fmt
-            if "%(trace_id)s" not in fmt:
+            if fmt and "%(trace_id)s" not in fmt:
                 handler.formatter = logging.Formatter(
                     fmt.replace(
                         "%(message)s",

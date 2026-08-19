@@ -36,17 +36,13 @@ _METRICS: Dict[str, Any] = {
 
 
 def get_graph_store() -> GraphStore:
-    """Factory to get graph store instance."""
-    from app.core.config import settings
+    """Process-level graph store (singleton mock in development/test)."""
+    from app.services.graph import get_graph_store as _factory
 
-    if settings.graph_backend == "neo4j":
-        from app.services.graph.neo4j_store import Neo4jGraphStore
-
-        return Neo4jGraphStore()
-    else:
-        from app.services.graph.mock_store import MockGraphStore
-
-        return MockGraphStore()
+    try:
+        return _factory()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 def assert_tenant_binding(requested_tenant: str, token_tenant: str) -> None:

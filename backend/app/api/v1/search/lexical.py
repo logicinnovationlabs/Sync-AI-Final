@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 from app.core.config import settings
 from app.api.deps import get_current_user, require_scope
-from app.acl.filter import is_fail_closed
+from app.acl.filter import acl_terms_from_jwt, is_fail_closed
 from app.services.lexical.opensearch_store import OpenSearchLexicalStore
 
 logger = logging.getLogger(__name__)
@@ -31,9 +31,12 @@ class SearchFilters(BaseModel):
 class SearchRequest(BaseModel):
     """Lexical search request."""
     query: str = Field(..., description="Search query string")
-    tenant_id: str = Field(..., description="Tenant identifier")
-    user_id: str = Field(..., description="User identifier for ACL")
-    acl_terms: List[str] = Field(default_factory=list, description="ACL filter terms")
+    tenant_id: str = Field(..., description="Tenant identifier (must match JWT)")
+    user_id: str = Field(..., description="User identifier (ignored for ACL; JWT is source of truth)")
+    acl_terms: List[str] = Field(
+        default_factory=list,
+        description="Ignored. ACL is derived from the JWT, never from the body.",
+    )
     filters: Optional[SearchFilters] = None
     facets: Optional[List[str]] = Field(None, description="Facet fields to aggregate")
     from_: int = Field(0, ge=0, alias="from", description="Pagination offset")
@@ -101,11 +104,15 @@ async def search_lexical(
     # Verify tenant binding
     if request.tenant_id != tenant_id:
         raise HTTPException(status_code=403, detail="Tenant ID mismatch")
+
+    acl_terms = acl_terms_from_jwt(current_user)
     
     # Fail-closed if no ACL terms
-    if is_fail_closed(request.acl_terms):
+    if is_fail_closed(acl_terms):
         logger.warning(
-            f"ACL empty for user={request.user_id} tenant={request.tenant_id} — fail-closed"
+            "ACL empty for user=%s tenant=%s — fail-closed",
+            current_user.get("sub") or request.user_id,
+            request.tenant_id,
         )
         return SearchResponse(results=[], facets={}, total=0, took_ms=0.0)
     
@@ -117,7 +124,7 @@ async def search_lexical(
         raw = await store.search(
             tenant_id=request.tenant_id,
             query=request.query,
-            acl_terms=request.acl_terms,
+            acl_terms=acl_terms,
             filters=filters_dict,
             facets=request.facets,
             from_=request.from_,

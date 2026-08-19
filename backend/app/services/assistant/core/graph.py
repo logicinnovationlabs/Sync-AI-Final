@@ -25,6 +25,11 @@ from app.services.assistant.domain.models import (
 )
 from app.services.assistant.infrastructure.memory_store import EpisodicMemoryStore
 from app.services.assistant.infrastructure.tools import SearchToolbox, encode_acl_terms
+from app.services.assistant.infrastructure.chat_provider import (
+    ChatService,
+    assemble_chat_messages,
+    record_prompt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +52,9 @@ class OrchestratorState(TypedDict, total=False):
     used_document_reader: bool
     latency_ms: float
     errors: List[str]
+    llm_prompt: str
+    tool_call_rounds: int
+    chat_provider_name: str
 
 
 class OrchestratorGraph:
@@ -58,10 +66,20 @@ class OrchestratorGraph:
         memory: EpisodicMemoryStore,
         *,
         confidence_threshold: float = CONFIDENCE_THRESHOLD,
+        chat_provider: Any = None,
+        max_tool_call_rounds: Optional[int] = None,
     ) -> None:
+        from app.core.config import settings as _settings
+
         self.toolbox = toolbox
         self.memory = memory
         self.confidence_threshold = confidence_threshold
+        self.chat_service = ChatService(provider=chat_provider)
+        self.max_tool_call_rounds = (
+            max_tool_call_rounds
+            if max_tool_call_rounds is not None
+            else int(getattr(_settings, "llm_max_tool_call_rounds", 2) or 2)
+        )
         self._graph = build_orchestrator_graph(self)
 
     async def arun(
@@ -96,6 +114,9 @@ class OrchestratorGraph:
             "citations": [],
             "used_document_reader": False,
             "errors": [],
+            "llm_prompt": "",
+            "tool_call_rounds": 0,
+            "chat_provider_name": "",
         }
         final = await self._graph.ainvoke(initial)
         final["latency_ms"] = (time.perf_counter() - started) * 1000.0
@@ -186,7 +207,16 @@ class OrchestratorGraph:
         results: List[ToolResult] = []
 
         if intent == Intent.CHAT.value:
-            return {**state, "tool_results": [], "errors": errors}
+            return {**state, "tool_results": [], "errors": errors, "tool_call_rounds": 0}
+
+        rounds = int(state.get("tool_call_rounds") or 0)
+        if rounds >= self.max_tool_call_rounds:
+            return {
+                **state,
+                "tool_results": list(state.get("tool_results") or []),
+                "errors": errors + ["max tool-call rounds reached"],
+                "tool_call_rounds": rounds,
+            }
 
         if intent == Intent.READ.value:
             doc_id = None
@@ -211,6 +241,7 @@ class OrchestratorGraph:
                     "tool_results": [r.model_dump() for r in results],
                     "used_document_reader": True,
                     "errors": errors,
+                    "tool_call_rounds": rounds + 1,
                 }
 
         # Parallel lexical + vector via Federator fan-out wrappers + signal lookup.
@@ -247,6 +278,7 @@ class OrchestratorGraph:
             "tool_results": [r.model_dump() for r in results],
             "signals": signals,
             "errors": errors,
+            "tool_call_rounds": rounds + 1,
         }
 
     async def personalized_ranker(self, state: OrchestratorState) -> OrchestratorState:
@@ -293,7 +325,12 @@ class OrchestratorGraph:
         # Search vs Read switch: below threshold → Document Reader on top blob.
         used_reader = False
         errors = list(state.get("errors") or [])
-        if max_confidence(boosted) < self.confidence_threshold and boosted:
+        rounds = int(state.get("tool_call_rounds") or 0)
+        if (
+            max_confidence(boosted) < self.confidence_threshold
+            and boosted
+            and rounds < self.max_tool_call_rounds
+        ):
             top = boosted[0]
             acl = state["acl_compiled_filter"]
             call = ToolCall(
@@ -332,6 +369,7 @@ class OrchestratorGraph:
                 "tool_results": tool_results,
                 "used_document_reader": used_reader,
                 "errors": errors,
+                "tool_call_rounds": rounds + 1,
             }
 
         return {
@@ -340,29 +378,18 @@ class OrchestratorGraph:
             "ranked_hits": [h.__dict__ for h in boosted],
             "used_document_reader": used_reader,
             "errors": errors,
+            "tool_call_rounds": rounds,
         }
 
     async def response_generator(self, state: OrchestratorState) -> OrchestratorState:
         intent = state.get("intent")
         hits = state.get("ranked_hits") or []
-        if intent == Intent.CHAT.value:
-            text = (
-                "I can search your tenant corpus, open a specific document, "
-                "or answer with citations from retrieved sources. "
-                "Ask me to find something or open a document."
-            )
-            return {**state, "response_text": text, "citations": []}
+        req = state.get("request") or {}
+        user_prompt = str(req.get("prompt") or "")
 
-        if not hits:
-            text = "I could not find accessible documents for that request."
-            return {**state, "response_text": text, "citations": []}
-
-        lines = []
-        citations = []
-        for i, h in enumerate(hits[:5], start=1):
+        citations: List[Dict[str, Any]] = []
+        for h in hits[:5]:
             snippet = (h.get("snippet") or "").strip().replace("\n", " ")
-            title = h.get("title") or h.get("document_id")
-            lines.append(f"{i}. {title}: {snippet[:240]}")
             citations.append(
                 {
                     "document_id": h.get("document_id"),
@@ -371,11 +398,32 @@ class OrchestratorGraph:
                     "base_score": h.get("base_score"),
                 }
             )
-        prefix = "Here is what I found"
-        if state.get("used_document_reader"):
-            prefix += " (including a deep document read)"
-        text = prefix + ":\n" + "\n".join(lines)
-        return {**state, "response_text": text, "citations": citations}
+
+        context_hits = hits if intent != Intent.CHAT.value else []
+        messages, prompt_text = assemble_chat_messages(user_prompt, context_hits)
+        record_prompt(
+            {
+                "tenant_id": req.get("tenant_id"),
+                "user_id": req.get("user_id"),
+                "intent": intent,
+                "document_ids": [c.get("document_id") for c in citations if c.get("document_id")],
+                "prompt": prompt_text,
+            }
+        )
+
+        generation = await self.chat_service.generate(
+            messages,
+            ranked_hits=context_hits,
+            used_document_reader=bool(state.get("used_document_reader")),
+            max_tokens=256,
+        )
+        return {
+            **state,
+            "response_text": generation.text,
+            "citations": citations,
+            "llm_prompt": prompt_text,
+            "chat_provider_name": generation.provider,
+        }
 
 
 def build_orchestrator_graph(owner: OrchestratorGraph):

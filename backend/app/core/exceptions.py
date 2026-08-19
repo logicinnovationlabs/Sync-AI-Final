@@ -49,6 +49,17 @@ class InvalidTokenError(SnyQException):
         super().__init__(message, status_code=401)
 
 
+# Back-compat aliases for legacy signoff tests
+TokenInvalidError = InvalidTokenError
+
+
+class TokenExpiredError(SnyQException):
+    """Raised when a token has expired."""
+
+    def __init__(self, message: str = "Token has expired"):
+        super().__init__(message, status_code=401)
+
+
 class CrossTenantAccessError(SnyQException):
     """Raised when cross-tenant access is attempted."""
 

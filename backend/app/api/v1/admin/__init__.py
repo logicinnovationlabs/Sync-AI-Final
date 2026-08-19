@@ -4,7 +4,8 @@ Unauthenticated POST /admin/users has been removed. User invite lives at
 authenticated POST /api/v1/admin/users (require_admin).
 
 POST /admin/tenants remains first-time bootstrap (chicken-and-egg: no admin
-JWT exists until the tenant and first admin are created).
+JWT exists until the tenant and first admin are created) and is gated by
+X-SnyQ-Setup-Token / TENANT_BOOTSTRAP_TOKEN.
 """
 
 from fastapi import APIRouter

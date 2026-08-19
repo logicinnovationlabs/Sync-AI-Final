@@ -223,6 +223,27 @@ class DriveClient:
         except HttpError as e:
             # Silently ignore errors (channel may already be stopped)
             pass
+
+    async def export_file(
+        self,
+        access_token: str,
+        file_id: str,
+        mime_type: str,
+    ) -> bytes:
+        """Export a Google-native file (Docs/Sheets/Slides) as the given MIME type."""
+        service = self._build_service(access_token)
+        try:
+            return service.files().export(fileId=file_id, mimeType=mime_type).execute()
+        except HttpError as e:
+            raise Exception(f"Drive export API error: {e}")
+
+    async def download_file(self, access_token: str, file_id: str) -> bytes:
+        """Download binary file bytes via files.get_media."""
+        service = self._build_service(access_token)
+        try:
+            return service.files().get_media(fileId=file_id).execute()
+        except HttpError as e:
+            raise Exception(f"Drive download API error: {e}")
     
     async def list_permissions(
         self,
@@ -251,3 +272,38 @@ class DriveClient:
         except HttpError as e:
             # If permissions API fails, return empty (file may be deleted)
             return []
+
+    async def export_file(
+        self,
+        access_token: str,
+        file_id: str,
+        mime_type: str = "text/plain",
+    ) -> bytes:
+        """Export a Google-native file (Docs/Sheets/Slides) to the given MIME type."""
+        service = self._build_service(access_token)
+        try:
+            data = service.files().export(fileId=file_id, mimeType=mime_type).execute()
+            if isinstance(data, bytes):
+                return data
+            if isinstance(data, str):
+                return data.encode("utf-8")
+            return str(data).encode("utf-8")
+        except HttpError as e:
+            raise Exception(f"Drive export API error: {e}") from e
+
+    async def download_file(self, access_token: str, file_id: str) -> bytes:
+        """Download binary file content from Drive."""
+        import io
+        from googleapiclient.http import MediaIoBaseDownload
+
+        service = self._build_service(access_token)
+        try:
+            request = service.files().get_media(fileId=file_id, supportsAllDrives=True)
+            buf = io.BytesIO()
+            downloader = MediaIoBaseDownload(buf, request)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
+            return buf.getvalue()
+        except HttpError as e:
+            raise Exception(f"Drive download API error: {e}") from e

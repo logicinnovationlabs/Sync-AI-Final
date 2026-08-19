@@ -213,15 +213,52 @@ class Settings(BaseSettings):
     oidc_redirect_uri: Optional[str] = Field(default=None)
 
     scim_token: Optional[str] = Field(default=None)
+    tenant_bootstrap_token: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "TENANT_BOOTSTRAP_TOKEN", "tenant_bootstrap_token"
+        ),
+    )
 
-    google_client_id: Optional[str] = Field(default=None)
-    google_client_secret: Optional[str] = Field(default=None)
-    google_redirect_uri: Optional[str] = Field(default=None)
+    google_client_id: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("GOOGLE_CLIENT_ID", "google_client_id"),
+    )
+    google_client_secret: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("GOOGLE_CLIENT_SECRET", "google_client_secret"),
+    )
+    google_redirect_uri: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("GOOGLE_REDIRECT_URI", "google_redirect_uri"),
+    )
+    frontend_url: str = Field(
+        default="http://localhost:3000",
+        validation_alias=AliasChoices("FRONTEND_URL", "frontend_url"),
+    )
+    celery_broker_url: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("CELERY_BROKER_URL", "celery_broker_url"),
+    )
+    celery_result_backend: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("CELERY_RESULT_BACKEND", "celery_result_backend"),
+    )
+    celery_task_always_eager: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("CELERY_TASK_ALWAYS_EAGER", "celery_task_always_eager"),
+    )
     # Optional env-seeded refresh token for local/real-source verification (7-day Testing apps).
     # Production path still expects tokens in TokenStore after OAuth exchange.
     google_refresh_token: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("GOOGLE_REFRESH_TOKEN", "google_refresh_token"),
+    )
+    google_pubsub_verification_token: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "GOOGLE_PUBSUB_VERIFICATION_TOKEN", "google_pubsub_verification_token"
+        ),
     )
 
     qdrant_api_key: Optional[str] = Field(default=None)
@@ -241,8 +278,32 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("QWEN_MODEL", "qwen_model"),
     )
+    # Chat LLM switch — independent of llm_provider (embeddings fake/gemini).
+    llm_chat_provider: str = Field(
+        default="fake",
+        validation_alias=AliasChoices("LLM_CHAT_PROVIDER", "llm_chat_provider"),
+    )
+    openrouter_base_url: str = Field(
+        default="https://openrouter.ai/api/v1",
+        validation_alias=AliasChoices("OPENROUTER_BASE_URL", "openrouter_base_url"),
+    )
+    llm_max_tool_call_rounds: int = Field(
+        default=2,
+        validation_alias=AliasChoices(
+            "LLM_MAX_TOOL_CALL_ROUNDS", "llm_max_tool_call_rounds"
+        ),
+    )
 
     environment: str = Field(default="development")
+    cors_allowed_origins: str = Field(
+        default="",
+        validation_alias=AliasChoices("CORS_ALLOWED_ORIGINS", "cors_allowed_origins"),
+        description="Comma-separated browser origins allowed in non-dev (empty = deny all)",
+    )
+    rate_limit_per_minute: int = Field(
+        default=120,
+        validation_alias=AliasChoices("RATE_LIMIT_PER_MINUTE", "rate_limit_per_minute"),
+    )
 
     tesseract_path: str = Field(default="/usr/bin/tesseract")
     ocr_language: str = Field(default="eng")
@@ -263,6 +324,10 @@ class Settings(BaseSettings):
     backup_bucket: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("BACKUP_BUCKET", "backup_bucket"),
+    )
+    backup_local_dir: str = Field(
+        default=".backups",
+        validation_alias=AliasChoices("BACKUP_LOCAL_DIR", "backup_local_dir"),
     )
     
     # ------------------------------------------------------------------
@@ -437,13 +502,20 @@ class Settings(BaseSettings):
         return self.oauth_issuer_url
 
     @property
+    def cors_origins_list(self) -> list[str]:
+        raw = (self.cors_allowed_origins or "").strip()
+        if not raw:
+            return []
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+    @property
     def scim_endpoint(self) -> Optional[str]:
         return self.scim_sync_endpoint
 
     # ------------------------------------------------------------------
     # Block K: Document Reader
     # ------------------------------------------------------------------
-    storage_backend: str = Field(default="mock")  # "mock" | "minio"
+    # storage_backend is defined once under Block D (STORAGE_BACKEND).
     storage_endpoint: str = Field(default="localhost:9000")
     storage_access_key: str = Field(default="")
     storage_secret_key: str = Field(default="")
@@ -452,7 +524,7 @@ class Settings(BaseSettings):
     stream_threshold_bytes: int = Field(default=10 * 1024 * 1024)  # 10MB
     stream_chunk_bytes: int = Field(default=8192)
     acl_backend: str = Field(default="mock")  # "mock" | "http"
-    acl_service_url: str = Field(default="http://localhost:8000/api/v1/acl")
+    acl_service_url: str = Field(default="http://localhost:8000/acl")
 
     @model_validator(mode="after")
     def _assemble_control_plane_url(self) -> "Settings":

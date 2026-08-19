@@ -3,7 +3,7 @@ Block A closeout signoff tests A1–A5 against real Postgres (block-a-verify-pg:
 
 These replace simulated assertions in test_signoff.py for genuine PASS evidence:
 - A1: 100 tokens, per-token evidence, mixed interactive + service
-- A2: 20 trials, revoke then poll GET /api/v1/me every 5s
+- A2: 20 trials, revoke then poll GET /me every 5s
 - A3: SCIM sync via 3 separate OS processes (genuine restart)
 - A4: 50 HTTP attempts of tenant-A token against tenant-B-scoped endpoints
 - A5: every scoped route from the route table, missing scope → 403 ErrorResponse
@@ -125,7 +125,7 @@ async def test_A1_tenant_binding_integrity_closeout():
 
 @pytest.mark.asyncio
 async def test_A2_revocation_latency_closeout():
-    """A2: 20 trials — revoke, poll GET /api/v1/me every 5s until 401, latency ≤60s."""
+    """A2: 20 trials — revoke, poll GET /me every 5s until 401, latency ≤60s."""
     transport = ASGITransport(app=app)
     trial_results = []
 
@@ -139,7 +139,7 @@ async def test_A2_revocation_latency_closeout():
             headers = {"Authorization": f"Bearer {token}"}
 
             # Confirm protected endpoint accepts pre-revoke
-            pre = await client.get("/api/v1/me", headers=headers)
+            pre = await client.get("/me", headers=headers)
             assert pre.status_code == 200, f"Trial {trial}: pre-revoke /me expected 200 got {pre.status_code}"
 
             payload = await token_service.decode_without_validation(token)
@@ -155,7 +155,7 @@ async def test_A2_revocation_latency_closeout():
             for poll in range(0, 13):
                 if poll > 0:
                     await asyncio.sleep(5)
-                resp = await client.get("/api/v1/me", headers=headers)
+                resp = await client.get("/me", headers=headers)
                 poll_statuses.append(resp.status_code)
                 if resp.status_code in (401, 403):
                     rejected_at = time.time()
@@ -254,9 +254,9 @@ async def test_A4_cross_tenant_replay_rejection_closeout():
     )
 
     endpoints = [
-        "/api/v1/scoped/search",
-        "/api/v1/scoped/documents",
-        "/api/v1/scoped/admin/audit",
+        "/scoped/search",
+        "/scoped/documents",
+        "/scoped/admin/audit",
     ]
 
     transport = ASGITransport(app=app)
