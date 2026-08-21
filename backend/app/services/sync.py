@@ -156,13 +156,13 @@ class SyncOrchestrator:
                         exc,
                     )
 
-                    if docs:
-                        await indexer.bulk_index(
-                            docs,
-                            tenant_id,
-                            extra_acl=extra_acl,
-                        )
-                        stats["indexed"] += len(docs)
+                if docs:
+                    await indexer.bulk_index(
+                        docs,
+                        tenant_id,
+                        extra_acl=extra_acl,
+                    )
+                    stats["indexed"] += len(docs)
 
             if result.next_cursor:
                 stats["final_cursor"] = result.next_cursor

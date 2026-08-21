@@ -334,19 +334,11 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
         final_cursor = result.get("final_cursor")
         if final_cursor:
             _run_async(cursor_store.update_cursor(tenant_id, source_type, final_cursor))
-        
-        # Register watch channel/subscription only after a completed crawl
-        webhook_base_url = getattr(settings, "WEBHOOK_BASE_URL", "http://localhost:8000")
-        watch_manager = WatchManager(oauth_manager, cursor_store, webhook_base_url)
-        
-        if source_type == "google_drive" and final_cursor:
-            _run_async(watch_manager.register_drive_watch(tenant_id, final_cursor))
-        elif source_type == "google_gmail" and final_cursor:
-            pubsub_topic = getattr(settings, "GOOGLE_PUBSUB_TOPIC", "")
-            if pubsub_topic:
-                full_topic = f"projects/{getattr(settings, 'GOOGLE_PUBSUB_PROJECT_ID', '')}/topics/{pubsub_topic}"
-                _run_async(watch_manager.register_gmail_watch(tenant_id, final_cursor, full_topic))
-        
+
+        _register_watches_best_effort(
+            oauth_manager, tenant_id, source_type, final_cursor
+        )
+
         logger.info(
             f"Backfill completed for tenant {tenant_id}, source {source_type}: "
             f"{result.get('indexed_count', 0)} indexed, {result.get('deleted_count', 0)} deleted, "
@@ -625,6 +617,50 @@ def google_queue_ping() -> dict:
     """Harmless ping used to prove a worker is consuming the `google` queue."""
     logger.info("google_queue_ping: pipeline=queue_ok queue=google")
     return {"ok": True, "queue": "google"}
+
+
+def _register_watches_best_effort(
+    oauth_manager, tenant_id: str, source_type: str, final_cursor: Optional[str]
+) -> None:
+    """Push watches are optional. Never fail a completed crawl over them.
+
+    Google rejects http://localhost webhook URLs, so a local Connect+sync
+    used to index files and then mark the task `error` on watch setup.
+    """
+    if not final_cursor or oauth_manager is None:
+        return
+    webhook_base_url = (
+        getattr(settings, "webhook_base_url", None)
+        or "http://localhost:8000"
+    )
+    lowered = webhook_base_url.lower()
+    if "localhost" in lowered or "127.0.0.1" in lowered:
+        logger.info(
+            "Skipping Google watch registration tenant=%s source=%s "
+            "(webhook URL is not publicly reachable)",
+            tenant_id,
+            source_type,
+        )
+        return
+    watch_manager = WatchManager(oauth_manager, cursor_store, webhook_base_url)
+    try:
+        if source_type == "google_drive":
+            _run_async(watch_manager.register_drive_watch(tenant_id, final_cursor))
+        elif source_type == "google_gmail":
+            pubsub_topic = getattr(settings, "google_pubsub_topic", None) or ""
+            project_id = getattr(settings, "google_pubsub_project_id", None) or ""
+            if pubsub_topic and project_id:
+                full_topic = f"projects/{project_id}/topics/{pubsub_topic}"
+                _run_async(
+                    watch_manager.register_gmail_watch(tenant_id, final_cursor, full_topic)
+                )
+    except Exception:
+        logger.warning(
+            "Watch registration failed after successful index tenant=%s source=%s",
+            tenant_id,
+            source_type,
+            exc_info=True,
+        )
 
 
 def _acl_terms_for_user(user_id: Optional[str]) -> list:

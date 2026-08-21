@@ -20,12 +20,12 @@ export function DocumentBrowser() {
     hasScope(s.effectiveScopes(), SCOPES.DOCUMENT_READ)
   )
   const [query, setQuery] = useState("")
-  const [submitted, setSubmitted] = useState("")
+  const [submitted, setSubmitted] = useState("*")
   const [openId, setOpenId] = useState<string | null>(null)
 
   const search = useQuery({
     queryKey: ["federated-search", submitted],
-    queryFn: () => federatedSearch(token!, submitted),
+    queryFn: () => federatedSearch(token!, submitted || "*"),
     enabled: Boolean(token) && canSearch && submitted.length > 0,
     retry: false,
   })
@@ -44,7 +44,7 @@ export function DocumentBrowser() {
       <form
         onSubmit={(event) => {
           event.preventDefault()
-          setSubmitted(query.trim())
+          setSubmitted(query.trim() || "*")
           setOpenId(null)
         }}
         className="relative"
@@ -57,7 +57,7 @@ export function DocumentBrowser() {
           id="doc-search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search the live federated index…"
+          placeholder="Search indexed Drive, Gmail, and files — or press Enter to list them"
           className="h-11 w-full rounded-full border border-border bg-card pr-4 pl-11 text-sm outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-foreground/25 focus:ring-2 focus:ring-ring/40"
         />
       </form>

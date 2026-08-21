@@ -157,27 +157,38 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-# Mount routers under /api/v1 only (single canonical prefix)
-app.include_router(auth.router, prefix="/api/v1")
-app.include_router(oauth.router, prefix="/api/v1")
-app.include_router(me.router, prefix="/api/v1")
-app.include_router(admin_router, prefix="/api/v1", tags=["admin"])
+def _include_product_and_legacy(router, **kwargs) -> None:
+    """Mount at the frontend/OAuth path and again under /api/v1.
+
+    The UI, Google redirect URI, and connector tests call `/auth/login`,
+    `/connectors/...`, `/me`, etc. Older clients and contracts.yaml still
+    use `/api/v1/...`. Both must resolve or post-login Celery enqueue 404s.
+    """
+    extra_prefix = kwargs.pop("prefix", "")
+    app.include_router(router, prefix=extra_prefix, **kwargs)
+    app.include_router(router, prefix=f"/api/v1{extra_prefix}", **kwargs)
+
+
+_include_product_and_legacy(auth.router)
+_include_product_and_legacy(oauth.router)
+_include_product_and_legacy(me.router)
+_include_product_and_legacy(admin_router, tags=["admin"])
 app.include_router(tenant_bootstrap_router, prefix="/admin", tags=["admin"])
-app.include_router(connectors_router, prefix="/api/v1")
-app.include_router(connectors_org_router, prefix="/api/v1")
-app.include_router(scoped_probes.router, prefix="/api/v1")
-app.include_router(webhooks_router, prefix="/api/v1")
-app.include_router(identity_routes.router, prefix="/api/v1")
-app.include_router(acl_routes.router, prefix="/api/v1")
-app.include_router(embed.router, prefix="/api/v1", tags=["embeddings"])
-app.include_router(lexical.router, prefix="/api/v1", tags=["search-lexical"])
-app.include_router(vector.router, prefix="/api/v1", tags=["search-vector"])
-app.include_router(graph_search.router, prefix="/api/v1", tags=["search-graph"])
-app.include_router(signals_routes.router, prefix="/api/v1", tags=["signals"])
-app.include_router(federated_search.router, prefix="/api/v1", tags=["search-federated"])
-app.include_router(document_routes.router, prefix="/api/v1", tags=["document-reader"])
-app.include_router(assistant_routes.router, prefix="/api/v1/assistant", tags=["assistant"])
-app.include_router(mcp_gateway_router, prefix="/api/v1")
+_include_product_and_legacy(connectors_router)
+_include_product_and_legacy(connectors_org_router)
+_include_product_and_legacy(scoped_probes.router)
+_include_product_and_legacy(webhooks_router)
+_include_product_and_legacy(identity_routes.router)
+_include_product_and_legacy(acl_routes.router)
+_include_product_and_legacy(embed.router, tags=["embeddings"])
+_include_product_and_legacy(lexical.router, tags=["search-lexical"])
+_include_product_and_legacy(vector.router, tags=["search-vector"])
+_include_product_and_legacy(graph_search.router, tags=["search-graph"])
+_include_product_and_legacy(signals_routes.router, tags=["signals"])
+_include_product_and_legacy(federated_search.router, tags=["search-federated"])
+_include_product_and_legacy(document_routes.router, tags=["document-reader"])
+_include_product_and_legacy(assistant_routes.router, prefix="/assistant", tags=["assistant"])
+_include_product_and_legacy(mcp_gateway_router)
 
 
 # Probes

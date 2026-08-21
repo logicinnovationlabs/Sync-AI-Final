@@ -13,11 +13,19 @@ from app.core.telemetry import setup_telemetry
 
 setup_telemetry(service_name="snyq-celery")
 
+
+def _celery_redis_url(explicit: str | None) -> str:
+    """Prefer CELERY_* then the shared Redis URL so host and Docker both enqueue."""
+    if explicit:
+        return explicit
+    return getattr(settings, "session_store_redis_url", None) or "redis://localhost:6379/1"
+
+
 # Create Celery app
 celery_app = Celery(
     "snyq_backend",
-    broker=getattr(settings, "celery_broker_url", None) or "redis://redis:6379/1",
-    backend=getattr(settings, "celery_result_backend", None) or "redis://redis:6379/1",
+    broker=_celery_redis_url(getattr(settings, "celery_broker_url", None)),
+    backend=_celery_redis_url(getattr(settings, "celery_result_backend", None)),
 )
 
 # Configuration
@@ -58,6 +66,7 @@ if task_always_eager:
 
 # Auto-discover tasks
 celery_app.autodiscover_tasks(["app.workers"])
+import app.workers.tasks  # noqa: F401, E402 — register backfill_source on the google queue
 # CeleryInstrumentor is applied in app.core.telemetry.setup_telemetry
 
 # Register periodic tasks (watch renewal, scheduled backups)

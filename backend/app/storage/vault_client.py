@@ -40,6 +40,14 @@ _SETTINGS_BOOTSTRAP = {
     PlatformSecretKeys.MINIO_SECRET_KEY: "storage_secret_key",
 }
 
+# Local OpenSearch has security disabled; local Qdrant has no API key.
+_OPTIONAL_DEV_SECRETS = frozenset(
+    {
+        PlatformSecretKeys.QDRANT_API_KEY,
+        PlatformSecretKeys.OPENSEARCH_PASSWORD,
+    }
+)
+
 
 def _bootstrap_from_settings(key_name: str) -> Optional[str]:
     attr = _SETTINGS_BOOTSTRAP.get(key_name)
@@ -196,6 +204,8 @@ class MockVaultClient(VaultClient):
         if settings.environment in ("development", "test") and "db_password" in key_name:
             if mock_backends_allowed():
                 return "postgres"
+        if mock_backends_allowed() and key_name in _OPTIONAL_DEV_SECRETS:
+            return ""
         raise VaultError(
             f"Secret '{key_name}' not found. Set env var {self._env_key(key_name)} or call set_secret()."
         )

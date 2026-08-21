@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import require_scope
-from app.acl.filter import acl_terms_from_jwt, is_fail_closed
+from app.acl.filter import acl_terms_from_jwt, document_is_visible, is_fail_closed
 from app.models.federated import (
     BackendStatus,
     FederatedSearchRequest,
@@ -90,6 +90,77 @@ async def _safe_call_vector(
     finally:
         status.latency_ms = (time.perf_counter() - started) * 1000
     
+    return [], status
+
+
+def _payload_to_hit(payload: Dict[str, Any], score: float) -> Dict[str, Any]:
+    body = str(payload.get("content") or payload.get("body_text") or payload.get("snippet") or "")
+    return {
+        "document_id": str(payload.get("id") or payload.get("document_id") or ""),
+        "title": str(payload.get("title") or payload.get("id") or ""),
+        "snippet": body[:400],
+        "score": score,
+        "sources": ["indexed"],
+    }
+
+
+async def _safe_call_indexed(
+    query: str, tenant_id: str, acl_terms: List[str], size: int
+) -> tuple[List[Dict[str, Any]], BackendStatus]:
+    """Read the Block B `documents` collection that Celery actually upserts."""
+    started = time.perf_counter()
+    status = BackendStatus(name="indexed", ok=False)
+    try:
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+        from app.storage.qdrant_client import qdrant_client
+
+        tenant_filter = Filter(
+            must=[
+                FieldCondition(key="tenant_id", match=MatchValue(value=str(tenant_id)))
+            ]
+        )
+        hits: List[Dict[str, Any]] = []
+        browse = not query or query.strip() in {"*", "all"}
+        if browse:
+            points, _ = qdrant_client.client.scroll(
+                collection_name=qdrant_client.collection_name,
+                scroll_filter=tenant_filter,
+                limit=size * 2,
+                with_payload=True,
+                with_vectors=False,
+            )
+            raw = [(p.payload or {}, 1.0) for p in points]
+        else:
+            from app.services.embedding import embedding_service
+
+            query_embedding = await embedding_service.embed_text(query)
+            if not query_embedding:
+                raise ValueError("embedding service returned an empty vector")
+            scored = qdrant_client.client.search(
+                collection_name=qdrant_client.collection_name,
+                query_vector=query_embedding,
+                query_filter=tenant_filter,
+                limit=size * 2,
+            )
+            raw = [(p.payload or {}, float(p.score or 0.0)) for p in scored]
+
+        for payload, score in raw:
+            if not document_is_visible(
+                acl_terms, payload.get("permissions") or payload.get("acl_terms")
+            ):
+                continue
+            hit = _payload_to_hit(payload, score)
+            if hit["document_id"]:
+                hits.append(hit)
+        status.ok = True
+        status.hit_count = len(hits)
+        return hits, status
+    except Exception as exc:
+        logger.warning("Indexed collection search failed: %s", exc)
+        status.error = str(exc)
+    finally:
+        status.latency_ms = (time.perf_counter() - started) * 1000
     return [], status
 
 
@@ -178,30 +249,35 @@ async def federated_search(
             query=body.query,
         )
     
-    # Fan-out to backends concurrently
-    tasks = []
+    tasks = [
+        _safe_call_indexed(body.query, tenant_id, acl_terms, body.size),
+    ]
     if body.enable_lexical:
         tasks.append(_safe_call_lexical(body.query, tenant_id, acl_terms, body.size))
     if body.enable_vector:
         tasks.append(_safe_call_vector(body.query, tenant_id, acl_terms, body.size))
-    
-    if not tasks:
-        raise HTTPException(status_code=400, detail="No search backends enabled")
-    
+
     results = await asyncio.gather(*tasks)
-    
-    # Extract results and statuses
-    lexical_results = results[0][0] if body.enable_lexical else []
-    vector_results = results[1][0] if body.enable_vector and len(results) > 1 else []
-    
+    indexed_results = results[0][0]
+    rest = results[1:]
+    lexical_results: List[Dict[str, Any]] = []
+    vector_results: List[Dict[str, Any]] = []
+    if body.enable_lexical and rest:
+        lexical_results = rest[0][0]
+        rest = rest[1:]
+    if body.enable_vector and rest:
+        vector_results = rest[0][0]
+
     statuses = [r[1] for r in results]
-    
-    # Check if all backends failed
+
     if not any(s.ok for s in statuses):
         raise HTTPException(status_code=503, detail="All search backends unavailable")
-    
-    # Merge and rank
-    merged = _merge_and_rank(lexical_results, vector_results, body.size)
+
+    merged = _merge_and_rank(
+        indexed_results + lexical_results,
+        vector_results,
+        body.size,
+    )
     
     # Pagination
     start = body.from_

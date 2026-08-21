@@ -1,4 +1,4 @@
-"""Tenant-scoped episodic memory backed by Postgres (:5433)."""
+"""Tenant-scoped episodic memory backed by the control-plane Postgres."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import json
 import logging
 import os
 from typing import Any, Dict, List, Optional
+from urllib.parse import quote_plus
 
 import psycopg
 from psycopg.rows import dict_row
@@ -14,10 +15,20 @@ from app.services.assistant.domain.models import SessionContext, TurnRecord
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DSN = os.getenv(
-    "ORCHESTRATOR_DATABASE_URL",
-    "postgresql://postgres:verify@127.0.0.1:5433/block_e",
-)
+
+def _sync_postgres_dsn() -> str:
+    """Resolve a psycopg DSN. Never use the old :5433 / block_e default in Docker."""
+    explicit = (os.getenv("ORCHESTRATOR_DATABASE_URL") or "").strip()
+    if explicit:
+        return explicit.replace("postgresql+asyncpg://", "postgresql://")
+    from app.core.config import settings
+
+    url = (settings.control_plane_database_url or "").strip()
+    if url:
+        return url.replace("postgresql+asyncpg://", "postgresql://")
+    user = quote_plus(str(settings.db_user))
+    password = quote_plus(str(settings.db_password))
+    return f"postgresql://{user}:{password}@{settings.db_host}:5432/{settings.db_name}"
 
 
 class EpisodicMemoryStore:
@@ -29,10 +40,10 @@ class EpisodicMemoryStore:
     """
 
     def __init__(self, dsn: Optional[str] = None) -> None:
-        self.dsn = dsn or DEFAULT_DSN
+        self.dsn = dsn or _sync_postgres_dsn()
 
     def _connect(self) -> psycopg.Connection:
-        return psycopg.connect(self.dsn, row_factory=dict_row)
+        return psycopg.connect(self.dsn, row_factory=dict_row, connect_timeout=5)
 
     def ensure_schema(self) -> None:
         with self._connect() as conn:

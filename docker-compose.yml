@@ -194,7 +194,7 @@ services:
       - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
       - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
     ports:
-      - "3000:3000"
+      - "3002:3000"
     networks: [snyq_network]
 
   alertmanager:
@@ -222,7 +222,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: python -m alembic upgrade head
+    command: python -m alembic upgrade heads
     networks: [snyq_network]
 
   seed:
@@ -273,6 +273,9 @@ services:
       - "8000:8000"
     env_file:
       - .env.docker
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/migrations:/app/migrations
     depends_on:
       postgres:
         condition: service_healthy
@@ -296,7 +299,7 @@ services:
       start_period: 60s
     restart: unless-stopped
     command: >
-      sh -c "python -m alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+      sh -c "python -m alembic upgrade heads && uvicorn app.main:app --host 0.0.0.0 --port 8000"
     networks: [snyq_network]
 
   celery_worker:
@@ -306,6 +309,8 @@ services:
     container_name: snyq_celery_worker
     env_file:
       - .env.docker
+    volumes:
+      - ./backend/app:/app/app
     healthcheck:
       disable: true
     restart: unless-stopped
@@ -314,6 +319,10 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      qdrant:
+        condition: service_started
+      opensearch:
+        condition: service_started
     command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 -Q celery,google
     networks: [snyq_network]
 

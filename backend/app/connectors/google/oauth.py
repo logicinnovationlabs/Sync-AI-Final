@@ -262,9 +262,13 @@ def seed_token_store_from_env(
     """
     rt = refresh_token
     if not rt:
-        from app.storage.vault_client import PlatformSecretKeys, vault_client
+        try:
+            from app.storage.vault_client import PlatformSecretKeys, vault_client
+            from app.core.exceptions import VaultError
 
-        rt = vault_client.get(PlatformSecretKeys.GOOGLE_REFRESH_TOKEN) or ""
+            rt = vault_client.get(PlatformSecretKeys.GOOGLE_REFRESH_TOKEN) or ""
+        except (Exception, VaultError):
+            rt = ""
     rt = (rt or "").strip()
     if not rt:
         return False

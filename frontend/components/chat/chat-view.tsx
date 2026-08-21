@@ -119,7 +119,11 @@ export function ChatView() {
         )
       } catch (err) {
         const message =
-          err instanceof ApiError ? err.message : "Chat request failed."
+          err instanceof ApiError
+            ? err.message
+            : err instanceof DOMException && err.name === "TimeoutError"
+              ? "Chat timed out talking to the API. Retry once — it should be fast now."
+              : "Chat request failed."
         setTurns((prev) =>
           prev.map((t) =>
             t.kind === "answer" && t.id === answerId

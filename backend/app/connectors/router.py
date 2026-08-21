@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+import logging
 
 from app.api.deps import get_current_user, get_tenant, require_scope
 from app.services.tenant_resolver import TenantRouting
@@ -34,6 +35,8 @@ from app.connectors.google.token_store import (
 )
 from app.connectors.google import status_store
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/connectors", tags=["connectors"])
 
 GOOGLE_SOURCES = ("google_drive", "google_gmail")
@@ -41,8 +44,8 @@ _DEFAULT_GOOGLE_CALLBACK = "http://localhost:8000/connectors/google/callback"
 
 
 def _google_redirect_uri() -> str:
-    raw = settings.google_redirect_uri or _DEFAULT_GOOGLE_CALLBACK
-    return raw.replace("/api/v1/connectors/", "/connectors/")
+    """Must match the URI registered on the Google OAuth client exactly."""
+    return (settings.google_redirect_uri or _DEFAULT_GOOGLE_CALLBACK).rstrip("/")
 
 
 class BackfillRequest(BaseModel):
@@ -86,7 +89,11 @@ async def trigger_backfill(
         raise HTTPException(status_code=403, detail="Cross-tenant execution rejected")
 
     status_store.set_status(tenant_id, source_type, connection_status="syncing", last_error="")
-    task_result = backfill_tenant_source.delay(tenant_id=tenant_id, source_type=source_type)
+    task_result = backfill_tenant_source.delay(
+        tenant_id=tenant_id,
+        source_type=source_type,
+        user_id=_user_id(current_user),
+    )
 
     return {
         "status": "queued",
@@ -266,12 +273,23 @@ async def google_oauth_callback(
         status_store.set_status(
             tenant_id, source_type, connection_status="syncing", last_error=""
         )
-        backfill_source.delay(
-            tenant_id=tenant_id,
-            source_type=source_type,
-            user_id=user_id,
-            connector_id=google_credential_ref(tenant_id),
-        )
+        try:
+            backfill_source.delay(
+                tenant_id=tenant_id,
+                source_type=source_type,
+                user_id=user_id,
+                connector_id=google_credential_ref(tenant_id),
+            )
+        except Exception:
+            status_store.set_status(
+                tenant_id,
+                source_type,
+                connection_status="error",
+                last_error="celery_enqueue_failed",
+            )
+            logger.exception(
+                "Failed to enqueue backfill tenant=%s source=%s", tenant_id, source_type
+            )
 
     return RedirectResponse(frontend_connectors_redirect("connected"), status_code=302)
 

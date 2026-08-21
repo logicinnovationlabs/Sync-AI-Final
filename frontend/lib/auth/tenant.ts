@@ -30,7 +30,7 @@ export function tenantFromHost(hostname?: string): string {
     .toLowerCase()
     .replace(/:\d+$/, "")
 
-  const fallback = process.env.NEXT_PUBLIC_DEFAULT_TENANT ?? ""
+  const fallback = (process.env.NEXT_PUBLIC_DEFAULT_TENANT || "alpha").trim()
 
   if (!host || BARE_HOSTS.has(host)) return fallback
 

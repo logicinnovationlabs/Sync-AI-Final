@@ -42,6 +42,7 @@ export async function streamAssistantChat(params: {
       session_id: params.sessionId,
       ...(params.tenantId ? { tenant_id: params.tenantId } : {}),
     }),
+    signal: AbortSignal.timeout(45_000),
   })
 
   if (!res.ok) {
@@ -50,6 +51,10 @@ export async function streamAssistantChat(params: {
       message = formatApiError(await res.json()) ?? message
     } catch {
       // ignore
+    }
+    if (res.status === 405) {
+      message =
+        "Chat is POST-only. Refresh the page (a leftover service worker can turn this into GET)."
     }
     throw new ApiError(res.status, message)
   }
