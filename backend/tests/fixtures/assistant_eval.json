@@ -1,0 +1,73 @@
+{
+  "accuracy_definition": "A case passes when (1) retrieved document_ids include every expected_source_id, (2) if expect_refuse is true the answer is the grounded refuse sentence, otherwise every required_fact appears in the answer, and (3) the answer does not introduce numbers or document-like identifiers that are absent from retrieved context. This is evidence-based and measurable; it is not a claim of 100% accuracy.",
+  "corpus": [
+    {
+      "document_id": "doc-public-python",
+      "title": "Python tutorials",
+      "snippet": "Python tutorials cover lists, dicts, and async functions.",
+      "body": "Python tutorials cover lists, dicts, and async functions. Chapter 1 intro.",
+      "score": 0.91,
+      "chunk_id": "chunk-python-1",
+      "page": 1
+    },
+    {
+      "document_id": "doc-public-api",
+      "title": "API documentation",
+      "snippet": "The public API uses bearer tokens and tenant-scoped routes. Rate limits apply.",
+      "body": "The public API uses bearer tokens and tenant-scoped routes. Rate limits apply.",
+      "score": 0.84,
+      "chunk_id": "chunk-api-1",
+      "page": 2
+    },
+    {
+      "document_id": "doc-leave-policy",
+      "title": "Leave policy FY2026",
+      "snippet": "Employees receive 18 days of paid annual leave. Unused leave does not carry over after 31 March.",
+      "body": "Employees receive 18 days of paid annual leave. Unused leave does not carry over after 31 March.",
+      "score": 0.88,
+      "chunk_id": "chunk-leave-1",
+      "page": 3
+    }
+  ],
+  "cases": [
+    {
+      "id": "python-topics",
+      "question": "What do the Python tutorials cover?",
+      "required_facts": ["lists", "dicts"],
+      "expected_source_ids": ["doc-public-python"],
+      "expect_refuse": false
+    },
+    {
+      "id": "api-auth",
+      "question": "How does the public API authenticate requests?",
+      "required_facts": ["bearer tokens"],
+      "expected_source_ids": ["doc-public-api"],
+      "expect_refuse": false
+    },
+    {
+      "id": "leave-days",
+      "question": "How many paid annual leave days do employees receive?",
+      "required_facts": ["18"],
+      "expected_source_ids": ["doc-leave-policy"],
+      "expect_refuse": false
+    },
+    {
+      "id": "refuse-missing-from-context",
+      "question": "What is the 2024 payroll tax rate for contractors in Estonia?",
+      "required_facts": [],
+      "expected_source_ids": [],
+      "expect_refuse": true,
+      "empty_corpus": true,
+      "notes": "Correct behavior is to refuse: the needed fact is absent from retrieved context."
+    },
+    {
+      "id": "refuse-unrelated-corpus",
+      "question": "What is the 2024 payroll tax rate for contractors in Estonia?",
+      "required_facts": [],
+      "expected_source_ids": [],
+      "expect_refuse": true,
+      "live_only": true,
+      "notes": "Same question against an unrelated corpus. FakeChatProvider cannot refuse here; live Qwen must."
+    }
+  ]
+}

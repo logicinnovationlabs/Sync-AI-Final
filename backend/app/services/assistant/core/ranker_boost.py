@@ -145,3 +145,41 @@ def max_confidence(hits: Sequence[RankedHit]) -> float:
     if not hits:
         return 0.0
     return max(h.boosted_score for h in hits)
+
+
+def retrieval_confidence(hits: Sequence[RankedHit]) -> float:
+    """Map retrieval scores onto a 0–1 confidence used for search-vs-read.
+
+    Federator fusion uses RRF with k=60, so rank-1 is ~1/61 ≈ 0.016. That is
+    *not* cosine similarity. Treating it as 0–1 made every query fall below
+    CONFIDENCE_THRESHOLD (0.6) and deep-read a weakly related top document.
+    """
+    if not hits:
+        return 0.0
+    top = hits[0]
+    meta = top.meta if isinstance(top.meta, dict) else {}
+    nested = meta.get("metadata") if isinstance(meta.get("metadata"), dict) else {}
+
+    def _pick(*keys: str) -> float:
+        for src in (meta, nested, top.meta):
+            if not isinstance(src, dict):
+                continue
+            for key in keys:
+                val = _as_float(src.get(key), default=-1.0)
+                if val >= 0.0:
+                    return val
+        return -1.0
+
+    vector = _pick("vector_score")
+    lexical = _pick("lexical_score")
+    similarity = max(vector, lexical)
+    if similarity >= 0.05:
+        return min(1.0, similarity)
+
+    rrf = max(top.boosted_score, top.base_score, _pick("fusion_score", "score"))
+    if rrf <= 0.0:
+        return 0.0
+    if rrf <= 0.05:
+        # Rank-1 single-list RRF ≈ 1/61. Normalize so top-of-list is ~1.0.
+        return min(1.0, rrf * 61.0)
+    return min(1.0, rrf)

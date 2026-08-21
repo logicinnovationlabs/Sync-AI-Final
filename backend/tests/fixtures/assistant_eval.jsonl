@@ -1,0 +1,5 @@
+{"id":"python-topics","question":"What do the Python tutorials cover?","required_facts":["lists","dicts"],"expected_source_ids":["doc-public-python"],"expect_refuse":false}
+{"id":"api-auth","question":"How does the public API authenticate requests?","required_facts":["bearer tokens"],"expected_source_ids":["doc-public-api"],"expect_refuse":false}
+{"id":"leave-days","question":"How many paid annual leave days do employees receive?","required_facts":["18"],"expected_source_ids":["doc-leave-policy"],"expect_refuse":false}
+{"id":"refuse-missing-from-context","question":"What is the 2024 payroll tax rate for contractors in Estonia?","required_facts":[],"expected_source_ids":[],"expect_refuse":true,"empty_corpus":true}
+{"id":"refuse-unrelated-corpus","question":"What is the 2024 payroll tax rate for contractors in Estonia?","required_facts":[],"expected_source_ids":[],"expect_refuse":true,"live_only":true}

@@ -123,6 +123,35 @@ pytest tests/test_block_*_signoff.py -v
 pytest tests/test_block_h_signoff.py -v -s
 ```
 
+### Grounded assistant (Block L)
+
+Chat answers are evidence-based: retrieval runs for every query, Qwen is called server-side with a strict “answer only from context” prompt, and the UI waits for that completion before showing a final answer.
+
+**What “accuracy” means here:** a question passes when the retrieved `document_id`s include the expected sources, the answer contains the required facts (or correctly refuses when the fact is absent from context), and the answer does not introduce identifiers/numbers missing from that context. This is measured by the eval suite. It is **not** a claim of 100% accuracy.
+
+```bash
+# Offline pipeline eval (FakeChatProvider, no network)
+cd backend
+python scripts/eval_grounded_chat.py
+pytest tests/test_grounded_chat_prompt.py tests/test_grounded_chat_eval.py -v
+
+# Live Qwen via OpenRouter (requires OPENROUTER_API_KEY + QWEN_MODEL)
+python scripts/eval_grounded_chat.py --live --include-live-only
+```
+
+Enable debug retrieval metadata and pipeline timing logs:
+
+```bash
+# backend
+ASSISTANT_DEBUG=1
+LOG_LEVEL=INFO   # look for [assistant.pipeline] in server logs
+
+# frontend (or automatic in NODE_ENV=development)
+NEXT_PUBLIC_ASSISTANT_DEBUG=1
+```
+
+Set `LLM_CHAT_PROVIDER=openrouter` (not `fake`) or the UI will answer in milliseconds from snippet concatenation and never call Qwen.
+
 ---
 
 ## 📁 Project Structure

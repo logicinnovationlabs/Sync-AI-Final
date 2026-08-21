@@ -158,6 +158,43 @@ class EpisodicMemoryStore:
         val = row["memory_value"]
         return dict(val) if isinstance(val, dict) else {"value": val}
 
+    def list_sessions_for_user(
+        self, tenant_id: str, user_id: str, *, limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """Newest-first session summaries for one principal. Tenant-scoped."""
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT session_id, user_id, history_json, updated_at
+                    FROM orchestrator_sessions
+                    WHERE tenant_id = %s AND user_id = %s
+                    ORDER BY updated_at DESC
+                    LIMIT %s
+                    """,
+                    (tenant_id, user_id, int(limit)),
+                )
+                rows = cur.fetchall()
+        out: List[Dict[str, Any]] = []
+        for row in rows:
+            history = row.get("history_json") or []
+            title = ""
+            if isinstance(history, list):
+                for turn in history:
+                    if isinstance(turn, dict) and turn.get("role") == "user":
+                        title = str(turn.get("content") or "").strip()
+                        break
+            updated = row.get("updated_at")
+            out.append(
+                {
+                    "session_id": row["session_id"],
+                    "title": title[:80] if title else "New chat",
+                    "turn_count": len(history) if isinstance(history, list) else 0,
+                    "updated_at": updated.isoformat() if updated is not None else None,
+                }
+            )
+        return out
+
     def list_sessions_for_tenant(self, tenant_id: str) -> List[str]:
         with self._connect() as conn:
             with conn.cursor() as cur:

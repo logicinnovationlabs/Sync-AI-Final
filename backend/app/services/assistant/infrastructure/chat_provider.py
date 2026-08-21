@@ -4,22 +4,51 @@ Mirrors EmbeddingProvider / GeminiEmbeddingProvider / FakeEmbeddingProvider:
 a small Protocol, env-selected implementations, constructed from Settings.
 
 ``LLM_CHAT_PROVIDER`` is independent of ``LLM_PROVIDER`` (embeddings).
-Values: ``fake`` (default, no network) | ``openrouter`` (OpenAI-compatible
+Values: ``fake`` (default for offline tests) | ``openrouter`` (OpenAI-compatible
 client at OpenRouter, model from ``QWEN_MODEL``).
 """
 
 from __future__ import annotations
 
+import logging
+import re
+import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Dict, List, Optional, Protocol, Sequence
 
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
+
 OPENROUTER_DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
+QWEN_TIMEOUT_S = 90.0
+MAX_SOURCE_CHARS = 1200
+MAX_CONTEXT_CHARS = 9000
+MAX_HISTORY_TURNS = 6
+TOP_K_SOURCES = 8
+
+REFUSE_TEXT = (
+    "I don't have enough information in the provided context to answer that accurately."
+)
+
+GROUNDED_SYSTEM_PROMPT = """You are a tenant-scoped assistant. Answer from the retrieved sources. Be helpful with informal, short, or underspecified questions.
+
+Rules:
+- Treat the retrieved sources as the only authoritative evidence. Do not use world knowledge.
+- Users often omit dates, document names, account names, or other details. Infer what they mean from the sources: prefer the most recent, most relevant, or only matching item in the context.
+- Examples: "what is my mail" → the email address in the sources; "leave policy" → the leave policy in the sources even if the user did not name the year; "unpaid invoice" → the outstanding invoice(s) in the sources.
+- When you resolve a vague question this way, give the specific answer and briefly name the scope you used (e.g. "From the FY2026 leave policy in your sources"). Do not ask for a date or filename if the sources already make the default obvious.
+- Prior conversation is only for resolving references ("that one", "the same invoice"). It is not a source of facts and must never override retrieved sources.
+- If several sources conflict and you cannot tell which one they mean, ask one short clarification. If they do not conflict, answer from the best match.
+- If nothing in the sources is related to the question, reply with exactly: I don't have enough information in the provided context to answer that accurately.
+- Never invent facts, citations, file names, numbers, policies, dates, or steps that are not in the sources.
+- Cite each important claim using the supplied source identifier in square brackets, e.g. [1] or [1, p.3].
+- Prefer a precise, short answer over a dump of snippets."""
 
 # Inspectable log of prompts actually sent to a chat provider. Tests (L1)
 # assert restricted content never appears here. Entries never include API keys.
 PROMPT_LOG: List[Dict[str, Any]] = []
+_FAKE_PROVIDER_WARNED = False
 
 
 def clear_prompt_log() -> None:
@@ -32,6 +61,28 @@ def record_prompt(entry: Dict[str, Any]) -> None:
         del PROMPT_LOG[:250]
 
 
+def redact_provider_error(exc: BaseException) -> str:
+    """User-facing provider error with secrets stripped."""
+    text = str(exc)
+    text = re.sub(r"sk-[A-Za-z0-9_\-]+", "[redacted]", text)
+    text = re.sub(r"(?i)bearer\s+\S+", "Bearer [redacted]", text)
+    text = re.sub(r"(?i)api[_-]?key['\"]?\s*[:=]\s*\S+", "api_key=[redacted]", text)
+    if len(text) > 240:
+        text = text[:240] + "…"
+    return text
+
+
+def is_refuse_answer(text: str) -> bool:
+    normalized = (
+        (text or "")
+        .replace("\u2019", "'")
+        .replace("\u2018", "'")
+        .strip()
+        .lower()
+    )
+    return "don't have enough information in the provided context" in normalized
+
+
 @dataclass
 class ChatGeneration:
     """Minimal generate() result the graph node consumes."""
@@ -39,6 +90,8 @@ class ChatGeneration:
     text: str
     provider: str
     citations_meta: List[Dict[str, Any]] = field(default_factory=list)
+    error: Optional[str] = None
+    timings_ms: Dict[str, float] = field(default_factory=dict)
 
 
 class ChatProvider(Protocol):
@@ -53,44 +106,135 @@ class ChatProvider(Protocol):
     ) -> ChatGeneration: ...
 
 
+def _hit_meta(hit: Dict[str, Any]) -> Dict[str, Any]:
+    meta = hit.get("meta") if isinstance(hit.get("meta"), dict) else {}
+    nested = meta.get("metadata") if isinstance(meta.get("metadata"), dict) else {}
+    extra = hit.get("metadata") if isinstance(hit.get("metadata"), dict) else {}
+
+    def first(*keys: str) -> Any:
+        for key in keys:
+            for src in (hit, meta, nested, extra):
+                value = src.get(key)
+                if value not in (None, ""):
+                    return value
+        return None
+
+    return {
+        "document_id": str(first("document_id", "id") or ""),
+        "chunk_id": first("chunk_id", "chunkId"),
+        "page": first("page", "page_number", "pageNumber"),
+        "title": str(first("title") or ""),
+        "source": first("source", "source_type", "repository"),
+    }
+
+
+def format_source_block(hit: Dict[str, Any], index: int) -> str:
+    meta = _hit_meta(hit)
+    snippet = str(hit.get("snippet") or hit.get("body") or "").strip()
+    if len(snippet) > MAX_SOURCE_CHARS:
+        snippet = snippet[:MAX_SOURCE_CHARS].rstrip() + "…"
+    header_parts = [f"[{index}]", f"document_id={meta['document_id'] or 'unknown'}"]
+    if meta["title"]:
+        header_parts.append(f"title={meta['title']}")
+    if meta["chunk_id"]:
+        header_parts.append(f"chunk_id={meta['chunk_id']}")
+    if meta["page"] not in (None, ""):
+        header_parts.append(f"page={meta['page']}")
+    if meta["source"]:
+        header_parts.append(f"source={meta['source']}")
+    return " ".join(header_parts) + "\n" + (snippet or "(empty snippet)")
+
+
+def debug_source_chunks(ranked_hits: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Compact retrieval debug payload (ACL-filtered hits only; no secrets)."""
+    chunks: List[Dict[str, Any]] = []
+    for i, hit in enumerate(list(ranked_hits)[:TOP_K_SOURCES], start=1):
+        meta = _hit_meta(hit)
+        snippet = str(hit.get("snippet") or hit.get("body") or "").strip()
+        chunks.append(
+            {
+                "source_id": f"[{i}]",
+                "document_id": meta["document_id"] or None,
+                "chunk_id": meta["chunk_id"],
+                "page": meta["page"],
+                "title": meta["title"] or None,
+                "source": meta["source"],
+                "score": hit.get("boosted_score", hit.get("score")),
+                "base_score": hit.get("base_score"),
+                "snippet": snippet[:500],
+            }
+        )
+    return chunks
+
+
 def assemble_chat_messages(
     user_prompt: str,
     ranked_hits: List[Dict[str, Any]],
+    *,
+    conversation_history: Optional[Sequence[Dict[str, Any]]] = None,
 ) -> tuple[List[Dict[str, str]], str]:
     """Build chat messages from the user prompt + already-ACL-filtered hits.
 
     Retrieval (federator / document reader) is assumed to have filtered by
     the requesting principal before this runs. This function does not fetch
-    extra corpus content.
+    extra corpus content. Conversation history is included only as a
+    non-authoritative reference resolver.
     """
     source_blocks: List[str] = []
-    for i, hit in enumerate(ranked_hits[:8], start=1):
-        doc_id = str(hit.get("document_id") or "")
-        title = str(hit.get("title") or doc_id)
-        snippet = str(hit.get("snippet") or "").strip()
-        source_blocks.append(
-            f"[{i}] document_id={doc_id} title={title}\n{snippet}"
-        )
+    used = 0
+    for i, hit in enumerate(ranked_hits[:TOP_K_SOURCES], start=1):
+        block = format_source_block(hit, i)
+        if used + len(block) > MAX_CONTEXT_CHARS:
+            break
+        source_blocks.append(block)
+        used += len(block) + 2
     sources_text = (
         "\n\n".join(source_blocks) if source_blocks else "(no authorized sources)"
     )
-    system = (
-        "You are a tenant-scoped assistant. Answer only from the authorized "
-        "retrieved sources. If they are insufficient, say so. Refer to sources "
-        "by document_id. Do not invent documents or quote material that is not "
-        "in the sources."
+
+    history_lines: List[str] = []
+    prior = list(conversation_history or [])
+    if prior and prior[-1].get("role") == "user":
+        prior = prior[:-1]
+    for turn in prior[-MAX_HISTORY_TURNS:]:
+        role = str(turn.get("role") or "user")
+        if role not in ("user", "assistant"):
+            continue
+        content = str(turn.get("content") or "").strip().replace("\n", " ")
+        if not content:
+            continue
+        history_lines.append(f"{role}: {content[:400]}")
+    history_text = (
+        "\n".join(history_lines)
+        if history_lines
+        else "(none)"
     )
-    user = f"Question:\n{user_prompt}\n\nAuthorized retrieved sources:\n{sources_text}"
+
+    user = (
+        "Authoritative retrieved sources (the only allowed evidence):\n"
+        f"{sources_text}\n\n"
+        "Prior conversation (not evidence; do not invent facts from it; "
+        "sources above win if they conflict):\n"
+        f"{history_text}\n\n"
+        "The question may be informal or missing dates, names, or other details. "
+        "Infer the user's intent from the sources and answer specifically. "
+        "Ask a clarifying question only if the sources conflict or do not cover the topic.\n\n"
+        f"Question:\n{user_prompt}"
+    )
     messages = [
-        {"role": "system", "content": system},
+        {"role": "system", "content": GROUNDED_SYSTEM_PROMPT},
         {"role": "user", "content": user},
     ]
-    prompt_text = f"{system}\n\n{user}"
+    prompt_text = f"{GROUNDED_SYSTEM_PROMPT}\n\n{user}"
     return messages, prompt_text
 
 
 class FakeChatProvider:
-    """Deterministic synthesizer — keeps tests offline. Same shape as OpenRouter."""
+    """Deterministic synthesizer — keeps tests offline. Same shape as OpenRouter.
+
+    Does not invent facts: with no sources it refuses; with sources it quotes
+    retrieved snippets only.
+    """
 
     name = "fake"
 
@@ -99,32 +243,56 @@ class FakeChatProvider:
         messages: List[Dict[str, str]],
         **kwargs: Any,
     ) -> ChatGeneration:
-        user = ""
-        for msg in messages:
-            if msg.get("role") == "user":
-                user = msg.get("content") or ""
-        hits_meta = kwargs.get("ranked_hits") or []
+        started = time.perf_counter()
+        hits_meta = list(kwargs.get("ranked_hits") or [])
         if not hits_meta:
-            if "(no authorized sources)" in user or not user:
-                text = "I could not find accessible documents for that request."
-            else:
-                text = (
-                    "I can search your tenant corpus, open a specific document, "
-                    "or answer with citations from retrieved sources. "
-                    "Ask me to find something or open a document."
-                )
-            return ChatGeneration(text=text, provider=self.name)
+            return ChatGeneration(
+                text=REFUSE_TEXT,
+                provider=self.name,
+                timings_ms={
+                    "qwen_first_token_ms": 0.0,
+                    "qwen_completed_ms": (time.perf_counter() - started) * 1000.0,
+                },
+            )
 
         lines = []
         for i, hit in enumerate(hits_meta[:5], start=1):
             snippet = str(hit.get("snippet") or "").strip().replace("\n", " ")
             title = hit.get("title") or hit.get("document_id")
-            lines.append(f"{i}. {title}: {snippet[:240]}")
+            lines.append(f"{i}. {title}: {snippet[:240]} [{i}]")
         prefix = "Here is what I found"
         if kwargs.get("used_document_reader"):
             prefix += " (including a deep document read)"
         text = prefix + ":\n" + "\n".join(lines)
-        return ChatGeneration(text=text, provider=self.name)
+        elapsed = (time.perf_counter() - started) * 1000.0
+        return ChatGeneration(
+            text=text,
+            provider=self.name,
+            timings_ms={"qwen_first_token_ms": 0.0, "qwen_completed_ms": elapsed},
+        )
+
+
+def _completion_text(response: Any) -> tuple[str, Optional[str]]:
+    """Extract assistant text from a non-stream OpenAI-compatible payload."""
+    choices = getattr(response, "choices", None)
+    if not choices:
+        return "", "empty_choices"
+    choice = choices[0]
+    message = getattr(choice, "message", None)
+    content = getattr(message, "content", None) if message is not None else None
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict) and item.get("type") == "text":
+                parts.append(str(item.get("text") or ""))
+            elif isinstance(item, str):
+                parts.append(item)
+        content = "".join(parts)
+    text = (content or "").strip()
+    finish = getattr(choice, "finish_reason", None)
+    if not text:
+        return "", f"empty_content:{finish or 'unknown'}"
+    return text, None
 
 
 class OpenRouterChatProvider:
@@ -137,12 +305,17 @@ class OpenRouterChatProvider:
         api_key: str,
         model: str,
         base_url: str = OPENROUTER_DEFAULT_BASE_URL,
+        timeout_s: float = QWEN_TIMEOUT_S,
     ) -> None:
         # Import here so fake/unit tests do not require the openai package.
         from openai import AsyncOpenAI
 
         self.model = model
-        self._client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        self._client = AsyncOpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout_s,
+        )
 
     @classmethod
     def from_settings(cls, cfg: Any = None) -> "OpenRouterChatProvider":
@@ -163,17 +336,92 @@ class OpenRouterChatProvider:
         messages: List[Dict[str, str]],
         **kwargs: Any,
     ) -> ChatGeneration:
-        max_tokens = int(kwargs.get("max_tokens") or 256)
-        temperature = float(kwargs.get("temperature") or 0.2)
-        response = await self._client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=temperature,
+        started = time.perf_counter()
+        max_tokens = kwargs.get("max_tokens")
+        if max_tokens is None:
+            max_tokens = getattr(settings, "llm_chat_max_tokens", 1024) or 1024
+        temperature = kwargs.get("temperature")
+        if temperature is None:
+            temperature = getattr(settings, "llm_chat_temperature", 0.1)
+        try:
+            temperature = min(0.2, max(0.0, float(temperature)))
+        except (TypeError, ValueError):
+            temperature = 0.1
+
+        logger.info(
+            "[assistant.pipeline] Qwen request started model=%s max_tokens=%s temperature=%s",
+            self.model,
+            int(max_tokens),
+            temperature,
         )
-        choice = response.choices[0].message if response.choices else None
-        text = (choice.content if choice else None) or ""
-        return ChatGeneration(text=text.strip(), provider=self.name)
+        first_token_ms: Optional[float] = None
+        parts: List[str] = []
+        try:
+            stream = await self._client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                max_tokens=int(max_tokens),
+                temperature=temperature,
+                stream=True,
+            )
+            async for event in stream:
+                choices = getattr(event, "choices", None) or []
+                if not choices:
+                    continue
+                delta = getattr(choices[0], "delta", None)
+                content = getattr(delta, "content", None) if delta is not None else None
+                if not content:
+                    continue
+                if first_token_ms is None:
+                    first_token_ms = (time.perf_counter() - started) * 1000.0
+                    logger.info(
+                        "[assistant.pipeline] first token received ms=%.1f",
+                        first_token_ms,
+                    )
+                parts.append(content)
+        except Exception as exc:  # noqa: BLE001
+            elapsed = (time.perf_counter() - started) * 1000.0
+            err = redact_provider_error(exc)
+            logger.warning(
+                "[assistant.pipeline] Qwen request failed ms=%.1f error=%s",
+                elapsed,
+                err,
+            )
+            return ChatGeneration(
+                text="",
+                provider=self.name,
+                error=f"provider_error:{err}",
+                timings_ms={"qwen_completed_ms": elapsed},
+            )
+
+        text = "".join(parts).strip()
+        elapsed = (time.perf_counter() - started) * 1000.0
+        if not text:
+            logger.warning(
+                "[assistant.pipeline] Qwen returned empty payload ms=%.1f", elapsed
+            )
+            return ChatGeneration(
+                text="",
+                provider=self.name,
+                error="empty_content",
+                timings_ms={
+                    "qwen_first_token_ms": first_token_ms or elapsed,
+                    "qwen_completed_ms": elapsed,
+                },
+            )
+        logger.info(
+            "[assistant.pipeline] Qwen response completed ms=%.1f chars=%s",
+            elapsed,
+            len(text),
+        )
+        return ChatGeneration(
+            text=text,
+            provider=self.name,
+            timings_ms={
+                "qwen_first_token_ms": first_token_ms if first_token_ms is not None else elapsed,
+                "qwen_completed_ms": elapsed,
+            },
+        )
 
 
 def create_chat_provider(name: Optional[str] = None) -> ChatProvider:
@@ -181,6 +429,17 @@ def create_chat_provider(name: Optional[str] = None) -> ChatProvider:
     provider_name = (name or getattr(settings, "llm_chat_provider", None) or "fake")
     provider_name = str(provider_name).strip().lower()
     if provider_name in ("fake", "template"):
+        global _FAKE_PROVIDER_WARNED
+        if (
+            not _FAKE_PROVIDER_WARNED
+            and getattr(settings, "openrouter_api_key", None)
+            and getattr(settings, "qwen_model", None)
+        ):
+            _FAKE_PROVIDER_WARNED = True
+            logger.warning(
+                "[assistant.pipeline] LLM_CHAT_PROVIDER=fake; Qwen/OpenRouter is configured "
+                "but will not be called. Set LLM_CHAT_PROVIDER=openrouter to use the real model."
+            )
         return FakeChatProvider()
     if provider_name in ("openrouter", "qwen"):
         return OpenRouterChatProvider.from_settings(settings)

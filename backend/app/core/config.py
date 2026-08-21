@@ -293,6 +293,20 @@ class Settings(BaseSettings):
             "LLM_MAX_TOOL_CALL_ROUNDS", "llm_max_tool_call_rounds"
         ),
     )
+    llm_chat_temperature: float = Field(
+        default=0.1,
+        validation_alias=AliasChoices(
+            "LLM_CHAT_TEMPERATURE", "llm_chat_temperature"
+        ),
+    )
+    llm_chat_max_tokens: int = Field(
+        default=1024,
+        validation_alias=AliasChoices("LLM_CHAT_MAX_TOKENS", "llm_chat_max_tokens"),
+    )
+    assistant_debug: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("ASSISTANT_DEBUG", "assistant_debug"),
+    )
 
     environment: str = Field(default="development")
     cors_allowed_origins: str = Field(

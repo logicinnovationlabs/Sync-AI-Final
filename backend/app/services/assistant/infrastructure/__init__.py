@@ -4,7 +4,10 @@ from .chat_provider import (
     ChatService,
     FakeChatProvider,
     OpenRouterChatProvider,
+    REFUSE_TEXT,
     create_chat_provider,
+    assemble_chat_messages,
+    is_refuse_answer,
 )
 
 __all__ = [
@@ -13,5 +16,8 @@ __all__ = [
     "ChatService",
     "FakeChatProvider",
     "OpenRouterChatProvider",
+    "REFUSE_TEXT",
     "create_chat_provider",
+    "assemble_chat_messages",
+    "is_refuse_answer",
 ]

@@ -1,16 +1,23 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
-import { CiteMark } from "@/components/landing/cite-mark"
+import { Plus } from "lucide-react"
 import { Composer } from "@/components/chat/composer"
 import { SourceCard, type SourceCardData } from "@/components/chat/source-card"
 import { Loader } from "@/components/motion/loader"
-import { streamAssistantChat, type AssistantCitation } from "@/lib/api/assistant"
+import {
+  getAssistantSession,
+  listAssistantSessions,
+  streamAssistantChat,
+  stripInlineCitations,
+  type AssistantCitation,
+} from "@/lib/api/assistant"
 import { ApiError } from "@/lib/api/client"
 import { useAuthHydrated, useAuthStore } from "@/lib/auth/auth-store"
 import { EASE_OUT } from "@/lib/ease"
+import { cn } from "@/lib/utils"
 
 type Turn =
   | { kind: "user"; id: number; text: string }
@@ -23,6 +30,12 @@ type Turn =
       settled: boolean
     }
 
+type ChatWindow = {
+  id: string
+  title: string
+  updatedAt: number
+}
+
 function citationsToSources(citations: AssistantCitation[]): SourceCardData[] {
   return citations.map((c, i) => ({
     n: i + 1,
@@ -31,8 +44,68 @@ function citationsToSources(citations: AssistantCitation[]): SourceCardData[] {
     meta:
       c.score != null && Number.isFinite(c.score)
         ? `score ${Number(c.score).toFixed(3)}`
-        : "Block L citation",
+        : "Source",
   }))
+}
+
+function newSessionId() {
+  return typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `sess-${Date.now()}`
+}
+
+function storageKey(tenantId: string, userId: string) {
+  return `synq.chat.v1.${tenantId}.${userId}`
+}
+
+function loadLocalStore(tenantId: string, userId: string): {
+  activeId: string
+  windows: ChatWindow[]
+  turnsById: Record<string, Turn[]>
+} {
+  const empty = { activeId: newSessionId(), windows: [] as ChatWindow[], turnsById: {} }
+  if (typeof window === "undefined") return empty
+  try {
+    const raw = localStorage.getItem(storageKey(tenantId, userId))
+    if (!raw) return empty
+    const parsed = JSON.parse(raw) as {
+      activeId?: string
+      windows?: ChatWindow[]
+      turnsById?: Record<string, Turn[]>
+    }
+    return {
+      activeId: parsed.activeId || empty.activeId,
+      windows: Array.isArray(parsed.windows) ? parsed.windows : [],
+      turnsById: parsed.turnsById && typeof parsed.turnsById === "object" ? parsed.turnsById : {},
+    }
+  } catch {
+    return empty
+  }
+}
+
+function titleFromTurns(turns: Turn[]): string {
+  const first = turns.find((t) => t.kind === "user")
+  const text = first?.kind === "user" ? first.text.trim() : ""
+  return text ? text.slice(0, 80) : "New chat"
+}
+
+function historyToTurns(history: Array<{ role: string; content: string; citations?: AssistantCitation[] }>): Turn[] {
+  const turns: Turn[] = []
+  let id = 0
+  for (const item of history) {
+    if (item.role === "user") {
+      turns.push({ kind: "user", id: id++, text: item.content })
+    } else if (item.role === "assistant") {
+      turns.push({
+        kind: "answer",
+        id: id++,
+        text: stripInlineCitations(item.content || ""),
+        sources: citationsToSources(item.citations || []),
+        settled: true,
+      })
+    }
+  }
+  return turns
 }
 
 export function ChatView() {
@@ -41,19 +114,101 @@ export function ChatView() {
   const token = useAuthStore((s) => s.accessToken)
   const claims = useAuthStore((s) => s.claims)
   const authenticated = useAuthStore((s) => s.isAuthenticated())
+  const tenantId = claims?.tenant_id || "alpha"
+  const userId = claims?.sub || "anon"
+
   const [turns, setTurns] = useState<Turn[]>([])
+  const [windows, setWindows] = useState<ChatWindow[]>([])
+  const [sessionId, setSessionId] = useState("")
   const [activeCite, setActiveCite] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [ready, setReady] = useState(false)
   const nextId = useRef(0)
-  const sessionId = useRef(
-    typeof crypto !== "undefined" && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `sess-${Date.now()}`
-  )
+  const turnsRef = useRef<Turn[]>([])
+  const sessionRef = useRef("")
+  const windowsRef = useRef<ChatWindow[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  turnsRef.current = turns
+  sessionRef.current = sessionId
+  windowsRef.current = windows
 
   const last = turns[turns.length - 1]
   const busy = last?.kind === "answer" && !last.settled
+
+  const persist = useCallback(
+    (nextSession: string, nextTurns: Turn[], nextWindows: ChatWindow[]) => {
+      if (typeof window === "undefined") return
+      const titled = nextTurns.length
+        ? nextWindows.map((w) =>
+            w.id === nextSession ? { ...w, title: titleFromTurns(nextTurns), updatedAt: Date.now() } : w
+          )
+        : nextWindows
+      const turnsById: Record<string, Turn[]> = {}
+      try {
+        const prev = loadLocalStore(tenantId, userId)
+        Object.assign(turnsById, prev.turnsById)
+      } catch {
+        // ignore
+      }
+      turnsById[nextSession] = nextTurns
+      localStorage.setItem(
+        storageKey(tenantId, userId),
+        JSON.stringify({ activeId: nextSession, windows: titled, turnsById })
+      )
+    },
+    [tenantId, userId]
+  )
+
+  useEffect(() => {
+    if (!hydrated || !authenticated) return
+    const local = loadLocalStore(tenantId, userId)
+    const active = local.activeId || newSessionId()
+    setSessionId(active)
+    setTurns(local.turnsById[active] || [])
+    nextId.current = (local.turnsById[active] || []).reduce((m, t) => Math.max(m, t.id + 1), 0)
+    setWindows(
+      local.windows.length
+        ? local.windows
+        : [{ id: active, title: titleFromTurns(local.turnsById[active] || []), updatedAt: Date.now() }]
+    )
+    setReady(true)
+
+    if (!token) return
+    void (async () => {
+      try {
+        const remote = await listAssistantSessions(token)
+        setWindows((prev) => {
+          const byId = new Map<string, ChatWindow>()
+          for (const row of remote) {
+            byId.set(row.session_id, {
+              id: row.session_id,
+              title: row.title || "New chat",
+              updatedAt: row.updated_at ? Date.parse(row.updated_at) : Date.now(),
+            })
+          }
+          for (const w of prev) {
+            if (!byId.has(w.id)) byId.set(w.id, w)
+          }
+          if (!byId.has(active)) {
+            byId.set(active, {
+              id: active,
+              title: titleFromTurns(local.turnsById[active] || []),
+              updatedAt: Date.now(),
+            })
+          }
+          return [...byId.values()].sort((a, b) => b.updatedAt - a.updatedAt)
+        })
+      } catch {
+        // local history still works if the list endpoint is not up yet
+      }
+    })()
+  }, [authenticated, hydrated, tenantId, token, userId])
+
+  useEffect(() => {
+    if (!ready || !sessionId) return
+    persist(sessionId, turns, windows)
+  }, [persist, ready, sessionId, turns, windows])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({
@@ -61,6 +216,40 @@ export function ChatView() {
       block: "end",
     })
   }, [turns, reduce])
+
+  const openWindow = useCallback(
+    async (id: string) => {
+      if (id === sessionRef.current) return
+      setActiveCite(null)
+      setError(null)
+      setSessionId(id)
+      const local = loadLocalStore(tenantId, userId)
+      let nextTurns = local.turnsById[id] || []
+      if (token) {
+        try {
+          const detail = await getAssistantSession(token, id)
+          if (detail.history?.length) {
+            nextTurns = historyToTurns(detail.history)
+          }
+        } catch {
+          // keep local copy
+        }
+      }
+      setTurns(nextTurns)
+      nextId.current = nextTurns.reduce((m, t) => Math.max(m, t.id + 1), 0)
+    },
+    [tenantId, token, userId]
+  )
+
+  const startNewChat = useCallback(() => {
+    const id = newSessionId()
+    setActiveCite(null)
+    setError(null)
+    setSessionId(id)
+    setTurns([])
+    nextId.current = 0
+    setWindows((prev) => [{ id, title: "New chat", updatedAt: Date.now() }, ...prev.filter((w) => w.id !== id)])
+  }, [])
 
   const ask = useCallback(
     async (text: string) => {
@@ -70,38 +259,53 @@ export function ChatView() {
       }
       setError(null)
       setActiveCite(null)
-      const userId = nextId.current++
+      const userTurnId = nextId.current++
       const answerId = nextId.current++
       setTurns((prev) => [
         ...prev,
-        { kind: "user", id: userId, text },
+        { kind: "user", id: userTurnId, text },
         { kind: "answer", id: answerId, text: "", sources: [], settled: false },
       ])
+      setWindows((prev) => {
+        const exists = prev.some((w) => w.id === sessionRef.current)
+        const title = text.slice(0, 80)
+        const row = { id: sessionRef.current, title, updatedAt: Date.now() }
+        return exists
+          ? [row, ...prev.filter((w) => w.id !== sessionRef.current)]
+          : [row, ...prev]
+      })
 
       try {
         await streamAssistantChat({
           token,
           prompt: text,
-          sessionId: sessionId.current,
+          sessionId: sessionRef.current,
           tenantId: claims?.tenant_id,
           onEvent: (event) => {
             if (event.type === "token") {
               setTurns((prev) =>
                 prev.map((t) =>
                   t.kind === "answer" && t.id === answerId
-                    ? { ...t, text: t.text + event.text }
+                    ? { ...t, text: stripInlineCitations(t.text + event.text) }
                     : t
                 )
               )
             }
             if (event.type === "final") {
+              const providerError = event.generation_error
               setTurns((prev) =>
                 prev.map((t) =>
                   t.kind === "answer" && t.id === answerId
                     ? {
                         ...t,
-                        text: event.response_text || t.text,
+                        text: providerError
+                          ? ""
+                          : stripInlineCitations(event.response_text || t.text),
                         sources: citationsToSources(event.citations || []),
+                        error: providerError
+                          ? event.response_text ||
+                            "The language model did not return a usable answer."
+                          : undefined,
                         settled: true,
                       }
                     : t
@@ -113,7 +317,11 @@ export function ChatView() {
         setTurns((prev) =>
           prev.map((t) =>
             t.kind === "answer" && t.id === answerId && !t.settled
-              ? { ...t, settled: true }
+              ? {
+                  ...t,
+                  error: t.error || "Incomplete assistant response.",
+                  settled: true,
+                }
               : t
           )
         )
@@ -122,7 +330,7 @@ export function ChatView() {
           err instanceof ApiError
             ? err.message
             : err instanceof DOMException && err.name === "TimeoutError"
-              ? "Chat timed out talking to the API. Retry once — it should be fast now."
+              ? "Chat timed out waiting for the model. Retrieval and Qwen can take more than a few seconds — retry once."
               : "Chat request failed."
         setTurns((prev) =>
           prev.map((t) =>
@@ -144,10 +352,11 @@ export function ChatView() {
     )
   const railSources = railTurn?.sources ?? []
   const empty = turns.length === 0
+  const historyWindows = useMemo(
+    () => windows.filter((w) => w.id !== sessionId || w.title !== "New chat" || turns.length > 0),
+    [sessionId, turns.length, windows]
+  )
 
-  // Persist rehydrates from localStorage on the client only. SSR and the
-  // first client paint must share one tree (`useAuthHydrated` server
-  // snapshot is false) or logged-in users hydrate as "Sign in to chat".
   if (!hydrated) {
     return <div className="flex h-full min-h-0" />
   }
@@ -157,8 +366,8 @@ export function ChatView() {
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
         <p className="text-lg font-medium">Sign in to chat</p>
         <p className="max-w-md text-sm text-muted-foreground">
-          Chat talks to Block L at POST /assistant/orchestrator/chat. There
-          is no scripted fallback in the product surface.
+          Your conversations are saved per account so you can reopen earlier
+          windows.
         </p>
         <Link
           href="/login?next=/chat"
@@ -172,7 +381,69 @@ export function ChatView() {
 
   return (
     <div className="flex h-full min-h-0">
+      <aside className="hidden w-64 shrink-0 flex-col border-r border-border-subtle bg-muted/20 md:flex">
+        <div className="p-3">
+          <button
+            type="button"
+            onClick={startNewChat}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-border-subtle bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
+          >
+            <Plus className="size-4" />
+            New chat
+          </button>
+        </div>
+        <div className="px-3 pb-2 text-[0.6875rem] font-medium uppercase tracking-wide text-muted-foreground">
+          Previous
+        </div>
+        <ul className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-4">
+          {historyWindows.length === 0 ? (
+            <li className="px-2 py-3 text-sm text-muted-foreground">
+              No earlier chats yet.
+            </li>
+          ) : (
+            historyWindows.map((w) => (
+              <li key={w.id}>
+                <button
+                  type="button"
+                  onClick={() => void openWindow(w.id)}
+                  className={cn(
+                    "w-full truncate rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                    w.id === sessionId
+                      ? "bg-ink-blue/8 font-medium text-ink-blue"
+                      : "text-foreground hover:bg-muted"
+                  )}
+                >
+                  {w.title || "New chat"}
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+      </aside>
+
       <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex items-center justify-between gap-2 border-b border-border-subtle px-4 py-3 md:hidden">
+          <button
+            type="button"
+            onClick={startNewChat}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border-subtle px-2.5 py-1.5 text-sm"
+          >
+            <Plus className="size-3.5" />
+            New
+          </button>
+          <select
+            className="max-w-[60%] rounded-lg border border-border-subtle bg-card px-2 py-1.5 text-sm"
+            value={sessionId}
+            onChange={(event) => void openWindow(event.target.value)}
+          >
+            {windows.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.title || "New chat"}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
           {empty ? (
             <div className="mx-auto flex max-w-2xl flex-col gap-3 pt-16">
@@ -180,8 +451,8 @@ export function ChatView() {
                 What do you want to know?
               </h2>
               <p className="text-sm text-muted-foreground">
-                Answers come from the live assistant (Block L) with citations from
-                retrieved documents.
+                Ask in plain language. Answers come from your indexed documents,
+                with sources in the right-hand rail.
               </p>
             </div>
           ) : (
@@ -222,9 +493,6 @@ export function ChatView() {
                 {error}
               </p>
             )}
-            <p className="mt-2 text-[0.6875rem] text-muted-foreground">
-              Live Block L — POST /assistant/orchestrator/chat
-            </p>
           </div>
         </div>
       </div>
@@ -235,7 +503,7 @@ export function ChatView() {
         </div>
         {railSources.length === 0 ? (
           <p className="px-4 text-sm text-muted-foreground">
-            Records cited in an answer show up here.
+            Records used for the latest answer show up here.
           </p>
         ) : (
           <ul className="flex flex-col gap-2 px-3 pb-4">
@@ -294,17 +562,8 @@ function AnswerTurn({
       )}
 
       {turn.text && (
-        <p className="text-[0.9375rem] leading-7">
+        <div className="text-[0.9375rem] leading-7 whitespace-pre-wrap">
           {turn.text}
-          {turn.sources.map((source) => (
-            <CiteMark
-              key={source.n}
-              n={source.n}
-              active={activeCite === source.n}
-              onActivate={() => setActiveCite(source.n)}
-              onDeactivate={() => setActiveCite(null)}
-            />
-          ))}
           {streaming && (
             <motion.span
               aria-hidden
@@ -313,7 +572,7 @@ function AnswerTurn({
               className="ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[0.18em] rounded-full bg-ink-blue"
             />
           )}
-        </p>
+        </div>
       )}
 
       {turn.sources.length > 0 && turn.settled && (

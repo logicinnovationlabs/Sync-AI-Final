@@ -73,6 +73,7 @@ OPTIONAL = [
     "token_encryption_key",
     "openrouter_api_key",
     "qwen_model",
+    "llm_chat_provider",
 ]
 
 

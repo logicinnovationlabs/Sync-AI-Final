@@ -15,7 +15,7 @@ from app.services.assistant.core.ranker_boost import (
     RankedHit,
     apply_signal_boost,
     extract_base_hits,
-    max_confidence,
+    retrieval_confidence,
 )
 from app.services.assistant.domain.models import (
     OrchestratorRequest,
@@ -28,6 +28,7 @@ from app.services.assistant.infrastructure.tools import SearchToolbox, encode_ac
 from app.services.assistant.infrastructure.chat_provider import (
     ChatService,
     assemble_chat_messages,
+    debug_source_chunks,
     record_prompt,
 )
 
@@ -55,6 +56,10 @@ class OrchestratorState(TypedDict, total=False):
     llm_prompt: str
     tool_call_rounds: int
     chat_provider_name: str
+    timings_ms: Dict[str, float]
+    generation_error: str
+    debug_retrieval: List[Dict[str, Any]]
+    pipeline_t0: float
 
 
 class OrchestratorGraph:
@@ -90,6 +95,12 @@ class OrchestratorGraph:
         authorization: Optional[str] = None,
     ) -> Dict[str, Any]:
         started = time.perf_counter()
+        logger.info(
+            "[assistant.pipeline] request received tenant=%s session=%s prompt_len=%s",
+            request.tenant_id,
+            request.session_id,
+            len(request.prompt or ""),
+        )
         ctx = self.memory.load_session(request.tenant_id, request.session_id)
         if ctx is None:
             ctx = SessionContext(
@@ -117,9 +128,23 @@ class OrchestratorGraph:
             "llm_prompt": "",
             "tool_call_rounds": 0,
             "chat_provider_name": "",
+            "timings_ms": {"request_received_ms": 0.0},
+            "generation_error": "",
+            "debug_retrieval": [],
+            "pipeline_t0": started,
         }
         final = await self._graph.ainvoke(initial)
         final["latency_ms"] = (time.perf_counter() - started) * 1000.0
+        timings = dict(final.get("timings_ms") or {})
+        timings["total_ms"] = final["latency_ms"]
+        final["timings_ms"] = timings
+        logger.info(
+            "[assistant.pipeline] response ready latency_ms=%.1f provider=%s hits=%s error=%s",
+            final["latency_ms"],
+            final.get("chat_provider_name") or "",
+            len(final.get("ranked_hits") or []),
+            final.get("generation_error") or "",
+        )
 
         # Persist session (tenant-scoped).
         session_data = final.get("session") or ctx.model_dump()
@@ -188,6 +213,12 @@ class OrchestratorGraph:
         except Exception:  # noqa: BLE001
             logger.exception("activity ingest failed (non-blocking)")
 
+    def _elapsed_ms(self, state: OrchestratorState) -> float:
+        t0 = state.get("pipeline_t0")
+        if not t0:
+            return 0.0
+        return (time.perf_counter() - float(t0)) * 1000.0
+
     # ---- graph nodes ----
 
     async def intent_router(self, state: OrchestratorState) -> OrchestratorState:
@@ -205,9 +236,6 @@ class OrchestratorGraph:
         prompt = req.get("prompt") or ""
         errors = list(state.get("errors") or [])
         results: List[ToolResult] = []
-
-        if intent == Intent.CHAT.value:
-            return {**state, "tool_results": [], "errors": errors, "tool_call_rounds": 0}
 
         rounds = int(state.get("tool_call_rounds") or 0)
         if rounds >= self.max_tool_call_rounds:
@@ -283,8 +311,6 @@ class OrchestratorGraph:
 
     async def personalized_ranker(self, state: OrchestratorState) -> OrchestratorState:
         """Call Ranking Service output (via Federator results) then apply signal boost."""
-        if state.get("intent") == Intent.CHAT.value:
-            return state
         if state.get("used_document_reader") and state.get("intent") == Intent.READ.value:
             # Reader path: synthesize a single hit from the document payload.
             for tr in state.get("tool_results") or []:
@@ -298,10 +324,16 @@ class OrchestratorGraph:
                         snippet=str(payload.get("body") or "")[:500],
                         sources=["document_reader"],
                     )
+                    timings = dict(state.get("timings_ms") or {})
+                    timings["context_retrieval_completed_ms"] = self._elapsed_ms(state)
+                    logger.info(
+                        "[assistant.pipeline] context retrieval completed hits=1 used_reader=true"
+                    )
                     return {
                         **state,
                         "base_hits": [hit.__dict__],
                         "ranked_hits": [hit.__dict__],
+                        "timings_ms": timings,
                     }
             return state
 
@@ -327,7 +359,7 @@ class OrchestratorGraph:
         errors = list(state.get("errors") or [])
         rounds = int(state.get("tool_call_rounds") or 0)
         if (
-            max_confidence(boosted) < self.confidence_threshold
+            retrieval_confidence(boosted) < self.confidence_threshold
             and boosted
             and rounds < self.max_tool_call_rounds
         ):
@@ -362,6 +394,13 @@ class OrchestratorGraph:
                 boosted = [promoted] + [h for h in boosted if h.document_id != top.document_id]
             elif reader.error:
                 errors.append(f"read_document: {reader.error}")
+            logger.info(
+                "[assistant.pipeline] context retrieval completed hits=%s used_reader=%s",
+                len(boosted),
+                used_reader,
+            )
+            timings = dict(state.get("timings_ms") or {})
+            timings["context_retrieval_completed_ms"] = self._elapsed_ms(state)
             return {
                 **state,
                 "base_hits": [h.__dict__ for h in base_hits],
@@ -370,8 +409,16 @@ class OrchestratorGraph:
                 "used_document_reader": used_reader,
                 "errors": errors,
                 "tool_call_rounds": rounds + 1,
+                "timings_ms": timings,
             }
 
+        logger.info(
+            "[assistant.pipeline] context retrieval completed hits=%s used_reader=%s",
+            len(boosted),
+            used_reader,
+        )
+        timings = dict(state.get("timings_ms") or {})
+        timings["context_retrieval_completed_ms"] = self._elapsed_ms(state)
         return {
             **state,
             "base_hits": [h.__dict__ for h in base_hits],
@@ -379,28 +426,40 @@ class OrchestratorGraph:
             "used_document_reader": used_reader,
             "errors": errors,
             "tool_call_rounds": rounds,
+            "timings_ms": timings,
         }
 
     async def response_generator(self, state: OrchestratorState) -> OrchestratorState:
+        from app.core.config import settings as _settings
+
         intent = state.get("intent")
-        hits = state.get("ranked_hits") or []
+        hits = list(state.get("ranked_hits") or [])
         req = state.get("request") or {}
         user_prompt = str(req.get("prompt") or "")
+        session = state.get("session") or {}
+        history = list(session.get("history") or [])
 
         citations: List[Dict[str, Any]] = []
-        for h in hits[:5]:
+        for i, h in enumerate(hits[:5], start=1):
             snippet = (h.get("snippet") or "").strip().replace("\n", " ")
+            meta = h.get("meta") if isinstance(h.get("meta"), dict) else {}
             citations.append(
                 {
                     "document_id": h.get("document_id"),
+                    "source_id": f"[{i}]",
+                    "chunk_id": h.get("chunk_id") or meta.get("chunk_id"),
+                    "page": h.get("page") or meta.get("page") or meta.get("page_number"),
                     "quote": snippet[:200],
                     "score": h.get("boosted_score"),
                     "base_score": h.get("base_score"),
                 }
             )
 
-        context_hits = hits if intent != Intent.CHAT.value else []
-        messages, prompt_text = assemble_chat_messages(user_prompt, context_hits)
+        messages, prompt_text = assemble_chat_messages(
+            user_prompt,
+            hits,
+            conversation_history=history,
+        )
         record_prompt(
             {
                 "tenant_id": req.get("tenant_id"),
@@ -411,18 +470,52 @@ class OrchestratorGraph:
             }
         )
 
+        timings = dict(state.get("timings_ms") or {})
+        timings["qwen_request_started_ms"] = self._elapsed_ms(state)
+        logger.info(
+            "[assistant.pipeline] Qwen request started provider=%s hits=%s",
+            getattr(self.chat_service.provider, "name", ""),
+            len(hits),
+        )
+        max_tokens_raw = getattr(_settings, "llm_chat_max_tokens", 1024)
+        temperature_raw = getattr(_settings, "llm_chat_temperature", 0.1)
         generation = await self.chat_service.generate(
             messages,
-            ranked_hits=context_hits,
+            ranked_hits=hits,
             used_document_reader=bool(state.get("used_document_reader")),
-            max_tokens=256,
+            max_tokens=int(max_tokens_raw if max_tokens_raw is not None else 1024),
+            temperature=float(temperature_raw if temperature_raw is not None else 0.1),
         )
+        gen_timings = generation.timings_ms or {}
+        if gen_timings.get("qwen_first_token_ms") is not None:
+            timings["qwen_first_token_ms"] = gen_timings["qwen_first_token_ms"]
+        timings["qwen_response_completed_ms"] = self._elapsed_ms(state)
+
+        errors = list(state.get("errors") or [])
+        text = (generation.text or "").strip()
+        gen_error = generation.error or ""
+        if gen_error or not text:
+            if gen_error:
+                errors.append(f"chat_provider: {gen_error}")
+            text = (
+                "The language model did not return a usable answer. "
+                "Please retry. No generated content was substituted."
+            )
+            logger.warning(
+                "[assistant.pipeline] Qwen payload invalid; refusing to fabricate an answer error=%s",
+                gen_error or "empty_text",
+            )
+
         return {
             **state,
-            "response_text": generation.text,
+            "response_text": text,
             "citations": citations,
             "llm_prompt": prompt_text,
             "chat_provider_name": generation.provider,
+            "timings_ms": timings,
+            "generation_error": gen_error,
+            "debug_retrieval": debug_source_chunks(hits),
+            "errors": errors,
         }
 
 

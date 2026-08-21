@@ -21,6 +21,15 @@ from tests.conftest import _get_app
 
 pytestmark = pytest.mark.block_l
 
+
+@pytest.fixture(autouse=True)
+def _offline_chat_provider(monkeypatch):
+    """Signoff hits the mounted graph singleton; keep it off the live Qwen path."""
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "llm_chat_provider", "fake")
+
+
 TENANT_A = str(uuid4())
 TENANT_B = str(uuid4())
 USER_ALICE = str(uuid4())
