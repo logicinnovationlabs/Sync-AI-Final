@@ -38,11 +38,14 @@ def _sync_redis():
         return None
 
 
-def _key(tenant_id: str, source_type: str) -> str:
+def _key(tenant_id: str, source_type: str, user_id: str = "") -> str:
+    uid = str(user_id or "").strip()
+    if uid:
+        return f"connector_status:{tenant_id}:{uid}:{source_type}"
     return f"connector_status:{tenant_id}:{source_type}"
 
 
-def get_status(tenant_id: str, source_type: str) -> Dict[str, Any]:
+def get_status(tenant_id: str, source_type: str, user_id: str = "") -> Dict[str, Any]:
     empty = {
         "connection_status": "not_connected",
         "files_indexed": 0,
@@ -53,7 +56,7 @@ def get_status(tenant_id: str, source_type: str) -> Dict[str, Any]:
     if client is None:
         return empty
     try:
-        raw = client.get(_key(tenant_id, source_type))
+        raw = client.get(_key(tenant_id, source_type, user_id))
         if not raw:
             return empty
         data = json.loads(raw)
@@ -68,12 +71,13 @@ def set_status(
     tenant_id: str,
     source_type: str,
     *,
+    user_id: str = "",
     connection_status: Optional[str] = None,
     files_indexed: Optional[int] = None,
     last_error: Optional[str] = None,
     increment_indexed: int = 0,
 ) -> Dict[str, Any]:
-    current = get_status(tenant_id, source_type)
+    current = get_status(tenant_id, source_type, user_id=user_id)
     if connection_status:
         current["connection_status"] = connection_status
     if files_indexed is not None:
@@ -87,7 +91,7 @@ def set_status(
     client = _sync_redis()
     if client is not None:
         try:
-            client.set(_key(tenant_id, source_type), json.dumps(current))
+            client.set(_key(tenant_id, source_type, user_id), json.dumps(current))
         except Exception as exc:
             logger.warning("Failed to persist connector status: %s", type(exc).__name__)
     return current

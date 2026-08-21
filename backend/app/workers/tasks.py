@@ -22,6 +22,7 @@ from app.services.indexer import indexer
 from app.services.cursor_store import cursor_store
 from app.services.registry import connector_registry
 from app.connectors.google.oauth import GoogleOAuthManager, seed_token_store_from_env
+from app.connectors.google.keys import cursor_scope_id, google_oauth_token_key
 from app.connectors.google.watch_manager import WatchManager
 from app.connectors.google.services.drive_service import DriveConnector
 from app.connectors.google.services.gmail_service import GmailConnector
@@ -260,10 +261,17 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
         Summary dict with counts and final cursor
     """
     try:
-        logger.info(f"Starting backfill for tenant {tenant_id}, source {source_type}")
+        logger.info(
+            "Starting backfill for tenant %s user %s source %s",
+            tenant_id,
+            user_id,
+            source_type,
+        )
         _validate_tenant_auth(tenant_id)
 
         token_store = PersistentGoogleTokenStore(tenant_id)
+        principal_id = str(user_id or "").strip()
+        scope_id = cursor_scope_id(tenant_id, principal_id)
 
         oauth_manager = None
         client_id = ""
@@ -279,18 +287,28 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
                     "https://www.googleapis.com/auth/userinfo.email",
                     "openid",
                 ],
+                principal_id=principal_id,
             )
             client_id = settings.google_client_id or ""
             client_secret = settings.google_client_secret or ""
-            status_store.set_status(tenant_id, source_type, connection_status="syncing", last_error="")
-        seed_token_store_from_env(
-            token_store,
-            tenant_id,
-            client_id=client_id,
-            client_secret=client_secret,
-            refresh_token=getattr(settings, "google_refresh_token", None),
+            status_store.set_status(
+                tenant_id,
+                source_type,
+                user_id=principal_id,
+                connection_status="syncing",
+                last_error="",
+            )
+        if not principal_id:
+            seed_token_store_from_env(
+                token_store,
+                tenant_id,
+                client_id=client_id,
+                client_secret=client_secret,
+                refresh_token=getattr(settings, "google_refresh_token", None),
+            )
+        mailbox_email = _lookup_mailbox_email(
+            tenant_id, token_store, oauth_manager, user_id=principal_id
         )
-        mailbox_email = _lookup_mailbox_email(tenant_id, token_store, oauth_manager)
         config = {
             "tenant_id": tenant_id,
             "mailbox_email": mailbox_email or "user@example.com",
@@ -305,7 +323,7 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
             connector.oauth_manager = oauth_manager
         
         # Resume from last mid-crawl checkpoint when present (Architecture B5)
-        resume_cursor = _run_async(cursor_store.get_cursor(tenant_id, source_type))
+        resume_cursor = _run_async(cursor_store.get_cursor(scope_id, source_type))
         if resume_cursor:
             logger.info(
                 f"Resuming backfill for tenant {tenant_id}, source {source_type} "
@@ -314,7 +332,7 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
 
         def _persist_checkpoint(next_cursor: str) -> None:
             """Persist page cursor after each successful batch (mid-crawl checkpoint)."""
-            _run_async(cursor_store.update_cursor(tenant_id, source_type, next_cursor))
+            _run_async(cursor_store.update_cursor(scope_id, source_type, next_cursor))
             logger.debug(
                 f"Checkpoint saved tenant={tenant_id} source={source_type} cursor={next_cursor!r}"
             )
@@ -333,7 +351,7 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
         # Store final cursor (may already match last per-page checkpoint)
         final_cursor = result.get("final_cursor")
         if final_cursor:
-            _run_async(cursor_store.update_cursor(tenant_id, source_type, final_cursor))
+            _run_async(cursor_store.update_cursor(scope_id, source_type, final_cursor))
 
         _register_watches_best_effort(
             oauth_manager, tenant_id, source_type, final_cursor
@@ -347,6 +365,7 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
         status_store.set_status(
             tenant_id,
             source_type,
+            user_id=principal_id,
             connection_status="active",
             files_indexed=int(result.get("indexed_count") or 0),
             last_error="",
@@ -360,7 +379,11 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
         conn_status = "needs_reauth" if "refresh" in err.lower() or "re-authorize" in err.lower() or "Unauthorized" in err else "error"
         try:
             status_store.set_status(
-                tenant_id, source_type, connection_status=conn_status, last_error=type(e).__name__
+                tenant_id,
+                source_type,
+                user_id=str(user_id or ""),
+                connection_status=conn_status,
+                last_error=type(e).__name__,
             )
         except Exception:
             pass
@@ -673,12 +696,16 @@ def _acl_terms_for_user(user_id: Optional[str]) -> list:
     return terms
 
 
-def _lookup_mailbox_email(tenant_id: str, token_store, oauth_manager) -> str:
-    """Read mailbox email from the stored token blob (set at OAuth callback). No extra API call."""
+def _lookup_mailbox_email(
+    tenant_id: str, token_store, oauth_manager, user_id: str = ""
+) -> str:
+    """Read mailbox email from the stored token blob (set at OAuth callback)."""
     if token_store is None:
         return ""
     try:
-        data = token_store.get_token(f"google_oauth:{tenant_id}") or {}
+        data = token_store.get_token(google_oauth_token_key(tenant_id, user_id)) or {}
+        if not data.get("mailbox_email"):
+            data = token_store.get_token(google_oauth_token_key(tenant_id)) or {}
         return str(data.get("mailbox_email") or "")
     except Exception:
         return ""

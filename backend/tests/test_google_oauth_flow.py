@@ -79,6 +79,23 @@ def test_token_blob_encrypt_decrypt_roundtrip():
     assert recovered == plaintext
 
 
+def test_oauth_manager_uses_per_user_token_key():
+    from app.connectors.google.keys import google_oauth_token_key
+
+    store = _MemoryTokenStore()
+    manager = GoogleOAuthManager(
+        store,
+        client_id="id",
+        client_secret="secret",
+        scopes=["https://www.googleapis.com/auth/drive.readonly"],
+        principal_id="user-1",
+    )
+    assert manager._get_token_key("tenant-a") == google_oauth_token_key("tenant-a", "user-1")
+    store.set_token(google_oauth_token_key("tenant-a", "user-1"), {"access_token": "mine"})
+    store.set_token(google_oauth_token_key("tenant-a"), {"access_token": "shared"})
+    assert store.get_token(manager._get_token_key("tenant-a"))["access_token"] == "mine"
+
+
 def test_persistent_token_store_roundtrip_memory_fallback():
     store = PersistentGoogleTokenStore("tenant-roundtrip")
     payload = {

@@ -74,14 +74,14 @@ class Indexer:
                 if k in allowed_keys
             }
             
-            # Prepare document for indexing
+            owner_acl = list(extra_acl or [])
             doc_dict = {
                 "id": doc.id,
                 "title": doc.title,
                 "content": doc.content,
                 "source_type": doc.source_type,
                 "url": doc.url,
-                "permissions": list(doc.permissions) + list(extra_acl or []),
+                "permissions": owner_acl or list(doc.permissions),
                 "created_at": doc.created_at.isoformat(),
                 "updated_at": doc.updated_at.isoformat(),
                 "source_updated_at": doc.source_updated_at.isoformat(),
@@ -123,7 +123,11 @@ class Indexer:
 
         for doc, vector in zip(processed_docs, vectors):
             doc_id = str(doc["id"])
-            acl_terms = _acl_terms(doc.get("permissions") or [], extra_acl)
+            acl_terms = (
+                _acl_terms(extra_acl, None)
+                if extra_acl
+                else _acl_terms(doc.get("permissions") or [], extra_acl)
+            )
             body = doc.get("content") or ""
             title = doc.get("title") or ""
             local_ingest_index.upsert(

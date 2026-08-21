@@ -22,6 +22,8 @@ ADMIN_SCOPES: List[str] = [
 MEMBER_SCOPES: List[str] = [
     "search.read",
     "document.read",
+    "connectors.read",
+    "connectors.write",
 ]
 
 

@@ -15,8 +15,8 @@ export default function AdminLayout({
     return null
   }
 
-  if (!isAdmin) {
-    return <PermissionDenied requiredScope="connectors.write" />
+    if (!isAdmin) {
+    return <PermissionDenied requiredScope="admin.users.read" />
   }
 
   return <>{children}</>
