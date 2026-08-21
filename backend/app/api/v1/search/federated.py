@@ -34,7 +34,7 @@ async def _safe_call_lexical(
         from app.services.lexical.opensearch_store import OpenSearchLexicalStore
         from app.core.config import settings
         
-        if settings.opensearch_url:
+        if settings.opensearch_url or settings.lexical_search_url:
             store = OpenSearchLexicalStore()
             payload = await store.search(
                 tenant_id=tenant_id,
@@ -303,7 +303,7 @@ async def federated_health() -> Dict[str, Any]:
     from app.core.config import settings
     
     backends = {
-        "lexical": bool(settings.opensearch_url),
+        "lexical": bool(settings.opensearch_url or settings.lexical_search_url),
         "vector": bool(settings.qdrant_url),
         "graph": bool(settings.neo4j_uri),
     }

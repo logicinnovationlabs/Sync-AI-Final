@@ -39,7 +39,7 @@ type ChatWindow = {
 function citationsToSources(citations: AssistantCitation[]): SourceCardData[] {
   return citations.map((c, i) => ({
     n: i + 1,
-    title: c.document_id || `Source ${i + 1}`,
+    title: c.title || c.document_id || `Source ${i + 1}`,
     snippet: c.quote || "",
     meta:
       c.score != null && Number.isFinite(c.score)

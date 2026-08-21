@@ -13,7 +13,8 @@ without duplicates or missing objects (upsert semantics + page-token resume).
 """
 
 from datetime import datetime, timezone
-from typing import Callable, List, Optional
+from typing import Awaitable, Callable, List, Optional, Union
+import inspect
 import logging
 
 from app.core.base_connector import BaseConnector
@@ -25,7 +26,9 @@ logger = logging.getLogger(__name__)
 
 
 # Callback invoked after each successfully indexed/deleted page with the next cursor.
-CursorUpdateCallback = Callable[[str], None]
+# May be sync or async — async is preferred inside Celery so DB I/O stays on the
+# same event loop (avoids "Future attached to a different loop").
+CursorUpdateCallback = Callable[[str], Union[None, Awaitable[None]]]
 
 
 class SyncOrchestrator:
@@ -211,7 +214,10 @@ class SyncOrchestrator:
                 "pipeline": None,
             }
 
-            # Pass 1: Deletions first (do not reuse backfill page-token as deletion cursor)
+            # Pass 1: Deletions first.
+            # IMPORTANT: never write changes.list tokens into final_cursor —
+            # that cursor is resumed by fetch_delta (files.list / messages.list)
+            # and an invalid pageToken aborts Drive with HttpError 400.
             del_cursor = None
             while True:
                 try:
@@ -233,9 +239,6 @@ class SyncOrchestrator:
                     stats["deleted_count"] += len(del_res.deleted_ids)
 
                 next_c = getattr(del_res, "next_cursor", None)
-                if next_c:
-                    stats["final_cursor"] = next_c
-
                 if not getattr(del_res, "has_more", False):
                     break
                 if not next_c:
@@ -244,10 +247,36 @@ class SyncOrchestrator:
 
             # Pass 2: Delta ingestion — paginate and checkpoint after each page
             delta_cursor = cursor
+            invalid_token_retried = False
             while True:
                 try:
                     delta_res = await connector.fetch_delta(since=since, cursor=delta_cursor)
-                except Exception:
+                except Exception as exc:
+                    err = str(exc)
+                    # Stale/corrupt list pageToken → reset and retry once from start
+                    if (
+                        delta_cursor
+                        and not invalid_token_retried
+                        and (
+                            "Invalid Value" in err
+                            or "pageToken" in err
+                            or "invalid" in err.lower()
+                        )
+                    ):
+                        logger.warning(
+                            "fetch_delta invalid cursor tenant=%s source=%s cursor=%r — resetting",
+                            tenant_id,
+                            connector.source_type,
+                            delta_cursor,
+                        )
+                        delta_cursor = None
+                        stats["final_cursor"] = None
+                        invalid_token_retried = True
+                        if on_cursor_update:
+                            maybe = on_cursor_update("")
+                            if inspect.isawaitable(maybe):
+                                await maybe
+                        continue
                     logger.exception(
                         "fetch_delta failed tenant=%s source=%s",
                         tenant_id,
@@ -312,7 +341,9 @@ class SyncOrchestrator:
                     # Exceptions here (e.g. simulated kill) must propagate so the
                     # task aborts without clearing the checkpoint.
                     if on_cursor_update:
-                        on_cursor_update(next_c)
+                        maybe = on_cursor_update(next_c)
+                        if inspect.isawaitable(maybe):
+                            await maybe
 
                 if not has_more:
                     break

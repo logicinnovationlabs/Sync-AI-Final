@@ -47,14 +47,21 @@ class QdrantVectorStore(VectorStore):
         if api_key in ("", "mock-secret"):
             api_key = None
         if qdrant_url:
-            self._client = QdrantClient(url=qdrant_url, api_key=api_key)
+            self._client = QdrantClient(url=qdrant_url, api_key=api_key, timeout=120)
         else:
             host = getattr(settings, "qdrant_host", "localhost")
             port = getattr(settings, "qdrant_port", 6333)
-            self._client = QdrantClient(host=host, port=port, api_key=api_key)
+            self._client = QdrantClient(host=host, port=port, api_key=api_key, timeout=120)
         
         self.collection_prefix = getattr(settings, 'qdrant_collection_prefix', 'snyq')
-        self.dimensions = settings.embedding_dimensions  # Use settings directly (default: 360)
+        # Prefer explicit EMBEDDING_DIMENSIONS; fall back to EMBEDDING_DIMENSION
+        # so fake/local embeds and the vector collection stay aligned.
+        self.dimensions = int(
+            getattr(settings, "embedding_dimensions", None)
+            or getattr(settings, "embedding_dimension", None)
+            or 384
+        )
+        self._upsert_batch_size = 50
         self._ensured_collections: set[str] = set()
         logger.info(f"QdrantVectorStore initialized with prefix: {self.collection_prefix}, dimensions: {self.dimensions}")
     
@@ -268,6 +275,9 @@ class QdrantVectorStore(VectorStore):
         for chunk in chunks:
             # Normalize embedding dimensions
             normalized_embedding = self._normalize_embedding(chunk["embedding"])
+            chunk_text = chunk.get("chunk_text", "") or ""
+            if len(chunk_text) > 4000:
+                chunk_text = chunk_text[:4000]
             
             point = self.qm.PointStruct(
                 id=_point_id(chunk["chunk_id"], chunk["model_version"]),
@@ -278,13 +288,19 @@ class QdrantVectorStore(VectorStore):
                     "document_id": chunk["document_id"],
                     "model_version": chunk["model_version"],
                     "acl_terms": chunk.get("acl_terms", []),
-                    "chunk_text": chunk.get("chunk_text", ""),
+                    "chunk_text": chunk_text,
                     "metadata": chunk.get("metadata", {}),
                 },
             )
             points.append(point)
         
-        self._client.upsert(collection_name=name, points=points)
+        batch = max(1, int(self._upsert_batch_size))
+        for i in range(0, len(points), batch):
+            self._client.upsert(
+                collection_name=name,
+                points=points[i : i + batch],
+                wait=True,
+            )
         logger.info(f"Upserted {len(points)} chunks to {name}")
         
         return len(points)

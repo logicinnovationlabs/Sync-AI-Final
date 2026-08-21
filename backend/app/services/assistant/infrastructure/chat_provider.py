@@ -22,27 +22,37 @@ logger = logging.getLogger(__name__)
 
 OPENROUTER_DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 QWEN_TIMEOUT_S = 90.0
-MAX_SOURCE_CHARS = 1200
-MAX_CONTEXT_CHARS = 9000
+MAX_SOURCE_CHARS = 900
+MAX_CONTEXT_CHARS = 6000
 MAX_HISTORY_TURNS = 6
-TOP_K_SOURCES = 8
+TOP_K_SOURCES = 4
+# Drop weak federator/RRF noise so we do not dump unrelated mail into the answer.
+MIN_SOURCE_SCORE = 0.12
 
 REFUSE_TEXT = (
     "I don't have enough information in the provided context to answer that accurately."
 )
 
-GROUNDED_SYSTEM_PROMPT = """You are a tenant-scoped assistant. Answer from the retrieved sources. Be helpful with informal, short, or underspecified questions.
+GREETING_TEXT = (
+    "Hi — I can help with your indexed Drive, Gmail, and docs. "
+    "Ask a specific question and I’ll answer from your sources."
+)
 
-Rules:
+GROUNDED_SYSTEM_PROMPT = """You are SynQ, a precise enterprise assistant. Answer only from the supplied context.
+
+Voice (Claude-like):
+- Be concise, clear, and warm. Prefer 2–5 short sentences or a tight bullet list.
+- Lead with the direct answer. No preamble like "Here is what I found" or dump of every source.
+- Skip filler, speculation, and unrelated documents.
+
+Grounding rules (authoritative):
 - Treat the retrieved sources as the only authoritative evidence. Do not use world knowledge.
-- Users often omit dates, document names, account names, or other details. Infer what they mean from the sources: prefer the most recent, most relevant, or only matching item in the context.
-- Examples: "what is my mail" → the email address in the sources; "leave policy" → the leave policy in the sources even if the user did not name the year; "unpaid invoice" → the outstanding invoice(s) in the sources.
-- When you resolve a vague question this way, give the specific answer and briefly name the scope you used (e.g. "From the FY2026 leave policy in your sources"). Do not ask for a date or filename if the sources already make the default obvious.
-- Prior conversation is only for resolving references ("that one", "the same invoice"). It is not a source of facts and must never override retrieved sources.
-- If several sources conflict and you cannot tell which one they mean, ask one short clarification. If they do not conflict, answer from the best match.
+- Users often omit dates, document names, or account names. Infer from the most relevant / most recent matching item in the sources when the default is obvious.
+- Prior conversation is only for resolving references ("that one"). It is not evidence and must never override retrieved sources.
+- If several sources conflict and you cannot tell which one they mean, ask one short clarification.
 - If nothing in the sources is related to the question, reply with exactly: I don't have enough information in the provided context to answer that accurately.
 - Never invent facts, citations, file names, numbers, policies, dates, or steps that are not in the sources.
-- Cite each important claim using the supplied source identifier in square brackets, e.g. [1] or [1, p.3].
+- Cite important claims with source ids in square brackets, e.g. [1] or [1, p.3]. Use at most 2–3 citations.
 - Prefer a precise, short answer over a dump of snippets."""
 
 # Inspectable log of prompts actually sent to a chat provider. Tests (L1)
@@ -167,6 +177,33 @@ def debug_source_chunks(ranked_hits: Sequence[Dict[str, Any]]) -> List[Dict[str,
     return chunks
 
 
+def filter_relevant_hits(
+    ranked_hits: Sequence[Dict[str, Any]],
+    *,
+    min_score: float = MIN_SOURCE_SCORE,
+    limit: int = TOP_K_SOURCES,
+) -> List[Dict[str, Any]]:
+    """Keep only hits strong enough to ground an answer."""
+    kept: List[Dict[str, Any]] = []
+    for hit in ranked_hits:
+        score = hit.get("boosted_score", hit.get("score", hit.get("base_score")))
+        try:
+            score_f = float(score) if score is not None else 0.0
+        except (TypeError, ValueError):
+            score_f = 0.0
+        # Always keep explicit document-reader evidence.
+        sources = hit.get("sources") or []
+        if "document_reader" in sources or "document_reader_fallback" in sources:
+            kept.append(dict(hit))
+            continue
+        if score_f < min_score:
+            continue
+        kept.append(dict(hit))
+        if len(kept) >= limit:
+            break
+    return kept[:limit]
+
+
 def assemble_chat_messages(
     user_prompt: str,
     ranked_hits: List[Dict[str, Any]],
@@ -180,9 +217,10 @@ def assemble_chat_messages(
     extra corpus content. Conversation history is included only as a
     non-authoritative reference resolver.
     """
+    relevant = filter_relevant_hits(ranked_hits)
     source_blocks: List[str] = []
     used = 0
-    for i, hit in enumerate(ranked_hits[:TOP_K_SOURCES], start=1):
+    for i, hit in enumerate(relevant[:TOP_K_SOURCES], start=1):
         block = format_source_block(hit, i)
         if used + len(block) > MAX_CONTEXT_CHARS:
             break
@@ -216,8 +254,8 @@ def assemble_chat_messages(
         "Prior conversation (not evidence; do not invent facts from it; "
         "sources above win if they conflict):\n"
         f"{history_text}\n\n"
-        "The question may be informal or missing dates, names, or other details. "
-        "Infer the user's intent from the sources and answer specifically. "
+        "Answer the question directly and briefly. Do not summarize every source. "
+        "Use only sources that actually answer the question. "
         "Ask a clarifying question only if the sources conflict or do not cover the topic.\n\n"
         f"Question:\n{user_prompt}"
     )
@@ -232,8 +270,8 @@ def assemble_chat_messages(
 class FakeChatProvider:
     """Deterministic synthesizer — keeps tests offline. Same shape as OpenRouter.
 
-    Does not invent facts: with no sources it refuses; with sources it quotes
-    retrieved snippets only.
+    Does not invent facts: with no sources it refuses; with sources it answers
+    concisely from the top hit only (never dumps a numbered corpus list).
     """
 
     name = "fake"
@@ -244,7 +282,25 @@ class FakeChatProvider:
         **kwargs: Any,
     ) -> ChatGeneration:
         started = time.perf_counter()
-        hits_meta = list(kwargs.get("ranked_hits") or [])
+        prompt = ""
+        for msg in reversed(list(messages or [])):
+            if msg.get("role") == "user":
+                prompt = str(msg.get("content") or "")
+                break
+        question = ""
+        if "Question:\n" in prompt:
+            question = prompt.rsplit("Question:\n", 1)[-1].strip()
+        from app.services.assistant.core.intent_router import is_greeting_or_chitchat
+
+        if is_greeting_or_chitchat(question):
+            elapsed = (time.perf_counter() - started) * 1000.0
+            return ChatGeneration(
+                text=GREETING_TEXT,
+                provider=self.name,
+                timings_ms={"qwen_first_token_ms": 0.0, "qwen_completed_ms": elapsed},
+            )
+
+        hits_meta = filter_relevant_hits(list(kwargs.get("ranked_hits") or []))
         if not hits_meta:
             return ChatGeneration(
                 text=REFUSE_TEXT,
@@ -255,15 +311,12 @@ class FakeChatProvider:
                 },
             )
 
-        lines = []
-        for i, hit in enumerate(hits_meta[:5], start=1):
-            snippet = str(hit.get("snippet") or "").strip().replace("\n", " ")
-            title = hit.get("title") or hit.get("document_id")
-            lines.append(f"{i}. {title}: {snippet[:240]} [{i}]")
-        prefix = "Here is what I found"
-        if kwargs.get("used_document_reader"):
-            prefix += " (including a deep document read)"
-        text = prefix + ":\n" + "\n".join(lines)
+        top = hits_meta[0]
+        snippet = str(top.get("snippet") or "").strip().replace("\n", " ")
+        title = str(top.get("title") or top.get("document_id") or "your document").strip()
+        if len(snippet) > 280:
+            snippet = snippet[:280].rstrip() + "…"
+        text = f"From **{title}**: {snippet} [1]"
         elapsed = (time.perf_counter() - started) * 1000.0
         return ChatGeneration(
             text=text,
@@ -428,21 +481,35 @@ def create_chat_provider(name: Optional[str] = None) -> ChatProvider:
     """Factory: config change selects the implementation (L4)."""
     provider_name = (name or getattr(settings, "llm_chat_provider", None) or "fake")
     provider_name = str(provider_name).strip().lower()
-    if provider_name in ("fake", "template"):
+    has_openrouter = bool(
+        getattr(settings, "openrouter_api_key", None)
+        and getattr(settings, "qwen_model", None)
+    )
+    # Prefer real Qwen whenever credentials exist, even if env still says fake.
+    if provider_name in ("openrouter", "qwen") or (
+        provider_name in ("fake", "template", "auto") and has_openrouter
+    ):
+        if provider_name in ("fake", "template") and has_openrouter:
+            logger.info(
+                "[assistant.pipeline] OpenRouter/Qwen credentials detected — using real chat model"
+            )
+        try:
+            return OpenRouterChatProvider.from_settings(settings)
+        except ValueError as exc:
+            logger.warning(
+                "[assistant.pipeline] Falling back to fake chat provider: %s", exc
+            )
+            return FakeChatProvider()
+    if provider_name in ("fake", "template", "auto"):
         global _FAKE_PROVIDER_WARNED
-        if (
-            not _FAKE_PROVIDER_WARNED
-            and getattr(settings, "openrouter_api_key", None)
-            and getattr(settings, "qwen_model", None)
-        ):
+        if not _FAKE_PROVIDER_WARNED:
             _FAKE_PROVIDER_WARNED = True
             logger.warning(
-                "[assistant.pipeline] LLM_CHAT_PROVIDER=fake; Qwen/OpenRouter is configured "
-                "but will not be called. Set LLM_CHAT_PROVIDER=openrouter to use the real model."
+                "[assistant.pipeline] LLM_CHAT_PROVIDER=%s with no OPENROUTER_API_KEY/QWEN_MODEL — "
+                "using offline fake synthesizer. Set both to call Qwen via OpenRouter.",
+                provider_name,
             )
         return FakeChatProvider()
-    if provider_name in ("openrouter", "qwen"):
-        return OpenRouterChatProvider.from_settings(settings)
     raise ValueError(f"Unknown chat provider: {provider_name}")
 
 

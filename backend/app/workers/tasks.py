@@ -291,6 +291,13 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
             refresh_token=getattr(settings, "google_refresh_token", None),
         )
         mailbox_email = _lookup_mailbox_email(tenant_id, token_store, oauth_manager)
+        if not user_id:
+            # OAuth stores connected_by so manual/beat re-syncs still ACL to the owner
+            try:
+                blob = token_store.get_token(f"google_oauth:{tenant_id}") or {}
+                user_id = blob.get("connected_by") or blob.get("user_id") or None
+            except Exception:
+                user_id = None
         config = {
             "tenant_id": tenant_id,
             "mailbox_email": mailbox_email or "user@example.com",
@@ -305,19 +312,29 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
             connector.oauth_manager = oauth_manager
         
         # Resume from last mid-crawl checkpoint when present (Architecture B5)
-        resume_cursor = _run_async(cursor_store.get_cursor(tenant_id, source_type))
+        resume_cursor = _run_async(cursor_store.get_cursor(tenant_id, source_type)) or None
         if resume_cursor:
             logger.info(
                 f"Resuming backfill for tenant {tenant_id}, source {source_type} "
                 f"from checkpoint cursor={resume_cursor!r}"
             )
 
-        def _persist_checkpoint(next_cursor: str) -> None:
-            """Persist page cursor after each successful batch (mid-crawl checkpoint)."""
-            _run_async(cursor_store.update_cursor(tenant_id, source_type, next_cursor))
+        async def _persist_checkpoint(next_cursor: str) -> None:
+            """Persist page cursor after each successful batch (mid-crawl checkpoint).
+
+            Must be async and awaited on the sync orchestrator's loop — calling
+            ``_run_async`` from inside ``asyncio.run`` opens a second loop and
+            breaks SQLAlchemy/asyncpg connection pooling.
+            """
+            await cursor_store.update_cursor(tenant_id, source_type, next_cursor or None)
             logger.debug(
                 f"Checkpoint saved tenant={tenant_id} source={source_type} cursor={next_cursor!r}"
             )
+
+        # Stamp the SynQ user who connected Google so federated search ACL matches JWT ``sub``
+        owner_acl = _acl_terms_for_user(user_id)
+        if mailbox_email:
+            owner_acl = list(dict.fromkeys(owner_acl + _acl_terms_for_user(f"user:{mailbox_email}")))
 
         # Run sync orchestrator (two-pass: deletions then delta, paginated + checkpointed)
         since = datetime.utcnow() - timedelta(days=365)  # Look back 1 year
@@ -327,7 +344,7 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
             since=since,
             cursor=resume_cursor,
             on_cursor_update=_persist_checkpoint,
-            extra_acl=_acl_terms_for_user(user_id),
+            extra_acl=owner_acl,
         )
         
         # Store final cursor (may already match last per-page checkpoint)

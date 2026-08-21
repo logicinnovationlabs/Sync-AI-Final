@@ -74,11 +74,11 @@ class Indexer:
                 if k in allowed_keys
             }
             
-            # Prepare document for indexing
+            full_content = doc.content or ""
             doc_dict = {
                 "id": doc.id,
                 "title": doc.title,
-                "content": doc.content,
+                "content": full_content,
                 "source_type": doc.source_type,
                 "url": doc.url,
                 "permissions": list(doc.permissions) + list(extra_acl or []),
@@ -90,12 +90,22 @@ class Indexer:
             }
             processed_docs.append(doc_dict)
         
-        # Generate embeddings
-        texts = [f"{doc['title']} {doc['content']}" for doc in processed_docs]
+        # Generate embeddings (cap text length for speed / provider limits)
+        texts = [
+            f"{doc['title']} {doc['content']}"[:12000] for doc in processed_docs
+        ]
         vectors = await self.embedding_service.embed_texts(texts)
-        
-        # Index to Qdrant (Block B collection)
-        await self.qdrant.upsert_documents(processed_docs, vectors)
+
+        # Block B Qdrant payloads: truncate bodies so large Gmail batches don't timeout
+        qdrant_docs = []
+        for doc in processed_docs:
+            payload = dict(doc)
+            body = payload.get("content") or ""
+            if len(body) > 8000:
+                payload["content"] = body[:8000]
+            qdrant_docs.append(payload)
+
+        await self.qdrant.upsert_documents(qdrant_docs, vectors)
 
         await self._fanout_search_pipeline(processed_docs, vectors, tenant_id, extra_acl or [])
         

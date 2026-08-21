@@ -2,6 +2,7 @@ import { API_BASE_URL, ApiError, apiFetch, formatApiError } from "@/lib/api/clie
 
 export interface AssistantCitation {
   document_id?: string | null
+  title?: string | null
   source_id?: string | null
   chunk_id?: string | null
   page?: string | number | null

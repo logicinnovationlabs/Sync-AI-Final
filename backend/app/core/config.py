@@ -165,8 +165,11 @@ class Settings(BaseSettings):
         ),
     )
     embedding_dimensions: int = Field(
-        default=360,
-        validation_alias=AliasChoices("EMBEDDING_DIMENSIONS", "embedding_dimensions"),
+        default=384,
+        validation_alias=AliasChoices(
+            "EMBEDDING_DIMENSIONS",
+            "embedding_dimensions",
+        ),
     )
     azure_openai_endpoint: Optional[str] = Field(default=None)
     azure_openai_deployment: Optional[str] = Field(default=None)
@@ -263,7 +266,10 @@ class Settings(BaseSettings):
 
     qdrant_api_key: Optional[str] = Field(default=None)
     gemini_api_key: Optional[str] = Field(default=None)
-    embedding_dimension: int = Field(default=3072)
+    embedding_dimension: int = Field(
+        default=384,
+        validation_alias=AliasChoices("EMBEDDING_DIMENSION", "embedding_dimension"),
+    )
 
     # Connector / assistant token crypto + LLM providers (optional until used)
     token_encryption_key: Optional[str] = Field(
@@ -364,7 +370,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("EMBEDDING_BATCH_SIZE", "embedding_batch_size"),
     )
     embedding_dimensions: int = Field(
-        default=360,  # Fixed: Match production default and fixture dimensions
+        default=384,
         validation_alias=AliasChoices("EMBEDDING_DIMENSIONS", "embedding_dimensions"),
     )
     

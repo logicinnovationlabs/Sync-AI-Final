@@ -263,9 +263,11 @@ async def google_oauth_callback(
         )
 
     mailbox_email = await _resolve_mailbox_email(oauth, tenant_id)
-    if mailbox_email:
+    if mailbox_email or user_id:
         merged = dict(token_data or {})
-        merged["mailbox_email"] = mailbox_email
+        if mailbox_email:
+            merged["mailbox_email"] = mailbox_email
+        merged["connected_by"] = user_id
         token_store.set_token(f"google_oauth:{tenant_id}", merged)
     await _record_connector_rows(tenant_id, user_id, mailbox_email)
 

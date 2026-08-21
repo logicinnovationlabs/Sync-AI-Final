@@ -80,11 +80,13 @@ class QdrantClient:
             or getattr(settings, "QDRANT_COLLECTION_NAME", "documents")
         )
         
-        # Initialize SDK client
+        # Initialize SDK client — long timeout for large Gmail/Drive batches
         self.client = QdrantClientSDK(
             url=self.url,
             api_key=self.api_key,
+            timeout=120,
         )
+        self._upsert_batch_size = 25
     
     def create_collection(
         self,
@@ -167,12 +169,17 @@ class QdrantClient:
             )
             points.append(point)
         
-        # Upsert to Qdrant
+        # Upsert in batches — 100 email payloads + large vectors routinely
+        # exceed the default HTTP timeout when sent as one request.
         try:
-            self.client.upsert(
-                collection_name=self.collection_name,
-                points=points,
-            )
+            batch = max(1, int(self._upsert_batch_size))
+            for i in range(0, len(points), batch):
+                chunk = points[i : i + batch]
+                self.client.upsert(
+                    collection_name=self.collection_name,
+                    points=chunk,
+                    wait=True,
+                )
             logger.info(f"Upserted {len(points)} documents to Qdrant")
         except Exception as e:
             logger.error(f"Failed to upsert documents to Qdrant: {e}")

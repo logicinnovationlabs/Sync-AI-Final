@@ -87,7 +87,10 @@ class OpenSearchLexicalStore(LexicalStore):
         os_user = getattr(settings, "opensearch_user", None)
         if os_user and os_password and os_password not in ("", "mock-secret"):
             http_auth = (os_user, os_password)
-        opensearch_url = getattr(settings, 'opensearch_url', None)
+        opensearch_url = (
+            getattr(settings, "opensearch_url", None)
+            or getattr(settings, "lexical_search_url", None)
+        )
         # Increase timeout to 60 seconds for slow Docker/test environments
         timeout = 60
         

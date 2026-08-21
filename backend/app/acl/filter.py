@@ -114,6 +114,11 @@ def acl_terms_from_jwt(payload: Mapping[str, Any]) -> List[str]:
         _add(principal)
         _add(f"user:{principal}")
 
+    email = payload.get("email")
+    if email:
+        _add(str(email).strip().lower())
+        _add(f"user:{str(email).strip().lower()}")
+
     groups = payload.get("groups") or []
     if isinstance(groups, (list, tuple)):
         for group in groups:

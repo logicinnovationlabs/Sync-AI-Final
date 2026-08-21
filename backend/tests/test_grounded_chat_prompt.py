@@ -22,8 +22,9 @@ def test_system_prompt_requires_context_only_and_refuse():
     assert "authoritative" in GROUNDED_SYSTEM_PROMPT.lower()
     assert REFUSE_TEXT in GROUNDED_SYSTEM_PROMPT
     assert "Never invent facts" in GROUNDED_SYSTEM_PROMPT
-    assert "underspecified" in GROUNDED_SYSTEM_PROMPT.lower()
+    assert "concise" in GROUNDED_SYSTEM_PROMPT.lower()
     assert "most relevant" in GROUNDED_SYSTEM_PROMPT.lower()
+    assert "Here is what I found" in GROUNDED_SYSTEM_PROMPT  # forbidden preamble called out
 
 
 @pytest.mark.asyncio
@@ -45,6 +46,7 @@ async def test_fake_provider_quotes_retrieved_snippets_only():
             "document_id": "doc-leave-policy",
             "title": "Leave policy FY2026",
             "snippet": "Employees receive 18 days of paid annual leave.",
+            "boosted_score": 0.9,
         }
     ]
     messages, prompt = assemble_chat_messages("How many leave days?", hits)
@@ -56,6 +58,7 @@ async def test_fake_provider_quotes_retrieved_snippets_only():
     gen = await FakeChatProvider().generate(messages, ranked_hits=hits)
     assert "18 days" in gen.text
     assert "Estonia" not in gen.text
+    assert "Here is what I found" not in gen.text
 
 
 def test_conversation_history_does_not_override_sources():

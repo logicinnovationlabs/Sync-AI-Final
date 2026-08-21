@@ -106,13 +106,14 @@ class CursorStore:
             record = result.scalar_one_or_none()
             
             if record:
-                record.cursor = cursor
+                # Empty string clears the resume token (e.g. after invalid pageToken)
+                record.cursor = cursor or None
                 record.last_sync_at = datetime.utcnow()
             else:
                 record = SyncCursor(
                     tenant_id=tenant_id,
                     source_type=source_type,
-                    cursor=cursor,
+                    cursor=cursor or None,
                     last_sync_at=datetime.utcnow(),
                 )
                 session.add(record)

@@ -26,16 +26,19 @@ from app.services.assistant.domain.models import (
 from app.services.assistant.infrastructure.memory_store import EpisodicMemoryStore
 from app.services.assistant.infrastructure.tools import SearchToolbox, encode_acl_terms
 from app.services.assistant.infrastructure.chat_provider import (
+    GREETING_TEXT,
     ChatService,
     assemble_chat_messages,
     debug_source_chunks,
+    filter_relevant_hits,
     record_prompt,
 )
 
 logger = logging.getLogger(__name__)
 
-# Search vs Read switch threshold (spec §2).
-CONFIDENCE_THRESHOLD = 0.6
+# Avoid deep-reading a weakly related top document on noisy RRF scores.
+# Require clearer retrieval confidence before expanding a blob.
+CONFIDENCE_THRESHOLD = 0.75
 
 
 class OrchestratorState(TypedDict, total=False):
@@ -246,6 +249,17 @@ class OrchestratorGraph:
                 "tool_call_rounds": rounds,
             }
 
+        # Greetings must not retrieve random corpus hits.
+        if intent == Intent.GREETING.value:
+            return {
+                **state,
+                "tool_results": [],
+                "ranked_hits": [],
+                "base_hits": [],
+                "errors": errors,
+                "tool_call_rounds": rounds,
+            }
+
         if intent == Intent.READ.value:
             doc_id = None
             atts = req.get("attachments") or []
@@ -433,14 +447,30 @@ class OrchestratorGraph:
         from app.core.config import settings as _settings
 
         intent = state.get("intent")
-        hits = list(state.get("ranked_hits") or [])
+        hits = filter_relevant_hits(list(state.get("ranked_hits") or []))
         req = state.get("request") or {}
         user_prompt = str(req.get("prompt") or "")
         session = state.get("session") or {}
         history = list(session.get("history") or [])
 
+        # Social openers: short reply, no sources rail.
+        if intent == Intent.GREETING.value:
+            timings = dict(state.get("timings_ms") or {})
+            timings["qwen_response_completed_ms"] = self._elapsed_ms(state)
+            return {
+                **state,
+                "response_text": GREETING_TEXT,
+                "citations": [],
+                "ranked_hits": [],
+                "llm_prompt": "",
+                "chat_provider_name": "greeting",
+                "timings_ms": timings,
+                "generation_error": "",
+                "debug_retrieval": [],
+            }
+
         citations: List[Dict[str, Any]] = []
-        for i, h in enumerate(hits[:5], start=1):
+        for i, h in enumerate(hits[:3], start=1):
             snippet = (h.get("snippet") or "").strip().replace("\n", " ")
             meta = h.get("meta") if isinstance(h.get("meta"), dict) else {}
             citations.append(
@@ -452,6 +482,7 @@ class OrchestratorGraph:
                     "quote": snippet[:200],
                     "score": h.get("boosted_score"),
                     "base_score": h.get("base_score"),
+                    "title": h.get("title") or meta.get("title") or "",
                 }
             )
 
@@ -477,13 +508,13 @@ class OrchestratorGraph:
             getattr(self.chat_service.provider, "name", ""),
             len(hits),
         )
-        max_tokens_raw = getattr(_settings, "llm_chat_max_tokens", 1024)
+        max_tokens_raw = getattr(_settings, "llm_chat_max_tokens", 512)
         temperature_raw = getattr(_settings, "llm_chat_temperature", 0.1)
         generation = await self.chat_service.generate(
             messages,
             ranked_hits=hits,
             used_document_reader=bool(state.get("used_document_reader")),
-            max_tokens=int(max_tokens_raw if max_tokens_raw is not None else 1024),
+            max_tokens=int(max_tokens_raw if max_tokens_raw is not None else 512),
             temperature=float(temperature_raw if temperature_raw is not None else 0.1),
         )
         gen_timings = generation.timings_ms or {}
@@ -505,11 +536,19 @@ class OrchestratorGraph:
                 "[assistant.pipeline] Qwen payload invalid; refusing to fabricate an answer error=%s",
                 gen_error or "empty_text",
             )
+            citations = []
+
+        # Refuse answers should not paint a misleading sources rail.
+        from app.services.assistant.infrastructure.chat_provider import is_refuse_answer
+
+        if is_refuse_answer(text):
+            citations = []
 
         return {
             **state,
             "response_text": text,
             "citations": citations,
+            "ranked_hits": hits,
             "llm_prompt": prompt_text,
             "chat_provider_name": generation.provider,
             "timings_ms": timings,
