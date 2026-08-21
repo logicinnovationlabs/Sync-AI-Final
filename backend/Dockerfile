@@ -27,7 +27,9 @@ COPY app ./app
 COPY migrations ./migrations
 COPY alembic.ini ./
 COPY scripts ./scripts
-COPY keys ./keys
+# JWT PEMs are gitignored. Mount them at runtime (Render secret files) at
+# /app/keys/private.pem and /app/keys/public.pem. Dev can generate ephemeral keys.
+RUN mkdir -p /app/keys
 
 # Set environment variables defaults
 ENV PYTHONUNBUFFERED=1 \
