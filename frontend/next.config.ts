@@ -8,9 +8,6 @@ const nextConfig: NextConfig = {
   // Pin to this package. A lockfile in C:\Users\ROHAN made Turbopack
   // treat the whole home directory as the app and freeze page compiles.
   outputFileTracingRoot: frontendRoot,
-  turbopack: {
-    root: frontendRoot,
-  },
 }
 
 export default nextConfig
