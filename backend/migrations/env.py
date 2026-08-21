@@ -81,8 +81,22 @@ async def run_async_migrations() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
-    asyncio.run(run_async_migrations())
+    """Run migrations in 'online' mode.
+
+    Database unreachable (Render IPv6 / missing Postgres) must not fail boot.
+    The web process has to bind $PORT even when Alembic cannot connect.
+    """
+    import logging
+
+    log = logging.getLogger("alembic")
+    try:
+        asyncio.run(run_async_migrations())
+    except Exception as exc:
+        log.warning(
+            "Skipping migrations; database unreachable (%s: %s)",
+            type(exc).__name__,
+            exc,
+        )
 
 
 if context.is_offline_mode():

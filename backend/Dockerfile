@@ -42,5 +42,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=5s --timeout=5s --retries=10 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-CMD ["sh", "/app/scripts/render_start.sh"]
+CMD ["sh", "-c", "(python -m alembic upgrade heads || true) & exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
 
