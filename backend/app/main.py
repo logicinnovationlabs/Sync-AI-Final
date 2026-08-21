@@ -107,11 +107,19 @@ app.add_middleware(HttpMetricsMiddleware)
 app.add_middleware(RateLimitMiddleware)
 
 _cors_origins = settings.cors_origins_list
+# Browsers reject allow_origins=["*"] together with allow_credentials=True.
+# In development, allow localhost and Vercel preview/prod hosts by regex.
+_cors_regex = None
 if _is_relaxed_env and not _cors_origins:
-    _cors_origins = ["*"]
+    _cors_origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+    _cors_regex = r"https://([a-z0-9-]+\.)*vercel\.app"
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
+    allow_origin_regex=_cors_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
