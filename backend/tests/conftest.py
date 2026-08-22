@@ -32,6 +32,7 @@ from app.models.canonical import (  # noqa: F401 — Block C metadata
     ACLEntryRow,
     ContainerACLEntryRow,
     ContainerEdgeRow,
+    PendingIdentityQueueRow,
 )
 from app.services.cursor_store import SyncCursor
 from app.storage.vault_client import MockVaultClient

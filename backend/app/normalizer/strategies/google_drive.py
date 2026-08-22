@@ -123,6 +123,7 @@ class GoogleDriveNormalizer(NormalizerStrategy):
             "parent_folder_id": raw.get("parents", [""])[0] if raw.get("parents") else "",
             "web_view_link": raw.get("webViewLink", ""),
             "size_bytes": size_bytes,
+            "visibility_mode": "restricted",
         }
         
         return metadata
@@ -136,6 +137,7 @@ class GoogleDriveNormalizer(NormalizerStrategy):
         """
         hints = []
         permissions = raw.get("permissions", [])
+        skipped_non_user = 0
         
         for perm in permissions:
             perm_type = perm.get("type", "")
@@ -166,24 +168,15 @@ class GoogleDriveNormalizer(NormalizerStrategy):
                     name=perm.get("displayName"),
                 )
                 hints.append((hint, level))
-            elif perm_type == "group" and email:
-                # Groups will be resolved separately in ACLCompiler
-                hint = IdentityHint(
-                    source_type="google_drive",
-                    external_id=perm_id or email,
-                    email=email,
-                    name=perm.get("displayName"),
-                )
-                hints.append((hint, level))
-            elif perm_type == "anyone":
-                # Public file — use special wildcard principal
-                hint = IdentityHint(
-                    source_type="google_drive",
-                    external_id="anyone",
-                    email="*",
-                    name="Anyone with the link",
-                )
-                hints.append((hint, level))
+            elif perm_type in ("group", "anyone", "domain"):
+                skipped_non_user += 1
+        
+        if skipped_non_user:
+            logger.info(
+                "skipped %s non-user Drive permission(s) file_id=%s",
+                skipped_non_user,
+                raw.get("id"),
+            )
         
         # If no permissions found, default to owner
         if not hints:
@@ -201,13 +194,8 @@ class GoogleDriveNormalizer(NormalizerStrategy):
         return hints
     
     def extract_containers(self, raw: Dict[str, Any]) -> List[str]:
-        """
-        Extract parent folder IDs for inheritance.
-        
-        Drive files can have multiple parents (though uncommon after My Drive changes).
-        """
-        parents = raw.get("parents", [])
-        return parents if isinstance(parents, list) else []
+        """Drive file ACL is permissions.list on the file. No folder inheritance."""
+        return []
     
     def extract_identity_hints(self, raw: Dict[str, Any]) -> Dict[str, IdentityHint]:
         """

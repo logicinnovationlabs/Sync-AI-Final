@@ -20,7 +20,7 @@ from app.core.models import (
 )
 from app.acl.container_service import ContainerService
 from app.acl.inheritance import compute_inherited_entries
-from app.identity.resolver import IdentityResolver
+from app.identity.resolver import MIRROR_BIND_SOURCES, IdentityResolver
 
 logger = logging.getLogger(__name__)
 
@@ -80,18 +80,18 @@ class ACLCompiler:
             document, permission_hints, tenant_id
         )
         all_entries.extend(direct_entries)
+
+        # Drive/Gmail: permissions.list (or mailbox owner) is the full snapshot.
+        # Folder inheritance and group expansion would grant access Drive did not.
+        if document.source_type not in MIRROR_BIND_SOURCES:
+            inherited_entries = await compute_inherited_entries(
+                document, self.container_service
+            )
+            all_entries.extend(inherited_entries)
+            expanded_entries = await self._expand_group_membership(all_entries, tenant_id)
+            all_entries.extend(expanded_entries)
         
-        # 2. Compute inherited entries from containers
-        inherited_entries = await compute_inherited_entries(
-            document, self.container_service
-        )
-        all_entries.extend(inherited_entries)
-        
-        # 3. Expand group membership (cycle-safe)
-        expanded_entries = await self._expand_group_membership(all_entries, tenant_id)
-        all_entries.extend(expanded_entries)
-        
-        # 4. Apply deny overrides and deduplicate
+        # Apply deny overrides and deduplicate
         final_entries = self._apply_deny_overrides(all_entries)
         
         return final_entries
@@ -108,11 +108,15 @@ class ACLCompiler:
         Resolves identity hints to principal_id or group_id.
         """
         direct_entries: List[ACLEntry] = []
+        pending_count = 0
         
         for hint, level in permission_hints:
             # Determine if this is a group or individual
             # Groups have email patterns like "group@example.com" or type hints
-            is_group = await self._is_group_hint(hint, tenant_id)
+            is_group = (
+                hint.source_type not in MIRROR_BIND_SOURCES
+                and await self._is_group_hint(hint, tenant_id)
+            )
             
             if is_group:
                 # Resolve to group_id
@@ -138,13 +142,20 @@ class ACLCompiler:
             else:
                 # Resolve to principal_id
                 try:
-                    resolved = await self.identity_resolver.resolve(hint, tenant_id)
+                    resolved = await self.identity_resolver.resolve(
+                        hint,
+                        tenant_id,
+                        document_id=document.id,
+                    )
+                    if resolved.is_pending or resolved.principal_id is None:
+                        pending_count += 1
+                        continue
                     entry = ACLEntry(
                         document_id=document.id,
                         principal_id=resolved.principal_id,
                         group_id=None,
                         permission=level,
-                        granted_via="direct",
+                        granted_via=_granted_via(document.source_type),
                         source_container_id=None,
                         is_deny=False,
                         source_type=document.source_type,
@@ -155,6 +166,13 @@ class ACLCompiler:
                     direct_entries.append(entry)
                 except Exception as e:
                     logger.error(f"Failed to resolve identity hint {hint}: {e}")
+
+        if pending_count:
+            logger.info(
+                "%s shares queued pending identity match document_id=%s",
+                pending_count,
+                document.id,
+            )
         
         return direct_entries
     
@@ -349,3 +367,11 @@ class ACLCompiler:
             PermissionLevel.OWNER: 4,
         }
         return ranks.get(level, 0)
+
+
+def _granted_via(source_type: str) -> str:
+    if source_type == "google_drive":
+        return "drive_share"
+    if source_type == "google_gmail":
+        return "gmail_mailbox"
+    return "direct"

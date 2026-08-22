@@ -89,6 +89,11 @@ def test_b5_checkpoint_resume_real_gmail():
     """
     Real-source B5 against Gmail (multi-page). Drive account currently has too few
     files for a multi-page kill; smoke confirmed Drive auth works separately.
+
+    Proves pagination / checkpoint-resume against live Gmail, not ACL persist.
+    process_raw_batch is mocked to return None so indexing uses
+    connector.transform — do not rely on an unrouted tenant id to
+    silently skip Block C.
     """
     from app.connectors.google.oauth import GoogleOAuthManager, seed_token_store_from_env
     from app.connectors.google.services.gmail_service import GmailConnector
@@ -148,13 +153,16 @@ def test_b5_checkpoint_resume_real_gmail():
 
     indexed_store: Dict[str, Any] = {}
 
-    async def fake_bulk_index(docs, tenant_id_arg):
+    async def fake_bulk_index(docs, tenant_id_arg, **kwargs):
         for d in docs:
             indexed_store[d.id] = d
 
     async def fake_delete_by_ids(ids, tenant_id_arg, source_type):
         for i in ids:
             indexed_store.pop(i, None)
+
+    async def skip_block_c(*args, **kwargs):
+        return None
 
     checkpoint = {"cursor": None, "updates": []}
 
@@ -164,7 +172,10 @@ def test_b5_checkpoint_resume_real_gmail():
 
     since = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
-    with patch("app.services.sync.indexer") as mock_indexer:
+    with patch(
+        "app.connectors.google.pipeline_bridge.process_raw_batch",
+        side_effect=skip_block_c,
+    ), patch("app.services.sync.indexer") as mock_indexer:
         mock_indexer.bulk_index = fake_bulk_index
         mock_indexer.delete_by_ids = fake_delete_by_ids
 

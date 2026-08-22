@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -121,3 +121,42 @@ class ContainerEdgeRow(Base, TimestampMixin):
     child_container_id: Mapped[str] = mapped_column(String(512), nullable=False, index=True)
     tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False, index=True)
     source_type: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class PendingIdentityQueueRow(Base):
+    """Unmatched Drive share emails waiting for a users.principal_id bind."""
+
+    __tablename__ = "pending_identity_queue"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "document_id",
+            "shared_email",
+            name="uq_pending_identity_tenant_doc_email",
+        ),
+        Index(
+            "ix_pending_identity_queue_tenant_email_resolved",
+            "tenant_id",
+            "shared_email",
+            "resolved_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid4, nullable=False
+    )
+    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    source_account_id: Mapped[Optional[UUID]] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    document_id: Mapped[str] = mapped_column(String(512), nullable=False)
+    shared_email: Mapped[str] = mapped_column(Text, nullable=False)
+    first_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    resolved_principal_id: Mapped[Optional[UUID]] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )

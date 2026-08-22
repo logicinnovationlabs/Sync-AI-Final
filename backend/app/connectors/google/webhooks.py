@@ -188,14 +188,12 @@ async def gmail_webhook(request: Request):
             raise HTTPException(status_code=403, detail="Unknown watch")
         
         tenant_id = watch_info["tenant_id"]
-        
-        # Update stored history ID if provided
-        if history_id:
-            await cursor_store.update_cursor(
-                tenant_id=tenant_id,
-                source_type="google_gmail",
-                cursor=history_id,
-            )
+
+        # Do not write Pub/Sub historyId into cursor_store here.
+        # history.list startHistoryId is exclusive of that id; advancing the
+        # cursor before Celery runs would drop the triggering message from
+        # the delta. process_gmail_notification advances the cursor after a
+        # successful fetch + process_raw_batch + bulk_index.
         
         # Enqueue Celery task with trace context propagation (§2.4)
         _otel_headers = {}

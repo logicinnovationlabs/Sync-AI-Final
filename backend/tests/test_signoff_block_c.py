@@ -151,6 +151,8 @@ async def test_c2_acl_fidelity(pipeline):
     Verify direct + inherited + group-expanded entries match 100%.
     """
     tenant_id = uuid4()
+    pipeline.canonical_repo.register_login_user(tenant_id, "owner@example.com", uuid4())
+    pipeline.canonical_repo.register_login_user(tenant_id, "alice@example.com", uuid4())
     
     # Create test document with known permissions
     raw = {
@@ -172,7 +174,7 @@ async def test_c2_acl_fidelity(pipeline):
     acl_entries = result["acl_entries"]
     
     # Verify we have expected entries
-    direct_entries = [e for e in acl_entries if e.granted_via == "direct"]
+    direct_entries = [e for e in acl_entries if e.granted_via == "drive_share"]
     
     # Should have at least 2 direct grants (owner + alice)
     assert len(direct_entries) >= 2, f"Expected ≥2 direct entries, got {len(direct_entries)}"
@@ -200,6 +202,8 @@ async def test_c3_revocation_propagation(pipeline):
     In tests, we directly invoke the pipeline with updated permissions.
     """
     tenant_id = uuid4()
+    pipeline.canonical_repo.register_login_user(tenant_id, "owner@example.com", uuid4())
+    pipeline.canonical_repo.register_login_user(tenant_id, "alice@example.com", uuid4())
     
     # Initial document with two users
     raw_v1 = {

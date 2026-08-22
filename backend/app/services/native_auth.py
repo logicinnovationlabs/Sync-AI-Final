@@ -7,6 +7,7 @@ Passwords are hashed with bcrypt before storage.
 
 from typing import Optional
 from uuid import uuid5, UUID
+import logging
 import bcrypt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user import User
 from app.services.scim_sync import PRINCIPAL_ID_NAMESPACE
 from app.core.exceptions import UnauthorizedError
+
+logger = logging.getLogger(__name__)
 
 
 class NativeAuthService:
@@ -168,6 +171,19 @@ class NativeAuthService:
         db_session.add(user)
         await db_session.commit()
         await db_session.refresh(user)
+
+        try:
+            from app.storage.canonical_repo import bind_pending_drive_shares
+
+            await bind_pending_drive_shares(
+                db_session, tenant_id, user.email, user.principal_id
+            )
+        except Exception:
+            logger.exception(
+                "pending identity drain failed at invite email=%s tenant_id=%s",
+                user.email,
+                tenant_id,
+            )
         
         return user
 

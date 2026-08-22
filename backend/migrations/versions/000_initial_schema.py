@@ -16,21 +16,32 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        'tenants',
-        sa.Column('tenant_id', postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column('name', sa.String(255), nullable=False),
-        sa.Column('subdomain', sa.String(255), nullable=False, unique=True),
-        sa.Column('tenancy_mode', sa.String(50), nullable=False, server_default='isolated_db'),
-        sa.Column('config', postgresql.JSONB(), nullable=False, server_default='{}'),
-        sa.Column('db_host', sa.String(255), nullable=False),
-        sa.Column('db_name', sa.String(255), nullable=False),
-        sa.Column('db_user', sa.String(255), nullable=False),
-        sa.Column('db_secret_key', sa.String(255), nullable=False),
-        sa.Column('created_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-    )
-    op.create_index('ix_tenants_subdomain', 'tenants', ['subdomain'], unique=True)
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    existing = set(inspector.get_table_names())
+    if "tenants" in existing:
+        cols = {c["name"] for c in inspector.get_columns("tenants")}
+        # Block D storage tests created a different tenants table (no subdomain / db_host).
+        if "subdomain" not in cols and "db_host" not in cols:
+            op.rename_table("tenants", "block_d_tenants")
+            existing.discard("tenants")
+
+    if "tenants" not in existing:
+        op.create_table(
+            'tenants',
+            sa.Column('tenant_id', postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+            sa.Column('name', sa.String(255), nullable=False),
+            sa.Column('subdomain', sa.String(255), nullable=False, unique=True),
+            sa.Column('tenancy_mode', sa.String(50), nullable=False, server_default='isolated_db'),
+            sa.Column('config', postgresql.JSONB(), nullable=False, server_default='{}'),
+            sa.Column('db_host', sa.String(255), nullable=False),
+            sa.Column('db_name', sa.String(255), nullable=False),
+            sa.Column('db_user', sa.String(255), nullable=False),
+            sa.Column('db_secret_key', sa.String(255), nullable=False),
+            sa.Column('created_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+            sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        )
+        op.create_index('ix_tenants_subdomain', 'tenants', ['subdomain'], unique=True)
 
     op.create_table(
         'users',

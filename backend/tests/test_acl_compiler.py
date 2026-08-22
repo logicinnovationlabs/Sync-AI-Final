@@ -51,6 +51,8 @@ def acl_compiler(identity_resolver, container_service, repo):
 async def test_compile_direct_permissions(acl_compiler, repo):
     """Test compilation of direct permissions."""
     tenant_id = uuid4()
+    alice_id = uuid4()
+    repo.register_login_user(tenant_id, "alice@example.com", alice_id)
     
     doc = CanonicalDocument(
         id="doc_1",
@@ -84,10 +86,11 @@ async def test_compile_direct_permissions(acl_compiler, repo):
     
     entries = await acl_compiler.compile(doc, permission_hints, tenant_id)
     
-    # Should have at least one direct entry
-    direct_entries = [e for e in entries if e.granted_via == "direct"]
+    # Should have at least one direct entry bound to the login principal
+    direct_entries = [e for e in entries if e.granted_via == "drive_share"]
     assert len(direct_entries) >= 1
     assert direct_entries[0].permission == PermissionLevel.OWNER
+    assert direct_entries[0].principal_id == alice_id
 
 
 @pytest.mark.asyncio
@@ -137,7 +140,7 @@ async def test_compile_group_expansion(acl_compiler, repo):
     # Create document with group permission
     doc = CanonicalDocument(
         id="doc_1",
-        source_type="google_drive",
+        source_type="generic",
         source_id="file_1",
         tenant_id=tenant_id,
         title="Test Document",
@@ -156,7 +159,7 @@ async def test_compile_group_expansion(acl_compiler, repo):
     permission_hints = [
         (
             IdentityHint(
-                source_type="google_drive",
+                source_type="generic",
                 external_id="group:group_1",
                 email="eng@example.com",
                 name="Engineering",

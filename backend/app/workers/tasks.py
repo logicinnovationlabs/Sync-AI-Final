@@ -31,7 +31,13 @@ from app.connectors.google import status_store
 from app.core.config import settings
 from app.storage.redis_client import redis_client
 from app.storage.vault_client import PlatformSecretKeys, vault_client
-from app.core.exceptions import TenantNotFoundError
+from app.core.exceptions import (
+    InvalidTokenError,
+    RevokedTokenError,
+    TenantNotFoundError,
+    UnauthorizedError,
+    VaultError,
+)
 from app.services.tenant_resolver import tenant_resolver
 import asyncio
 import inspect
@@ -73,6 +79,29 @@ except (ImportError, ValueError):
     pass
 
 logger = logging.getLogger(__name__)
+
+_AUTH_FAILURE_TYPES = (UnauthorizedError, InvalidTokenError, RevokedTokenError)
+
+
+def _is_google_auth_failure(exc: BaseException) -> bool:
+    """True only for typed credential/token failures, never VaultError."""
+    if isinstance(exc, VaultError):
+        return False
+    if isinstance(exc, _AUTH_FAILURE_TYPES):
+        return True
+    cause = getattr(exc, "__cause__", None)
+    if cause is not None and cause is not exc:
+        return _is_google_auth_failure(cause)
+    return False
+
+
+def _backfill_failure_status(exc: BaseException) -> str:
+    """Map a backfill exception to status_store vocabulary. Vault != re-auth."""
+    if isinstance(exc, VaultError) or isinstance(getattr(exc, "__cause__", None), VaultError):
+        return "error"
+    if _is_google_auth_failure(exc):
+        return "needs_reauth"
+    return "error"
 
 
 def _run_async(coro):
@@ -326,7 +355,7 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
                 pass
         config = {
             "tenant_id": tenant_id,
-            "mailbox_email": mailbox_email or "user@example.com",
+            "mailbox_email": mailbox_email or "",
             "connected_by": user_id or principal_id or "",
         }
         
@@ -485,9 +514,23 @@ def process_drive_notification(self, tenant_id: str) -> dict:
         # Fetch changes since page token
         delta_result = _run_async(connector.fetch_since_page_token(page_token))
         
-        # Transform
+        unified_docs = []
         if hasattr(delta_result, "documents") and delta_result.documents:
-            unified_docs = _run_async(connector.transform(delta_result.documents))
+            _attach_extracted_text_for_pipeline(delta_result.documents)
+            from app.connectors.google.pipeline_bridge import process_raw_batch
+
+            unified_docs = _run_async(
+                process_raw_batch(
+                    delta_result.documents,
+                    "google_drive",
+                    tenant_id,
+                    require_postgres=True,
+                )
+            )
+            if unified_docs is None:
+                raise RuntimeError(
+                    f"webhook ACL compile failed: process_raw_batch returned None tenant={tenant_id}"
+                )
             if unified_docs:
                 _run_async(indexer.bulk_index(unified_docs, tenant_id))
         
@@ -500,7 +543,7 @@ def process_drive_notification(self, tenant_id: str) -> dict:
         if hasattr(delta_result, "next_cursor") and delta_result.next_cursor:
             _run_async(cursor_store.update_cursor(tenant_id, "google_drive", delta_result.next_cursor))
         
-        doc_count = len(getattr(delta_result, "documents", []))
+        doc_count = len(unified_docs)
         logger.info(
             f"Drive notification processed for tenant {tenant_id}: "
             f"{doc_count} indexed, {len(deleted_ids)} deleted"
@@ -514,12 +557,32 @@ def process_drive_notification(self, tenant_id: str) -> dict:
     
     except Exception as e:
         logger.error(f"Drive notification processing failed for tenant {tenant_id}: {e}")
+        if isinstance(e, (InvalidTokenError, UnauthorizedError, RevokedTokenError)):
+            from app.connectors.google.drive_credentials import set_drive_ingest_paused
+
+            try:
+                _run_async(
+                    set_drive_ingest_paused(tenant_id, True, type(e).__name__)
+                )
+            except Exception:
+                logger.exception("failed to pause Drive ingest tenant=%s", tenant_id)
         
         # Retry on transient errors
         if "429" in str(e) or "quota" in str(e).lower():
             raise self.retry(exc=e, countdown=min(2 ** self.request.retries * 60, 3600))
         
         raise
+
+
+@celery_app.task
+def poll_drive_acl_delta() -> dict:
+    """Beat fallback: same incremental path as the Drive webhook, every ~3 minutes."""
+    from app.workers.drive_acl_poll import enqueue_drive_acl_poll
+
+    tenant_ids = _run_async(cursor_store.list_tenants_with_cursor("google_drive"))
+    result = enqueue_drive_acl_poll(tenant_ids, process_drive_notification.delay)
+    logger.info("poll_drive_acl_delta enqueued=%s", result["enqueued"])
+    return result
 
 
 @celery_app.task(bind=True, max_retries=5, default_retry_delay=30)
@@ -529,9 +592,10 @@ def process_gmail_notification(self, tenant_id: str) -> dict:
     
     Pipeline:
     1. Get stored history ID from cursor_store
-    2. Fetch history since that ID
-    3. Transform and index
-    4. Update stored cursor
+    2. Fetch history since that ID (messages.get payloads already full MIME)
+    3. process_raw_batch (Postgres CanonicalRepo) → ACLCompiler → replace_acl_entries
+    4. bulk_index (re-embed; same chain as Drive webhook / backfill)
+    5. Update stored cursor (only here — not on the HTTP webhook path)
     
     Args:
         tenant_id: Tenant identifier
@@ -578,9 +642,22 @@ def process_gmail_notification(self, tenant_id: str) -> dict:
         # Fetch changes since history ID
         delta_result = _run_async(connector.fetch_since_history_id(history_id))
         
-        # Transform
+        unified_docs = []
         if hasattr(delta_result, "documents") and delta_result.documents:
-            unified_docs = _run_async(connector.transform(delta_result.documents))
+            from app.connectors.google.pipeline_bridge import process_raw_batch
+
+            unified_docs = _run_async(
+                process_raw_batch(
+                    delta_result.documents,
+                    "google_gmail",
+                    tenant_id,
+                    require_postgres=True,
+                )
+            )
+            if unified_docs is None:
+                raise RuntimeError(
+                    f"webhook ACL compile failed: process_raw_batch returned None tenant={tenant_id}"
+                )
             if unified_docs:
                 _run_async(indexer.bulk_index(unified_docs, tenant_id))
         
@@ -589,11 +666,11 @@ def process_gmail_notification(self, tenant_id: str) -> dict:
         if deleted_ids:
             _run_async(indexer.delete_by_ids(deleted_ids, tenant_id, "google_gmail"))
         
-        # Update cursor
+        # Update cursor only after compile/index (or empty delta / deletes)
         if hasattr(delta_result, "next_cursor") and delta_result.next_cursor:
             _run_async(cursor_store.update_cursor(tenant_id, "google_gmail", delta_result.next_cursor))
         
-        doc_count = len(getattr(delta_result, "documents", []))
+        doc_count = len(unified_docs)
         logger.info(
             f"Gmail notification processed for tenant {tenant_id}: "
             f"{doc_count} indexed, {len(deleted_ids)} deleted"
@@ -708,6 +785,23 @@ def _register_watches_best_effort(
             tenant_id,
             source_type,
             exc_info=True,
+        )
+
+
+def _attach_extracted_text_for_pipeline(documents: list) -> None:
+    """Copy hydrate's ``_extracted_text`` onto ``extractedText`` for process_raw.
+
+    GoogleDriveNormalizer.extract_text does not read ``_extracted_text``. Glue
+    lives here so the webhook path does not change shared extractor field order.
+    """
+    for file in documents or []:
+        extracted = file.get("_extracted_text")
+        if isinstance(extracted, str) and extracted:
+            file["extractedText"] = extracted
+        logger.info(
+            "drive webhook change file_id=%s modifiedTime=%s",
+            file.get("id"),
+            file.get("modifiedTime"),
         )
 
 

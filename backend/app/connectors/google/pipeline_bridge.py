@@ -10,14 +10,10 @@ from app.core.base_connector import UnifiedDocument
 
 logger = logging.getLogger(__name__)
 
-_pipeline = None
+_memory_pipeline = None
 
 
-def get_pipeline():
-    """Lazy singleton Block C pipeline (in-process CanonicalRepo)."""
-    global _pipeline
-    if _pipeline is not None:
-        return _pipeline
+def _build_pipeline(repo):
     from app.services.pipeline import Pipeline
     from app.normalizer.registry import normalizer_registry
     from app.identity.resolver import IdentityResolver
@@ -25,63 +21,42 @@ def get_pipeline():
     from app.identity.matchers.username_matcher import UsernameMatcher
     from app.acl.compiler import ACLCompiler
     from app.acl.container_service import ContainerService
-    from app.storage.canonical_repo import CanonicalRepo
     import app.normalizer.strategies  # noqa: F401 — register strategies
 
-    repo = CanonicalRepo(use_memory=True)
     resolver = IdentityResolver([EmailMatcher(), UsernameMatcher()], repo)
     compiler = ACLCompiler(resolver, ContainerService(repo), repo)
-    _pipeline = Pipeline(normalizer_registry, resolver, compiler, repo)
-    return _pipeline
+    return Pipeline(normalizer_registry, resolver, compiler, repo)
 
 
-async def process_raw_batch(
+def get_pipeline(session=None):
+    """Build a Block C pipeline.
+
+    Production/backfill pass a tenant DB session (Postgres CanonicalRepo),
+    matching ``CanonicalRepo(use_memory=False, session=db_session)`` used by
+    ``/identity/resolve`` and ``/acl/{id}``. Memory repo is only a test fallback
+    when no session is available.
+    """
+    from app.storage.canonical_repo import CanonicalRepo
+
+    if session is not None:
+        repo = CanonicalRepo(use_memory=False, session=session)
+        return _build_pipeline(repo)
+
+    global _memory_pipeline
+    if _memory_pipeline is not None:
+        return _memory_pipeline
+    repo = CanonicalRepo(use_memory=True)
+    _memory_pipeline = _build_pipeline(repo)
+    return _memory_pipeline
+
+
+async def _run_pipeline(
+    pipeline,
     raw_documents: List[Dict[str, Any]],
     source_type: str,
+    tenant_uuid: UUID,
     tenant_id: str,
 ) -> Optional[List[UnifiedDocument]]:
-    """
-    Run Block C on each raw object. Returns UnifiedDocuments or None on failure
-    so the caller can fall back to connector.transform().
-
-    Always logs a visible path marker:
-      pipeline=block_c  — Block C produced at least one UnifiedDocument
-      pipeline=fallback_transform — Block C did not; caller must transform()
-    """
-    if not raw_documents:
-        logger.info(
-            "pipeline=block_c n=0 source=%s tenant=%s (empty batch, nothing to process)",
-            source_type,
-            tenant_id,
-        )
-        return []
-
-    try:
-        tenant_uuid = UUID(str(tenant_id))
-    except (TypeError, ValueError) as exc:
-        logger.warning(
-            "pipeline=fallback_transform source=%s tenant=%s reason=invalid_tenant_id "
-            "exc_type=%s exc=%s",
-            source_type,
-            tenant_id,
-            type(exc).__name__,
-            exc,
-        )
-        return None
-
-    try:
-        pipeline = get_pipeline()
-    except Exception as exc:
-        logger.warning(
-            "pipeline=fallback_transform source=%s tenant=%s reason=pipeline_init_failed "
-            "exc_type=%s exc=%s",
-            source_type,
-            tenant_id,
-            type(exc).__name__,
-            exc,
-        )
-        return None
-
     unified: List[UnifiedDocument] = []
     failures = 0
     for raw in raw_documents:
@@ -90,14 +65,14 @@ async def process_raw_batch(
             doc = result.get("unified_document")
             if doc is not None:
                 unified.append(doc)
-        except Exception as exc:
+        except Exception as extra:
             failures += 1
             logger.warning(
                 "pipeline=block_c_item_failed source=%s id=%s exc_type=%s exc=%s",
                 source_type,
                 raw.get("id"),
-                type(exc).__name__,
-                exc,
+                type(extra).__name__,
+                extra,
             )
 
     if unified:
@@ -119,3 +94,123 @@ async def process_raw_batch(
         failures,
     )
     return None
+
+
+async def process_raw_batch(
+    raw_documents: List[Dict[str, Any]],
+    source_type: str,
+    tenant_id: str,
+    *,
+    require_postgres: bool = False,
+) -> Optional[List[UnifiedDocument]]:
+    """
+    Run Block C on each raw object. Returns UnifiedDocuments or None on failure
+    so the caller can fall back to connector.transform().
+
+    ``require_postgres=True`` (webhook path): never fall back to in-memory
+    CanonicalRepo. Raise instead so Celery retries and nothing is mistaken
+    for a successful ACL persist. Backfill keeps the default False.
+
+    Always logs a visible path marker:
+      pipeline=block_c  — Block C produced at least one UnifiedDocument
+      pipeline=fallback_transform — Block C did not; caller must transform()
+    """
+    if not raw_documents:
+        logger.info(
+            "pipeline=block_c n=0 source=%s tenant=%s (empty batch, nothing to process)",
+            source_type,
+            tenant_id,
+        )
+        return []
+
+    try:
+        tenant_uuid = UUID(str(tenant_id))
+    except (TypeError, ValueError) as extra:
+        if require_postgres:
+            raise
+        logger.warning(
+            "pipeline=fallback_transform source=%s tenant=%s reason=invalid_tenant_id "
+            "exc_type=%s exc=%s",
+            source_type,
+            tenant_id,
+            type(extra).__name__,
+            extra,
+        )
+        return None
+
+    from app.core.exceptions import TenantNotFoundError
+    from app.services.tenant_resolver import tenant_resolver
+    from app.storage.tenant_db import tenant_db_manager
+
+    routing = None
+    try:
+        routing = await tenant_resolver.resolve(str(tenant_id))
+    except TenantNotFoundError:
+        if require_postgres:
+            raise
+        routing = None
+    except Exception as extra:
+        if require_postgres:
+            raise
+        logger.warning(
+            "pipeline postgres routing failed tenant=%s exc_type=%s exc=%s",
+            tenant_id,
+            type(extra).__name__,
+            extra,
+        )
+        routing = None
+
+    if routing is not None:
+        async for session in tenant_db_manager.get_session(
+            routing.db_host,
+            routing.db_name,
+            routing.db_user,
+            routing.db_password,
+            str(routing.tenant_id),
+        ):
+            try:
+                pipeline = get_pipeline(session=session)
+            except Exception as extra:
+                if require_postgres:
+                    raise
+                logger.warning(
+                    "pipeline=fallback_transform source=%s tenant=%s reason=pipeline_init_failed "
+                    "exc_type=%s exc=%s",
+                    source_type,
+                    tenant_id,
+                    type(extra).__name__,
+                    extra,
+                )
+                return None
+            return await _run_pipeline(
+                pipeline, raw_documents, source_type, tenant_uuid, tenant_id
+            )
+        if require_postgres:
+            raise RuntimeError(
+                f"webhook ACL compile aborted: tenant session was not opened tenant={tenant_id}"
+            )
+
+    if require_postgres:
+        raise RuntimeError(
+            f"webhook ACL compile aborted: postgres routing unavailable tenant={tenant_id}"
+        )
+
+    logger.info(
+        "pipeline postgres unavailable tenant=%s; using in-memory CanonicalRepo",
+        tenant_id,
+    )
+    try:
+        pipeline = get_pipeline()
+    except Exception as extra:
+        logger.warning(
+            "pipeline=fallback_transform source=%s tenant=%s reason=pipeline_init_failed "
+            "exc_type=%s exc=%s",
+            source_type,
+            tenant_id,
+            type(extra).__name__,
+            extra,
+        )
+        return None
+    return await _run_pipeline(
+        pipeline, raw_documents, source_type, tenant_uuid, tenant_id
+    )

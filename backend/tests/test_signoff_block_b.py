@@ -291,9 +291,10 @@ async def test_B2_webhook_incremental_correctness(
 ):
     """
     B2: Webhook-triggered incremental correctness.
-    
-    POST a valid notification, assert resulting task fetched only the delta
-    (not a full re-scan) and Qdrant reflects the changes.
+
+    Drive path: process_raw_batch (require_postgres) + bulk_index, not connector.transform.
+    Gmail path: same chain (mailbox-owner ACL compile), not connector.transform.
+    Fetches only the delta (not a full re-scan).
     """
     tenant_id = "tenant123"
     
@@ -311,9 +312,59 @@ async def test_B2_webhook_incremental_correctness(
                 return drive_fixtures["changes_page"]
             
             client_instance.list_changes = mock_list_changes
-            
-            # Process notification
-            result = process_drive_notification.apply_async(args=[tenant_id]).get()
+            client_instance.list_permissions = AsyncMock(return_value=[
+                {"type": "user", "emailAddress": "owner@example.com", "role": "owner"}
+            ])
+            client_instance.export_file = AsyncMock(return_value=b"webhook extracted body")
+            client_instance.download_file = AsyncMock(return_value=b"webhook extracted body")
+
+            captured = {}
+
+            async def fake_process_raw_batch(
+                docs, source_type, tenant_id_arg, *, require_postgres=False
+            ):
+                captured["docs"] = list(docs)
+                captured["require_postgres"] = require_postgres
+                captured["source_type"] = source_type
+                now = datetime.utcnow()
+                from app.core.base_connector import UnifiedDocument
+                piped = []
+                for d in docs:
+                    piped.append(
+                        UnifiedDocument(
+                            id=d["id"],
+                            title=d.get("name") or "Untitled",
+                            content=d.get("extractedText") or "",
+                            source_type="google_drive",
+                            url=d.get("webViewLink") or "https://drive.google.com",
+                            permissions=["user:aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"],
+                            created_at=now,
+                            updated_at=now,
+                            source_updated_at=now,
+                        )
+                    )
+                captured["piped"] = piped
+                return piped
+
+            with patch(
+                "app.connectors.google.pipeline_bridge.process_raw_batch",
+                side_effect=fake_process_raw_batch,
+            ), patch(
+                "app.workers.tasks.indexer.bulk_index", new_callable=AsyncMock
+            ) as mock_bulk, patch(
+                "app.connectors.google.services.drive_service.DriveConnector.transform",
+                new_callable=AsyncMock,
+            ) as mock_transform:
+                result = process_drive_notification.apply_async(args=[tenant_id]).get()
+
+            assert captured.get("require_postgres") is True
+            assert captured.get("source_type") == "google_drive"
+            assert len(captured.get("docs") or []) == 2
+            for raw in captured["docs"]:
+                assert raw.get("extractedText") == "webhook extracted body"
+            mock_transform.assert_not_called()
+            mock_bulk.assert_awaited()
+            assert mock_bulk.await_args.args[0] is captured["piped"]
             
             # Assert: Indexed 2 new/updated, deleted 1
             assert result["indexed_count"] == 2
@@ -347,13 +398,60 @@ async def test_B2_webhook_incremental_correctness(
                 return {}
             
             client_instance.get_message = mock_get_message
-            
-            # Process notification
-            result = process_gmail_notification.apply_async(args=[tenant_id]).get()
+
+            captured = {}
+
+            async def fake_process_raw_batch(
+                docs, source_type, tenant_id_arg, *, require_postgres=False
+            ):
+                captured["docs"] = list(docs)
+                captured["require_postgres"] = require_postgres
+                captured["source_type"] = source_type
+                now = datetime.utcnow()
+                from app.core.base_connector import UnifiedDocument
+                piped = []
+                for d in docs:
+                    piped.append(
+                        UnifiedDocument(
+                            id=d["id"],
+                            title="Quick Question",
+                            content=d.get("snippet") or "",
+                            source_type="google_gmail",
+                            url=f"https://mail.google.com/mail/u/0/#inbox/{d['id']}",
+                            permissions=["user:aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"],
+                            created_at=now,
+                            updated_at=now,
+                            source_updated_at=now,
+                        )
+                    )
+                captured["piped"] = piped
+                return piped
+
+            with patch(
+                "app.connectors.google.pipeline_bridge.process_raw_batch",
+                side_effect=fake_process_raw_batch,
+            ), patch(
+                "app.workers.tasks.indexer.bulk_index", new_callable=AsyncMock
+            ) as mock_bulk, patch(
+                "app.connectors.google.services.gmail_service.GmailConnector.transform",
+                new_callable=AsyncMock,
+            ) as mock_transform:
+                result = process_gmail_notification.apply_async(args=[tenant_id]).get()
+
+            assert captured.get("require_postgres") is True
+            assert captured.get("source_type") == "google_gmail"
+            assert len(captured.get("docs") or []) == 1
+            assert captured["docs"][0]["id"] == "18v2w3x4y5z6a7b8"
+            mock_transform.assert_not_called()
+            mock_bulk.assert_awaited()
+            assert mock_bulk.await_args.args[0] is captured["piped"]
             
             # Assert: Indexed 1 new, deleted 1
             assert result["indexed_count"] == 1
             assert result["deleted_count"] == 1
+
+            new_cursor = await mock_cursor_store.get_cursor(tenant_id, source_type)
+            assert new_cursor == "1234569"
             
             print(f"✓ B2 PASS (google_gmail): Incremental sync fetched delta only")
 
@@ -571,6 +669,11 @@ def test_b5_checkpoint_resume():
     2. Crawl is killed after ~50% (checkpoint persisted).
     3. Restart resumes from cursor; final set matches baseline
        (same count, no duplicates, no missing objects).
+
+    This test proves pagination / checkpoint-resume, not ACL persistence.
+    process_raw_batch is mocked to return None so indexing uses
+    connector.transform — do not rely on an unrouted tenant id to
+    silently skip Block C.
     """
     from app.services.sync import sync_orchestrator
 
@@ -583,7 +686,7 @@ def test_b5_checkpoint_resume():
 
     indexed_store = {}
 
-    async def fake_bulk_index(docs, tenant_id_arg):
+    async def fake_bulk_index(docs, tenant_id_arg, **kwargs):
         for d in docs:
             indexed_store[d.id] = d
 
@@ -591,13 +694,19 @@ def test_b5_checkpoint_resume():
         for i in ids:
             indexed_store.pop(i, None)
 
+    async def skip_block_c(*args, **kwargs):
+        return None
+
     checkpoint = {"cursor": None, "updates": []}
 
     def persist_cursor(next_cursor: str):
         checkpoint["cursor"] = next_cursor
         checkpoint["updates"].append(next_cursor)
 
-    with patch("app.services.sync.indexer") as mock_indexer:
+    with patch(
+        "app.connectors.google.pipeline_bridge.process_raw_batch",
+        side_effect=skip_block_c,
+    ), patch("app.services.sync.indexer") as mock_indexer:
         mock_indexer.bulk_index = fake_bulk_index
         mock_indexer.delete_by_ids = fake_delete_by_ids
 

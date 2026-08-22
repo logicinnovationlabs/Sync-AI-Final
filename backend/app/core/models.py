@@ -14,6 +14,7 @@ Models:
 """
 
 from enum import Enum
+from uuid import UUID
 from pydantic import BaseModel, UUID4, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
@@ -53,9 +54,9 @@ class CanonicalDocument(BaseModel):
     updated_at: datetime
     source_updated_at: datetime
 
-    owner_principal_id: Optional[UUID4] = None
-    creator_principal_id: Optional[UUID4] = None
-    last_modifier_principal_id: Optional[UUID4] = None
+    owner_principal_id: Optional[UUID] = None
+    creator_principal_id: Optional[UUID] = None
+    last_modifier_principal_id: Optional[UUID] = None
 
     structured_metadata: Dict[str, Any] = Field(default_factory=dict)   # allowlisted upstream in Block B
     parent_ids: List[str] = Field(default_factory=list)                 # container IDs for inheritance
@@ -69,7 +70,7 @@ class Principal(BaseModel):
     Same email seen across Drive + Gmail + Outlook resolves to the same principal_id
     within a tenant, but never merges across tenants.
     """
-    id: UUID4
+    id: UUID
     tenant_id: UUID4
     email: str                            # normalized (lowercase, stripped)
     name: Optional[str] = None
@@ -105,7 +106,7 @@ class ACLEntry(BaseModel):
     One of principal_id or group_id must be set (mutually exclusive).
     """
     document_id: str
-    principal_id: Optional[UUID4] = None   # set if grant is to an individual
+    principal_id: Optional[UUID] = None   # set if grant is to an individual
     group_id: Optional[UUID4] = None       # set if grant is to a group (mutually exclusive with principal_id)
     permission: PermissionLevel
     granted_via: str                       # "direct" | "inherited" | "group_membership"
@@ -165,10 +166,13 @@ class IdentityHint(BaseModel):
 class ResolvedIdentity(BaseModel):
     """
     Result of identity resolution.
-    
+
     Contains the resolved principal and metadata about the match.
+    ``matched_on="pending"`` / ``is_pending=True`` means the email was queued
+    rather than bound to a principal (Drive-share path only).
     """
-    principal_id: UUID4
-    principal: Principal
-    confidence: float                      # 0.0-1.0
-    matched_on: str                        # "email" | "username" | "new"
+    principal_id: Optional[UUID] = None
+    principal: Optional[Principal] = None
+    confidence: float = 0.0               # 0.0-1.0
+    matched_on: str                       # "email" | "username" | "new" | "pending"
+    is_pending: bool = False

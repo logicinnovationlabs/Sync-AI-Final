@@ -1,5 +1,7 @@
 "use client"
 
+import { useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "motion/react"
 import { Plug, RefreshCw, Unplug } from "lucide-react"
@@ -11,6 +13,7 @@ import {
   getGoogleAuthorizeUrl,
   triggerBackfill,
   type BackendSourceType,
+  type ConnectorStatus,
 } from "@/lib/api/connectors"
 import { ApiError } from "@/lib/api/client"
 import { useAuthHydrated, useAuthStore } from "@/lib/auth/auth-store"
@@ -40,6 +43,15 @@ const GOOGLE_SOURCES: { id: BackendSourceType; label: string }[] = [
   { id: "google_drive", label: "Drive" },
   { id: "google_gmail", label: "Gmail" },
 ]
+
+function sourceIsLinked(status: ConnectorStatus | undefined): boolean {
+  const connectionStatus = String(status?.details?.connection_status || "")
+  return (
+    Boolean(status?.cursor) ||
+    Boolean(status?.details?.token_present) ||
+    ["active", "syncing"].includes(connectionStatus)
+  )
+}
 
 function StatTile({ label, value, on }: { label: string; value: string; on: boolean }) {
   return (
@@ -94,9 +106,7 @@ function GoogleSource({ id, label }: { id: BackendSourceType; label: string }) {
     onSuccess: invalidate,
   })
 
-  const started = Boolean(status.data?.cursor) || ["active", "syncing"].includes(
-    String(status.data?.details?.connection_status || "")
-  )
+  const started = sourceIsLinked(status.data)
   const watching = Boolean(status.data?.watch_active)
   const connectionStatus = String(status.data?.details?.connection_status || "")
   const filesIndexed = Number(status.data?.details?.files_indexed || 0)
@@ -193,16 +203,44 @@ export function ConnectorCard({
 }) {
   const hydrated = useAuthHydrated()
   const token = useAuthStore((s) => s.accessToken)
+  const canRead = useAuthStore((s) =>
+    hasScope(s.effectiveScopes(), SCOPES.CONNECTORS_READ)
+  )
   const canWrite = useAuthStore((s) =>
     hasScope(s.effectiveScopes(), SCOPES.CONNECTORS_WRITE)
   )
 
+  const searchParams = useSearchParams()
+  const queryClient = useQueryClient()
+  const googleLive = connector.source === "google" && connector.available
+  const driveStatus = useQuery({
+    queryKey: ["connector-status", "google_drive"],
+    queryFn: () => getConnectorStatus(token!, "google_drive"),
+    enabled: googleLive && hydrated && Boolean(token) && canRead,
+    retry: false,
+  })
+  const gmailStatus = useQuery({
+    queryKey: ["connector-status", "google_gmail"],
+    queryFn: () => getConnectorStatus(token!, "google_gmail"),
+    enabled: googleLive && hydrated && Boolean(token) && canRead,
+    retry: false,
+  })
+  const googleLinked =
+    googleLive &&
+    (sourceIsLinked(driveStatus.data) || sourceIsLinked(gmailStatus.data))
   const authorize = useMutation({
     mutationFn: () => getGoogleAuthorizeUrl(token!),
     onSuccess: (data) => {
       if (data.authorization_url) window.location.href = data.authorization_url
     },
   })
+
+  useEffect(() => {
+    if (connector.source !== "google") return
+    const google = searchParams.get("google")
+    if (!google) return
+    queryClient.invalidateQueries({ queryKey: ["connector-status"] })
+  }, [connector.source, queryClient, searchParams])
 
   const live = connector.available
 
@@ -261,11 +299,16 @@ export function ConnectorCard({
           hydrated && canWrite && (
             <Button
               size="sm"
+              variant={googleLinked ? "outline" : "default"}
               disabled={authorize.isPending}
               onClick={() => authorize.mutate()}
             >
               <Plug className="size-3.5" />
-              {authorize.isPending ? "Opening…" : "Connect"}
+              {authorize.isPending
+                ? "Opening…"
+                : googleLinked
+                  ? "Reconnect"
+                  : "Connect"}
             </Button>
           )
         ) : (

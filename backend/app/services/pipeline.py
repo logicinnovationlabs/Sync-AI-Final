@@ -101,20 +101,24 @@ class Pipeline:
         # 5. Extract containers
         containers = strategy.extract_containers(raw)
         
+        source_id = raw.get("id", "")
+        doc_id = f"{source_type}_{source_id}"
+
         # 6. Extract identity hints for special roles
         identity_hints = strategy.extract_identity_hints(raw)
         
-        # 7. Resolve identities
+        # 7. Resolve identities (Drive/Gmail bind to users.principal_id when
+        # document_id is present — same UUID as ACL, no ghost metadata ids)
         resolved = {}
         for role, hint in identity_hints.items():
             try:
-                resolved[role] = await self.identity_resolver.resolve(hint, tenant_id)
+                resolved[role] = await self.identity_resolver.resolve(
+                    hint, tenant_id, document_id=doc_id
+                )
             except Exception as e:
                 logger.error(f"Failed to resolve identity hint for role {role}: {e}")
         
         # 8. Build CanonicalDocument
-        source_id = raw.get("id", "")
-        doc_id = f"{source_type}_{source_id}"
         
         # Parse timestamps
         created_at = self._parse_timestamp(raw.get("createdTime") or raw.get("internalDate"))
@@ -136,9 +140,21 @@ class Pipeline:
             created_at=created_at,
             updated_at=datetime.now(timezone.utc),
             source_updated_at=source_updated_at,
-            owner_principal_id=resolved.get("owner", None) and resolved["owner"].principal_id,
-            creator_principal_id=resolved.get("creator", None) and resolved["creator"].principal_id,
-            last_modifier_principal_id=resolved.get("last_modifier", None) and resolved["last_modifier"].principal_id,
+            owner_principal_id=(
+                resolved["owner"].principal_id
+                if resolved.get("owner") and not resolved["owner"].is_pending
+                else None
+            ),
+            creator_principal_id=(
+                resolved["creator"].principal_id
+                if resolved.get("creator") and not resolved["creator"].is_pending
+                else None
+            ),
+            last_modifier_principal_id=(
+                resolved["last_modifier"].principal_id
+                if resolved.get("last_modifier") and not resolved["last_modifier"].is_pending
+                else None
+            ),
             structured_metadata=metadata,
             parent_ids=containers,
         )

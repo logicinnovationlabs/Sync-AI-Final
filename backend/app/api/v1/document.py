@@ -20,12 +20,16 @@ from app.services.document_reader.reader import (
     redact_fields,
     stream_document_json,
 )
-from app.services.document_reader.store import create_document_store
+from app.services.document_reader.store import (
+    InMemoryDocumentStore,
+    get_shared_document_store,
+)
 
 logger = logging.getLogger(__name__)
 
-# Initialize Block K components
-store = create_document_store(settings)
+# Same in-process store the indexer writes. Celery still cannot share this
+# memory — GET falls back to the Qdrant `documents` collection below.
+store = get_shared_document_store()
 acl_checker = create_acl_checker(settings)
 
 # Router for document endpoints
@@ -59,6 +63,90 @@ async def get_tenant_id(current_user: Dict[str, Any] = Depends(get_current_user)
     return str(tenant_id)
 
 
+def _payload_body(payload: Dict[str, Any]) -> str:
+    return str(
+        payload.get("content")
+        or payload.get("body")
+        or payload.get("body_text")
+        or payload.get("snippet")
+        or ""
+    )
+
+
+async def _load_indexed_document(
+    tenant_id: str, doc_id: str
+) -> tuple[str, Dict[str, Any]] | None:
+    """Read the document Celery actually indexed (shared Qdrant collection)."""
+    try:
+        from app.storage.qdrant_client import qdrant_client
+
+        payload = await qdrant_client.get_document_payload(tenant_id, doc_id)
+        resolved_id = doc_id
+        if payload is None:
+            from app.services.vector.qdrant_store import QdrantVectorStore
+
+            parent = QdrantVectorStore().find_parent_document_id(tenant_id, doc_id)
+            if parent and parent != doc_id:
+                payload = await qdrant_client.get_document_payload(tenant_id, parent)
+                resolved_id = parent
+        if payload is None:
+            return None
+        return resolved_id, payload
+    except Exception:
+        logger.warning(
+            "indexed document lookup failed id=%s tenant=%s",
+            doc_id,
+            tenant_id,
+            exc_info=True,
+        )
+        return None
+
+
+async def _audit_document_acl(
+    tenant_id: str, principal_id: str, doc_id: str, allowed: bool
+) -> None:
+    """Best-effort audit of open-document allow/deny. Never fail the read."""
+    action = "document.acl_allow" if allowed else "document.acl_deny"
+    logger.info(
+        "%s tenant_id=%s principal_id=%s document_id=%s",
+        action,
+        tenant_id,
+        principal_id,
+        doc_id,
+    )
+    try:
+        from uuid import UUID
+
+        from app.core.exceptions import TenantNotFoundError
+        from app.services.admin.audit_logger import write_audit_log
+        from app.services.tenant_resolver import tenant_resolver
+        from app.storage.tenant_db import tenant_db_manager
+
+        tenant = UUID(str(tenant_id))
+        actor = UUID(str(principal_id))
+        routing = await tenant_resolver.resolve(str(tenant_id))
+        async for session in tenant_db_manager.get_session(
+            routing.db_host,
+            routing.db_name,
+            routing.db_user,
+            routing.db_password,
+            str(routing.tenant_id),
+        ):
+            await write_audit_log(
+                session,
+                tenant_id=tenant,
+                actor_id=actor,
+                action_type=action,
+                target={"document_id": doc_id, "allowed": allowed},
+            )
+            await session.commit()
+            return
+    except (TenantNotFoundError, TypeError, ValueError):
+        return
+    except Exception:
+        logger.exception("document ACL audit write failed")
+
+
 @router.get("/document/{doc_id}")
 async def get_document(
     doc_id: str,
@@ -83,12 +171,49 @@ async def get_document(
     if not principal_id:
         raise HTTPException(status_code=401, detail="principal_id missing from token")
 
+    async def _decide(doc_key: str) -> bool:
+        allowed = await acl_checker.is_allowed(tenant_id, principal_id, doc_key)
+        await _audit_document_acl(
+            tenant_id, principal_id, doc_key, allowed
+        )
+        return allowed
+
     metadata = await store.get_metadata(tenant_id, doc_id)
+    if not metadata and isinstance(store, InMemoryDocumentStore):
+        indexed = await _load_indexed_document(tenant_id, doc_id)
+        if indexed:
+            resolved_id, payload = indexed
+            allowed = await _decide(resolved_id)
+            if not allowed:
+                raise HTTPException(status_code=403, detail="Forbidden")
+            body = _payload_body(payload)
+            visible_metadata = redact_fields(
+                {
+                    "document_id": resolved_id,
+                    "tenant_id": tenant_id,
+                    "title": payload.get("title") or "",
+                    "source_type": payload.get("source_type"),
+                    "url": payload.get("url"),
+                    "created_at": payload.get("created_at"),
+                    "updated_at": payload.get("updated_at"),
+                    "owner_principal_id": payload.get("owner_principal_id") or "",
+                },
+                principal_id,
+            )
+            structured = payload.get("structured_metadata")
+            return build_document_payload(
+                doc_id=resolved_id,
+                tenant_id=tenant_id,
+                visible_metadata=visible_metadata,
+                body=body,
+                structured_data=structured if isinstance(structured, dict) else {},
+            )
+
     if not metadata:
         raise HTTPException(status_code=404, detail="Document not found")
 
     # K1: ACL re-check on every request — no caching
-    allowed = await acl_checker.is_allowed(tenant_id, principal_id, doc_id)
+    allowed = await _decide(doc_id)
     if not allowed:
         raise HTTPException(status_code=403, detail="Forbidden")
 

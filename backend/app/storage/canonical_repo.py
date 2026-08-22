@@ -13,10 +13,10 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import List, Optional
-from uuid import UUID
+from typing import List, Optional, Tuple
+from uuid import UUID, uuid4
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,7 +37,9 @@ from app.models.canonical import (
     ACLEntryRow,
     ContainerACLEntryRow,
     ContainerEdgeRow,
+    PendingIdentityQueueRow,
 )
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +173,8 @@ class CanonicalRepo:
         self._acl_entries: dict[str, List[ACLEntry]] = {}
         self._container_acl_entries: dict[tuple[str, UUID], List[ContainerACLEntry]] = {}
         self._container_edges: dict[tuple[str, UUID], Optional[str]] = {}
+        self._login_users_by_email: dict[tuple[UUID, str], Tuple[UUID, str]] = {}
+        self._pending_identity: dict[tuple[UUID, str, str], dict] = {}
 
     def _sql(self) -> AsyncSession:
         if self.use_memory:
@@ -224,21 +228,26 @@ class CanonicalRepo:
     async def delete_documents_and_acls(self, document_ids: List[str], tenant_id: UUID) -> None:
         if self.use_memory:
             for doc_id in document_ids:
-                self._documents.pop(doc_id, None)
-                self._acl_entries.pop(doc_id, None)
+                for alias in _document_id_aliases(doc_id):
+                    self._documents.pop(alias, None)
+                    self._acl_entries.pop(alias, None)
             return
         session = self._sql()
         tenant = _as_uuid(tenant_id)
-        if document_ids:
+        aliases: List[str] = []
+        for doc_id in document_ids:
+            aliases.extend(_document_id_aliases(doc_id))
+        aliases = list(dict.fromkeys(aliases))
+        if aliases:
             await session.execute(
                 delete(ACLEntryRow).where(
-                    ACLEntryRow.document_id.in_(document_ids),
+                    ACLEntryRow.document_id.in_(aliases),
                     ACLEntryRow.tenant_id == tenant,
                 )
             )
             await session.execute(
                 delete(CanonicalDocumentRow).where(
-                    CanonicalDocumentRow.id.in_(document_ids),
+                    CanonicalDocumentRow.id.in_(aliases),
                     CanonicalDocumentRow.tenant_id == tenant,
                 )
             )
@@ -551,3 +560,344 @@ class CanonicalRepo:
             )
         )
         await session.commit()
+
+    def register_login_user(self, tenant_id: UUID, email: str, principal_id: UUID) -> None:
+        """Memory-mode helper: seed a users-row stand-in for Drive-share tests."""
+        key = (_as_uuid(tenant_id), (email or "").strip().lower())
+        self._login_users_by_email[key] = (_as_uuid(principal_id), key[1])
+
+    async def get_login_user_by_email(
+        self, email: str, tenant_id: UUID
+    ) -> Optional[Tuple[UUID, str]]:
+        """Return (principal_id, email) from the login ``users`` table, not identity_principals."""
+        normalized = (email or "").strip().lower()
+        if not normalized:
+            return None
+        tenant = _as_uuid(tenant_id)
+        if self.use_memory:
+            return self._login_users_by_email.get((tenant, normalized))
+        session = self._sql()
+        result = await session.execute(
+            select(User).where(
+                User.tenant_id == tenant,
+                func.lower(User.email) == normalized,
+            )
+        )
+        row = result.scalar_one_or_none()
+        if row is None:
+            return None
+        return (row.principal_id, (row.email or "").strip().lower())
+
+    async def upsert_pending_identity(
+        self,
+        tenant_id: UUID,
+        document_id: str,
+        shared_email: str,
+        source_account_id: Optional[UUID] = None,
+    ) -> bool:
+        """Insert a pending row on first sight. Repeat sightings leave first_seen_at unchanged.
+
+        Returns True if a new row was inserted.
+        """
+        tenant = _as_uuid(tenant_id)
+        email = (shared_email or "").strip().lower()
+        key = (tenant, document_id, email)
+        now = datetime.now(timezone.utc)
+        if self.use_memory:
+            if key in self._pending_identity:
+                return False
+            self._pending_identity[key] = {
+                "id": uuid4(),
+                "tenant_id": tenant,
+                "source_account_id": source_account_id,
+                "document_id": document_id,
+                "shared_email": email,
+                "first_seen_at": now,
+                "resolved_at": None,
+                "resolved_principal_id": None,
+            }
+            return True
+        session = self._sql()
+        stmt = pg_insert(PendingIdentityQueueRow).values(
+            id=uuid4(),
+            tenant_id=tenant,
+            source_account_id=source_account_id,
+            document_id=document_id,
+            shared_email=email,
+            first_seen_at=now,
+            resolved_at=None,
+            resolved_principal_id=None,
+        ).on_conflict_do_nothing(
+            constraint="uq_pending_identity_tenant_doc_email"
+        )
+        result = await session.execute(stmt)
+        await session.commit()
+        return bool(result.rowcount)
+
+    async def insert_acl_entry(self, entry: ACLEntry, commit: bool = True) -> None:
+        """Append one ACL row. Does not replace the document snapshot."""
+        if self.use_memory:
+            existing = self._acl_entries.setdefault(entry.document_id, [])
+            for current in existing:
+                if (
+                    current.principal_id == entry.principal_id
+                    and current.group_id == entry.group_id
+                    and current.is_deny == entry.is_deny
+                ):
+                    return
+            existing.append(entry)
+            return
+        session = self._sql()
+        tenant = _as_uuid(entry.tenant_id)
+        result = await session.execute(
+            select(ACLEntryRow).where(
+                ACLEntryRow.document_id == entry.document_id,
+                ACLEntryRow.tenant_id == tenant,
+                ACLEntryRow.principal_id == entry.principal_id,
+                ACLEntryRow.is_deny == bool(entry.is_deny),
+            )
+        )
+        if result.scalar_one_or_none() is not None:
+            return
+        session.add(
+            ACLEntryRow(
+                document_id=entry.document_id,
+                principal_id=entry.principal_id,
+                group_id=entry.group_id,
+                permission=entry.permission.value
+                if isinstance(entry.permission, PermissionLevel)
+                else str(entry.permission),
+                granted_via=entry.granted_via,
+                source_container_id=entry.source_container_id,
+                is_deny=bool(entry.is_deny),
+                source_type=entry.source_type,
+                tenant_id=tenant,
+            )
+        )
+        if commit:
+            await session.commit()
+
+    async def drain_pending_identity_queue(
+        self,
+        tenant_id: UUID,
+        email: str,
+        principal_id: UUID,
+    ) -> List[str]:
+        """Bind unmatched Drive shares for this email to ``principal_id``. Return document ids."""
+        tenant = _as_uuid(tenant_id)
+        principal = _as_uuid(principal_id)
+        normalized = (email or "").strip().lower()
+        now = datetime.now(timezone.utc)
+        drained: List[str] = []
+
+        if self.use_memory:
+            for key, row in list(self._pending_identity.items()):
+                if (
+                    row["tenant_id"] == tenant
+                    and row["shared_email"] == normalized
+                    and row["resolved_at"] is None
+                ):
+                    doc_id = row["document_id"]
+                    await self.insert_acl_entry(
+                        _bound_share_acl_entry(doc_id, principal, tenant)
+                    )
+                    row["resolved_at"] = now
+                    row["resolved_principal_id"] = principal
+                    drained.append(doc_id)
+            return drained
+
+        session = self._sql()
+        result = await session.execute(
+            select(PendingIdentityQueueRow).where(
+                PendingIdentityQueueRow.tenant_id == tenant,
+                func.lower(PendingIdentityQueueRow.shared_email) == normalized,
+                PendingIdentityQueueRow.resolved_at.is_(None),
+            )
+        )
+        rows = list(result.scalars().all())
+        for row in rows:
+            await self.insert_acl_entry(
+                _bound_share_acl_entry(row.document_id, principal, tenant),
+                commit=False,
+            )
+            row.resolved_at = now
+            row.resolved_principal_id = principal
+            drained.append(row.document_id)
+        await session.commit()
+        return drained
+
+    async def rebind_acl_principal(
+        self,
+        tenant_id: UUID,
+        from_principal_id: UUID,
+        to_principal_id: UUID,
+    ) -> List[str]:
+        """Rewrite ACL rows minted under a ghost identity_principals id."""
+        if from_principal_id == to_principal_id:
+            return []
+        tenant = _as_uuid(tenant_id)
+        source = _as_uuid(from_principal_id)
+        target = _as_uuid(to_principal_id)
+        document_ids: List[str] = []
+
+        if self.use_memory:
+            for doc_id, entries in self._acl_entries.items():
+                changed = False
+                for entry in entries:
+                    if entry.tenant_id == tenant and entry.principal_id == source:
+                        entry.principal_id = target
+                        changed = True
+                if changed:
+                    document_ids.append(doc_id)
+            return document_ids
+
+        session = self._sql()
+        result = await session.execute(
+            select(ACLEntryRow).where(
+                ACLEntryRow.tenant_id == tenant,
+                ACLEntryRow.principal_id == source,
+            )
+        )
+        rows = list(result.scalars().all())
+        for row in rows:
+            row.principal_id = target
+            document_ids.append(row.document_id)
+        if rows:
+            await session.commit()
+        return list(dict.fromkeys(document_ids))
+
+    async def list_unresolved_pending(self, tenant_id: UUID) -> List[dict]:
+        tenant = _as_uuid(tenant_id)
+        if self.use_memory:
+            return [
+                {
+                    "document_id": row["document_id"],
+                    "shared_email": row["shared_email"],
+                    "first_seen_at": row["first_seen_at"],
+                }
+                for row in self._pending_identity.values()
+                if row["tenant_id"] == tenant and row["resolved_at"] is None
+            ]
+        session = self._sql()
+        result = await session.execute(
+            select(PendingIdentityQueueRow).where(
+                PendingIdentityQueueRow.tenant_id == tenant,
+                PendingIdentityQueueRow.resolved_at.is_(None),
+            )
+        )
+        return [
+            {
+                "document_id": row.document_id,
+                "shared_email": row.shared_email,
+                "first_seen_at": row.first_seen_at,
+            }
+            for row in result.scalars().all()
+        ]
+
+    async def principal_can_read_document(
+        self,
+        tenant_id: UUID,
+        principal_id: UUID,
+        document_id: str,
+    ) -> bool:
+        """Live acl_entries check: deny wins, missing row is deny (fail closed)."""
+        tenant = _as_uuid(tenant_id)
+        principal = _as_uuid(principal_id)
+        candidates = _document_id_aliases(document_id)
+
+        if self.use_memory:
+            entries: List[ACLEntry] = []
+            for candidate in candidates:
+                entries.extend(
+                    e
+                    for e in self._acl_entries.get(candidate, [])
+                    if e.tenant_id == tenant and e.principal_id == principal
+                )
+            if any(e.is_deny for e in entries):
+                return False
+            return any(not e.is_deny for e in entries)
+
+        session = self._sql()
+        result = await session.execute(
+            select(ACLEntryRow).where(
+                ACLEntryRow.tenant_id == tenant,
+                ACLEntryRow.principal_id == principal,
+                ACLEntryRow.document_id.in_(candidates),
+            )
+        )
+        rows = list(result.scalars().all())
+        if any(bool(row.is_deny) for row in rows):
+            return False
+        return any(not bool(row.is_deny) for row in rows)
+
+
+def _document_id_aliases(document_id: str) -> List[str]:
+    raw = (document_id or "").strip()
+    if not raw:
+        return []
+    aliases = [raw]
+    for prefix in ("google_drive_", "google_gmail_"):
+        if raw.startswith(prefix) and raw[len(prefix) :]:
+            aliases.append(raw[len(prefix) :])
+        elif not raw.startswith(("google_drive_", "google_gmail_")):
+            aliases.append(f"{prefix}{raw}")
+    seen = set()
+    out = []
+    for item in aliases:
+        if item not in seen:
+            seen.add(item)
+            out.append(item)
+    return out
+
+
+def _source_type_from_document_id(document_id: str) -> str:
+    raw = document_id or ""
+    if raw.startswith("google_gmail"):
+        return "google_gmail"
+    return "google_drive"
+
+
+def _bound_share_acl_entry(document_id: str, principal_id: UUID, tenant_id: UUID) -> ACLEntry:
+    now = datetime.now(timezone.utc)
+    source_type = _source_type_from_document_id(document_id)
+    return ACLEntry(
+        document_id=document_id,
+        principal_id=principal_id,
+        group_id=None,
+        permission=(
+            PermissionLevel.OWNER
+            if source_type == "google_gmail"
+            else PermissionLevel.READ
+        ),
+        granted_via=(
+            "gmail_mailbox" if source_type == "google_gmail" else "drive_share"
+        ),
+        source_container_id=None,
+        is_deny=False,
+        source_type=source_type,
+        tenant_id=tenant_id,
+        created_at=now,
+        updated_at=now,
+    )
+
+
+async def bind_pending_drive_shares(
+    session,
+    tenant_id: UUID,
+    email: str,
+    principal_id: UUID,
+) -> List[str]:
+    """Shared drain: write acl_entries, mark queue resolved, reindex those documents."""
+    repo = CanonicalRepo(use_memory=False, session=session)
+    document_ids = await repo.drain_pending_identity_queue(tenant_id, email, principal_id)
+    ghost = await repo.get_principal_by_email(email, tenant_id)
+    if ghost is not None and ghost.id != principal_id:
+        document_ids.extend(
+            await repo.rebind_acl_principal(tenant_id, ghost.id, principal_id)
+        )
+    document_ids = list(dict.fromkeys(document_ids))
+    if document_ids:
+        from app.services.indexer import indexer
+
+        await indexer.reindex_by_ids(str(tenant_id), document_ids, repo)
+    return document_ids
