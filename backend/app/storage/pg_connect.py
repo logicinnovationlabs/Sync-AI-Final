@@ -9,8 +9,14 @@ from __future__ import annotations
 
 import os
 import re
+import ssl
 from typing import Any, Dict, Optional
 from urllib.parse import parse_qsl, quote, unquote, urlencode, urlparse, urlunparse
+
+try:
+    import certifi
+except ImportError:  # pragma: no cover
+    certifi = None  # type: ignore[assignment]
 
 _LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "postgres"}
 _DIRECT_SUPABASE = re.compile(r"^db\.([a-z0-9]+)\.supabase\.co$", re.I)
@@ -126,6 +132,26 @@ def prepare_database_url(
     return "postgresql+asyncpg://" + urlunparse(rebuilt).removeprefix("postgresql://")
 
 
+def _cloud_ssl_context(*, host: str = "") -> ssl.SSLContext:
+    """TLS for Supabase / managed Postgres on slim hosts (Render Docker).
+
+    The Supabase session pooler chain fails strict verify on Render's slim image
+    (``CERTIFICATE_VERIFY_FAILED: self-signed certificate in certificate chain``).
+    Connection is still encrypted; we skip CA verify only for the pooler host.
+    """
+    if is_supabase_pooler_host(host):
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        return ctx
+    if certifi is not None:
+        return ssl.create_default_context(cafile=certifi.where())
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
+
+
 def connect_args_for_url(url: str) -> Dict[str, Any]:
     """asyncpg connect_args. Local Docker must disable TLS; cloud Postgres requires it."""
     parsed = urlparse(_as_libpq(url))
@@ -133,7 +159,7 @@ def connect_args_for_url(url: str) -> Dict[str, Any]:
     port = parsed.port or 5432
     if is_local_pg_host(host):
         return {"ssl": False}
-    args: Dict[str, Any] = {"ssl": True, "timeout": 10}
+    args: Dict[str, Any] = {"ssl": _cloud_ssl_context(host=host), "timeout": 10}
     # Transaction-mode pooler (PgBouncer / Supavisor :6543) cannot cache statements.
     if port == 6543 or is_supabase_pooler_host(host):
         args["statement_cache_size"] = 0

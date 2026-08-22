@@ -1,5 +1,7 @@
 """Postgres URL helpers for Render (IPv4) vs local Docker."""
 
+import ssl
+
 from app.storage.pg_connect import (
     connect_args_for_url,
     prepare_database_url,
@@ -28,5 +30,5 @@ def test_direct_supabase_swapped_for_pooler():
     url = prepare_database_url(direct, pooler_url=pooler)
     assert "pooler.supabase.com" in url
     assert "db.abcdefghijkl.supabase.co" not in url
-    assert connect_args_for_url(url)["ssl"] is True
+    assert isinstance(connect_args_for_url(url)["ssl"], ssl.SSLContext)
     assert connect_args_for_url(url)["statement_cache_size"] == 0
