@@ -25,6 +25,9 @@ const BARE_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "[::1]"])
 /** Subdomains that are ours, not a tenant's. */
 const RESERVED = new Set(["www", "app", "api", "admin", "staging", "preview"])
 
+/** Hosted preview/prod URLs — first label is the project name, not a tenant. */
+const PLATFORM_SUFFIXES = [".vercel.app", ".onrender.com"]
+
 export function tenantFromHost(hostname?: string): string {
   const host = (hostname ?? (typeof window !== "undefined" ? window.location.hostname : ""))
     .toLowerCase()
@@ -33,6 +36,8 @@ export function tenantFromHost(hostname?: string): string {
   const fallback = (process.env.NEXT_PUBLIC_DEFAULT_TENANT || "alpha").trim()
 
   if (!host || BARE_HOSTS.has(host)) return fallback
+
+  if (PLATFORM_SUFFIXES.some((suffix) => host.endsWith(suffix))) return fallback
 
   const labels = host.split(".")
   // Needs at least sub.domain.tld — `synq.ai` on its own is the marketing site.
