@@ -62,6 +62,25 @@ def is_supabase_direct_host(host: Optional[str]) -> bool:
     return bool(_DIRECT_SUPABASE.match(host or ""))
 
 
+def build_asyncpg_url(
+    *,
+    user: str,
+    password: str,
+    host: str,
+    port: int = 5432,
+    database: str,
+) -> str:
+    """Build a safe asyncpg SQLAlchemy URL (percent-encode credentials)."""
+    hostname = host.strip()
+    db_port = port
+    if ":" in hostname:
+        hostname, port_str = hostname.rsplit(":", 1)
+        db_port = int(port_str)
+    netloc = _netloc(user, password, hostname, db_port)
+    db = database.lstrip("/")
+    return prepare_database_url(f"postgresql+asyncpg://{netloc}/{db}")
+
+
 def prepare_database_url(
     url: str,
     *,

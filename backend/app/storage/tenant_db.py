@@ -9,7 +9,7 @@ from typing import Dict, AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, create_async_engine, async_sessionmaker
 
 from app.core.exceptions import TenantNotFoundError
-from app.storage.pg_connect import connect_args_for_url, prepare_database_url
+from app.storage.pg_connect import build_asyncpg_url, connect_args_for_url, prepare_database_url
 
 
 class TenantDatabaseManager:
@@ -48,8 +48,13 @@ class TenantDatabaseManager:
             return self._engines[tenant_id]
 
         host = db_host if ":" in db_host else f"{db_host}:5432"
-        database_url = prepare_database_url(
-            f"postgresql+asyncpg://{db_user}:{db_password}@{host}/{db_name}"
+        hostname, _, port_str = host.partition(":")
+        database_url = build_asyncpg_url(
+            user=db_user,
+            password=db_password,
+            host=hostname,
+            port=int(port_str or 5432),
+            database=db_name,
         )
         engine = create_async_engine(
             database_url,
