@@ -137,6 +137,36 @@ def test_p2_celery_beat_schedules_backup():
     )
 
 
+def test_p2_cors_preflight_allows_vercel_origin():
+    from fastapi.testclient import TestClient
+
+    import app.main as main_mod
+
+    client = TestClient(main_mod.app)
+    res = client.options(
+        "/auth/login",
+        headers={
+            "Origin": "https://sync-ai-ov33.vercel.app",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+    assert res.status_code == 200
+    assert res.headers.get("access-control-allow-origin") == "https://sync-ai-ov33.vercel.app"
+
+
+def test_p2_effective_cors_merges_frontend_url(monkeypatch):
+    from app.core.config import Settings
+
+    cfg = Settings(
+        cors_allowed_origins="https://app.example.com",
+        frontend_url="https://sync-ai-ov33.vercel.app/",
+        environment="production",
+    )
+    assert "https://app.example.com" in cfg.effective_cors_origins
+    assert "https://sync-ai-ov33.vercel.app" in cfg.effective_cors_origins
+
+
 def test_p2_backup_checksum_roundtrip(tmp_path, monkeypatch):
     import json
     import hashlib
