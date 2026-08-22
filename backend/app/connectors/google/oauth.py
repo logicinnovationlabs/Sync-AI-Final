@@ -16,6 +16,7 @@ from urllib.parse import urlencode
 
 from app.core.base_connector import TokenStore
 from app.core.exceptions import UnauthorizedError
+from app.connectors.google.keys import google_oauth_token_key
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ class GoogleOAuthManager:
         client_id: str,
         client_secret: str,
         scopes: list[str],
+        principal_id: str = "",
     ):
         """
         Initialize OAuth manager.
@@ -51,6 +53,7 @@ class GoogleOAuthManager:
         self.client_id = client_id
         self.client_secret = client_secret
         self.scopes = scopes
+        self.principal_id = str(principal_id or "").strip()
     
     def build_authorization_url(self, tenant_id: str, redirect_uri: str, state: str = "") -> str:
         """
@@ -146,6 +149,8 @@ class GoogleOAuthManager:
         """
         token_key = self._get_token_key(tenant_id)
         token_data = self.token_store.get_token(token_key)
+        if not token_data and self.principal_id:
+            token_data = self.token_store.get_token(google_oauth_token_key(tenant_id))
         
         if not token_data:
             raise UnauthorizedError(
@@ -202,12 +207,14 @@ class GoogleOAuthManager:
                     set_status(
                         tenant_id,
                         "google_drive",
+                        user_id=self.principal_id,
                         connection_status="needs_reauth",
                         last_error="token_refresh_failed",
                     )
                     set_status(
                         tenant_id,
                         "google_gmail",
+                        user_id=self.principal_id,
                         connection_status="needs_reauth",
                         last_error="token_refresh_failed",
                     )
@@ -236,8 +243,8 @@ class GoogleOAuthManager:
             return new_token_data
     
     def _get_token_key(self, tenant_id: str) -> str:
-        """Generate token storage key for a tenant."""
-        return f"google_oauth:{tenant_id}"
+        """Per-user token key when a principal is bound; else tenant-wide legacy."""
+        return google_oauth_token_key(tenant_id, self.principal_id)
 
 
 def seed_token_store_from_env(
@@ -273,7 +280,7 @@ def seed_token_store_from_env(
     if not rt:
         return False
 
-    existing = token_store.get_token(f"google_oauth:{tenant_id}") or {}
+    existing = token_store.get_token(google_oauth_token_key(tenant_id)) or {}
     if existing.get("refresh_token") or existing.get("access_token"):
         logger.info(
             "seed_token_store_from_env: skip, token already stored for tenant (will not clobber)"
@@ -282,7 +289,7 @@ def seed_token_store_from_env(
 
     # Expire access immediately so get_valid_token() refreshes on first use.
     token_store.set_token(
-        f"google_oauth:{tenant_id}",
+        google_oauth_token_key(tenant_id),
         {
             "access_token": "pending_refresh",
             "refresh_token": rt,
@@ -293,7 +300,9 @@ def seed_token_store_from_env(
     return True
 
 
-def google_oauth_from_settings(token_store: TokenStore) -> "GoogleOAuthManager":
+def google_oauth_from_settings(
+    token_store: TokenStore, principal_id: str = ""
+) -> "GoogleOAuthManager":
     """Build a GoogleOAuthManager from app settings + manifest scopes."""
     from app.core.config import settings
 
@@ -305,5 +314,7 @@ def google_oauth_from_settings(token_store: TokenStore) -> "GoogleOAuthManager":
         "https://www.googleapis.com/auth/userinfo.email",
         "openid",
     ]
-    return GoogleOAuthManager(token_store, client_id, client_secret, scopes)
+    return GoogleOAuthManager(
+        token_store, client_id, client_secret, scopes, principal_id=principal_id
+    )
 

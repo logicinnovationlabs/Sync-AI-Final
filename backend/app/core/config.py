@@ -195,6 +195,7 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     control_plane_database_url: Optional[str] = Field(default=None)
     supabase_db_url: Optional[str] = Field(default=None)
+    supabase_pooler_url: Optional[str] = Field(default=None)
 
     # Azure Key Vault client URL (optional). Distinct from KMS_KEY_VAULT_URL
     # (HashiCorp/local KMS). Leave empty to use MockVaultClient in local/dev.
@@ -555,6 +556,13 @@ class Settings(BaseSettings):
                 f"postgresql+asyncpg://{user}:{password}"
                 f"@{self.db_host}:5432/{self.db_name}"
             )
+        from app.storage.pg_connect import prepare_database_url
+
+        self.control_plane_database_url = prepare_database_url(
+            self.control_plane_database_url,
+            fallback_cloud_url=self.supabase_db_url or "",
+            pooler_url=self.supabase_pooler_url or "",
+        )
         # Normalize empty Azure vault URL → None (MockVaultClient)
         if isinstance(self.vault_url, str) and not self.vault_url.strip():
             self.vault_url = None

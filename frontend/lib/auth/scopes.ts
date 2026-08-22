@@ -11,13 +11,10 @@ export function hasScope(scopes: string[], scope: string): boolean {
 }
 
 /**
- * Admin-vs-member follows JWT scopes issued from the persisted org role
- * (Block N `scopes_for_role`). An admin login includes `connectors.write`
- * and `admin.*`. Members only get search.read + document.read.
+ * Admin-vs-member follows JWT scopes from the persisted org role.
+ * Members now also get connectors.read/write for their own Google account.
+ * Do not treat connectors.write as admin.
  */
 export function isAdmin(scopes: string[]): boolean {
-  return (
-    hasScope(scopes, SCOPES.CONNECTORS_WRITE) ||
-    scopes.some((scope) => scope.startsWith("admin."))
-  )
+  return scopes.some((scope) => scope.startsWith("admin."))
 }

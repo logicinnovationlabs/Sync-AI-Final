@@ -11,6 +11,7 @@ import asyncio
 
 from app.models.base import Base
 from app.core.config import settings
+from app.storage.pg_connect import connect_args_for_url
 
 # Import all models so Alembic can see them
 from app.models.tenant import Tenant
@@ -65,11 +66,12 @@ async def run_async_migrations() -> None:
     """Run migrations in 'online' mode with async engine."""
     configuration = config.get_section(config.config_ini_section)
     configuration["sqlalchemy.url"] = settings.control_plane_database_url
-    
+
     connectable = async_engine_from_config(
         configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=connect_args_for_url(settings.control_plane_database_url),
     )
 
     async with connectable.connect() as connection:
@@ -79,8 +81,22 @@ async def run_async_migrations() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
-    asyncio.run(run_async_migrations())
+    """Run migrations in 'online' mode.
+
+    Database unreachable (Render IPv6 / missing Postgres) must not fail boot.
+    The web process has to bind $PORT even when Alembic cannot connect.
+    """
+    import logging
+
+    log = logging.getLogger("alembic")
+    try:
+        asyncio.run(run_async_migrations())
+    except Exception as exc:
+        log.warning(
+            "Skipping migrations; database unreachable (%s: %s)",
+            type(exc).__name__,
+            exc,
+        )
 
 
 if context.is_offline_mode():

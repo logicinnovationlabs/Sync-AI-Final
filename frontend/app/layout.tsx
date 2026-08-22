@@ -28,9 +28,16 @@ const newsreader = Newsreader({
   display: "swap",
 });
 
-// NEXT_PUBLIC_SITE_URL keeps the canonical origin out of the source; the
-// localhost fallback is only for dev, where relative OG URLs are fine anyway.
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+function resolveSiteUrl(): string {
+  const raw = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").trim();
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return "http://localhost:3000";
+  }
+}
+
+const siteUrl = resolveSiteUrl();
 
 const description =
   "Every answer comes with its source. SynQ reads your Drive, inbox, WhatsApp Business chats and Tally ledgers as one, and points every line back to the record it came from.";

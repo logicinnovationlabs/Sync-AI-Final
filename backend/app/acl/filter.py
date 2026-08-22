@@ -42,8 +42,9 @@ def document_is_visible(
         return True
 
     terms = [t for t in (doc_acl or []) if t]
+    # Empty document ACL is private, not tenant-public.
     if not terms:
-        return True
+        return False
 
     deny_full = set(deny_terms_for(user_acl))
     if any(t in deny_full for t in terms):
@@ -69,12 +70,8 @@ def opensearch_acl_clause(
     deny = deny_terms_for(user_acl)
     return {
         "bool": {
-            "should": [
-                {"terms": {field: list(user_acl)}},
-                {"bool": {"must_not": {"exists": {"field": field}}}},
-            ],
+            "must": [{"terms": {field: list(user_acl)}}],
             "must_not": [{"terms": {field: deny}}] if deny else [],
-            "minimum_should_match": 1,
         }
     }
 

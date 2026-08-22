@@ -24,6 +24,10 @@ from app.workers.tasks import backfill_source, backfill_tenant_source
 from app.services.cursor_store import cursor_store
 from app.core.config import settings
 from app.connectors.google.oauth import google_oauth_from_settings
+from app.connectors.google.keys import (
+    cursor_scope_id,
+    google_oauth_token_key,
+)
 from app.connectors.google.oauth_state import (
     decode_oauth_state,
     encode_oauth_state,
@@ -88,11 +92,14 @@ async def trigger_backfill(
     if not tenant_id or str(tenant.tenant_id) != tenant_id:
         raise HTTPException(status_code=403, detail="Cross-tenant execution rejected")
 
-    status_store.set_status(tenant_id, source_type, connection_status="syncing", last_error="")
+    user_id = _user_id(current_user)
+    status_store.set_status(
+        tenant_id, source_type, user_id=user_id, connection_status="syncing", last_error=""
+    )
     task_result = backfill_tenant_source.delay(
         tenant_id=tenant_id,
         source_type=source_type,
-        user_id=_user_id(current_user),
+        user_id=user_id,
     )
 
     return {
@@ -121,20 +128,28 @@ async def get_connector_status(
     if not tenant_id or str(tenant.tenant_id) != tenant_id:
         raise HTTPException(status_code=403, detail="Cross-tenant execution rejected")
 
-    cursor = await cursor_store.get_cursor(tenant_id, source_type)
+    user_id = _user_id(current_user)
+    scope_id = cursor_scope_id(tenant_id, user_id)
+    cursor = await cursor_store.get_cursor(scope_id, source_type)
 
     watch_info = None
     try:
         if source_type == "google_drive":
-            watch_info = await cursor_store.get_watch_by_channel(f"drive-{tenant_id}", "resource")
+            watch_info = await cursor_store.get_watch_by_channel(
+                f"drive-{scope_id}", "resource"
+            )
         elif source_type == "google_gmail":
-            watch_info = await cursor_store.get_watch_by_email(f"user@{tenant_id}.com", source_type)
+            watch_info = await cursor_store.get_watch_by_email(
+                f"user@{scope_id}.com", source_type
+            )
     except Exception:
         watch_info = None
 
-    runtime = status_store.get_status(tenant_id, source_type)
+    runtime = status_store.get_status(tenant_id, source_type, user_id=user_id)
     token_store = PersistentGoogleTokenStore(tenant_id)
-    has_token = token_store.get_token(f"google_oauth:{tenant_id}") is not None
+    has_token = token_store.get_token(google_oauth_token_key(tenant_id, user_id)) is not None
+    if not has_token:
+        has_token = token_store.get_token(google_oauth_token_key(tenant_id)) is not None
     connection_status = runtime.get("connection_status") or "not_connected"
     if connection_status == "not_connected" and (cursor or has_token):
         connection_status = "active" if cursor else "syncing"
@@ -172,9 +187,15 @@ async def disconnect_connector(
     if not tenant_id or str(tenant.tenant_id) != tenant_id:
         raise HTTPException(status_code=403, detail="Cross-tenant execution rejected")
 
-    await cursor_store.update_cursor(tenant_id, source_type, "")
+    user_id = _user_id(current_user)
+    await cursor_store.update_cursor(cursor_scope_id(tenant_id, user_id), source_type, "")
     status_store.set_status(
-        tenant_id, source_type, connection_status="not_connected", files_indexed=0, last_error=""
+        tenant_id,
+        source_type,
+        user_id=user_id,
+        connection_status="not_connected",
+        files_indexed=0,
+        last_error="",
     )
 
     return {
@@ -207,9 +228,10 @@ async def get_google_authorize_url(
         raise HTTPException(status_code=503, detail="GOOGLE_CLIENT_ID is not configured")
 
     redirect_uri = _google_redirect_uri()
-    state = encode_oauth_state(str(tenant_id), _user_id(current_user))
+    user_id = _user_id(current_user)
+    state = encode_oauth_state(str(tenant_id), user_id)
     token_store = PersistentGoogleTokenStore(str(tenant_id))
-    oauth = google_oauth_from_settings(token_store)
+    oauth = google_oauth_from_settings(token_store, principal_id=user_id)
     auth_url = oauth.build_authorization_url(str(tenant_id), redirect_uri, state=state)
 
     return {
@@ -253,7 +275,7 @@ async def google_oauth_callback(
     redirect_uri = _google_redirect_uri()
 
     token_store = PersistentGoogleTokenStore(tenant_id)
-    oauth = google_oauth_from_settings(token_store)
+    oauth = google_oauth_from_settings(token_store, principal_id=user_id)
     try:
         token_data = await oauth.exchange_code_for_tokens(tenant_id, code, redirect_uri)
     except Exception:
@@ -268,24 +290,29 @@ async def google_oauth_callback(
         if mailbox_email:
             merged["mailbox_email"] = mailbox_email
         merged["connected_by"] = user_id
-        token_store.set_token(f"google_oauth:{tenant_id}", merged)
+        token_store.set_token(google_oauth_token_key(tenant_id, user_id), merged)
     await _record_connector_rows(tenant_id, user_id, mailbox_email)
 
     for source_type in GOOGLE_SOURCES:
         status_store.set_status(
-            tenant_id, source_type, connection_status="syncing", last_error=""
+            tenant_id,
+            source_type,
+            user_id=user_id,
+            connection_status="syncing",
+            last_error="",
         )
         try:
             backfill_source.delay(
                 tenant_id=tenant_id,
                 source_type=source_type,
                 user_id=user_id,
-                connector_id=google_credential_ref(tenant_id),
+                connector_id=google_credential_ref(tenant_id, user_id),
             )
         except Exception:
             status_store.set_status(
                 tenant_id,
                 source_type,
+                user_id=user_id,
                 connection_status="error",
                 last_error="celery_enqueue_failed",
             )
@@ -328,7 +355,7 @@ async def _record_connector_rows(tenant_id: str, user_id: str, mailbox_email: st
             routing.db_password,
             str(routing.tenant_id),
         )
-        cred_ref = google_credential_ref(tenant_id)
+        cred_ref = google_credential_ref(tenant_id, user_id)
         async with factory() as session:
             for source_type in GOOGLE_SOURCES:
                 result = await session.execute(

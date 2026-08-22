@@ -27,7 +27,9 @@ COPY app ./app
 COPY migrations ./migrations
 COPY alembic.ini ./
 COPY scripts ./scripts
-COPY keys ./keys
+# JWT PEMs are gitignored. Mount them at runtime (Render secret files) at
+# /app/keys/private.pem and /app/keys/public.pem. Dev can generate ephemeral keys.
+RUN mkdir -p /app/keys && chmod +x /app/scripts/render_start.sh && sed -i 's/\r$//' /app/scripts/render_start.sh
 
 # Set environment variables defaults
 ENV PYTHONUNBUFFERED=1 \
@@ -40,5 +42,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=5s --timeout=5s --retries=10 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "(python -m alembic upgrade heads || true) & exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
 

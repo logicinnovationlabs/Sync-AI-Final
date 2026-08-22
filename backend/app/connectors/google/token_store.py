@@ -20,15 +20,16 @@ from cryptography.fernet import Fernet, InvalidToken
 from app.core.base_connector import TokenStore
 from app.core.config import settings
 from app.storage.vault_client import vault_client
+from app.connectors.google.keys import (
+    principal_from_token_key,
+    tenant_from_token_key,
+    vault_google_oauth_key,
+)
 
 logger = logging.getLogger(__name__)
 
 _FERNET_VAULT_KEY = "kv/platform/google-oauth-fernet"
 _REDIS_PREFIX = "google_oauth_blob"
-
-
-def _vault_token_key(tenant_id: str) -> str:
-    return f"kv/tenant-{tenant_id}/google-oauth"
 
 
 def _redis_blob_key(tenant_id: str, token_key: str) -> str:
@@ -149,7 +150,7 @@ class PersistentGoogleTokenStore(TokenStore):
         if key in self._memory:
             return self._memory[key]
 
-        tenant_id = self.tenant_id or _tenant_from_token_key(key)
+        tenant_id = self.tenant_id or tenant_from_token_key(key)
         ciphertext = None
 
         if self._redis is not None and tenant_id:
@@ -159,7 +160,7 @@ class PersistentGoogleTokenStore(TokenStore):
                 ciphertext = None
 
         if not ciphertext and tenant_id:
-            vault_name = _vault_token_key(tenant_id)
+            vault_name = vault_google_oauth_key(tenant_id, principal_from_token_key(key))
             try:
                 if hasattr(vault_client, "get"):
                     ciphertext = vault_client.get(vault_name)
@@ -183,7 +184,7 @@ class PersistentGoogleTokenStore(TokenStore):
 
     def set_token(self, key: str, token_data: Dict[str, Any]) -> None:
         self._memory[key] = token_data
-        tenant_id = self.tenant_id or _tenant_from_token_key(key)
+        tenant_id = self.tenant_id or tenant_from_token_key(key)
         try:
             ciphertext = encrypt_token_blob(json.dumps(token_data))
         except Exception as exc:
@@ -197,7 +198,7 @@ class PersistentGoogleTokenStore(TokenStore):
                 logger.warning("Redis token persist failed: %s", type(exc).__name__)
 
         if tenant_id:
-            vault_name = _vault_token_key(tenant_id)
+            vault_name = vault_google_oauth_key(tenant_id, principal_from_token_key(key))
             try:
                 if hasattr(vault_client, "set"):
                     vault_client.set(vault_name, ciphertext)
@@ -205,13 +206,6 @@ class PersistentGoogleTokenStore(TokenStore):
                 logger.warning("Vault token persist failed: %s", type(exc).__name__)
 
 
-def _tenant_from_token_key(key: str) -> Optional[str]:
-    prefix = "google_oauth:"
-    if key.startswith(prefix):
-        return key[len(prefix) :]
-    return None
-
-
-def google_credential_ref(tenant_id: str) -> str:
+def google_credential_ref(tenant_id: str, user_id: str = "") -> str:
     """Vault key *name* stored on TenantConnector.credential_ref — never a secret."""
-    return _vault_token_key(tenant_id)
+    return vault_google_oauth_key(tenant_id, user_id)

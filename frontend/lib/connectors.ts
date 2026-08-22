@@ -24,7 +24,7 @@ export const CONNECTORS: ConnectorMeta[] = [
     source: "google",
     name: "Google Workspace",
     shortLabel: "Google",
-    description: "Drive documents and Gmail threads, indexed continuously.",
+    description: "Your Drive and Gmail. Only you can search what you connect.",
     connectionModel: "oauth",
     handshake: "OAuth consent",
     cadence: "Polled every ~3 min",
