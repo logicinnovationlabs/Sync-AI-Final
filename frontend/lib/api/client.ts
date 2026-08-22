@@ -89,15 +89,23 @@ export async function apiFetch<T>(
 
   const access = skipAuthRefresh ? token ?? null : await resolveAccessToken(token)
 
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    ...rest,
-    headers: {
-      "Content-Type": "application/json",
-      ...(access ? { Authorization: `Bearer ${access}` } : {}),
-      ...headers,
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  })
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      ...rest,
+      headers: {
+        "Content-Type": "application/json",
+        ...(access ? { Authorization: `Bearer ${access}` } : {}),
+        ...headers,
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    })
+  } catch {
+    throw new ApiError(
+      0,
+      `Cannot reach the API at ${API_BASE_URL}. Check NEXT_PUBLIC_API_BASE_URL and backend CORS (FRONTEND_URL / CORS_ALLOWED_ORIGINS on Render).`
+    )
+  }
 
   if (!res.ok) {
     const expiredAccess =

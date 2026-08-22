@@ -37,7 +37,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         )
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        if self.limit <= 0 or request.url.path.startswith(_EXEMPT_PREFIXES):
+        if (
+            self.limit <= 0
+            or request.method == "OPTIONS"
+            or request.url.path.startswith(_EXEMPT_PREFIXES)
+        ):
             return await call_next(request)
 
         client_ip = request.client.host if request.client else "unknown"

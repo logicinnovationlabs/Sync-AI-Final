@@ -522,12 +522,46 @@ class Settings(BaseSettings):
     def oidc_issuer(self) -> Optional[str]:
         return self.oauth_issuer_url
 
+    @staticmethod
+    def normalize_origin(origin: str) -> str:
+        """Strip whitespace and trailing slash so browser Origin headers match."""
+        return (origin or "").strip().rstrip("/")
+
     @property
     def cors_origins_list(self) -> list[str]:
         raw = (self.cors_allowed_origins or "").strip()
         if not raw:
             return []
-        return [origin.strip() for origin in raw.split(",") if origin.strip()]
+        return [
+            self.normalize_origin(origin)
+            for origin in raw.split(",")
+            if origin.strip()
+        ]
+
+    @property
+    def effective_cors_origins(self) -> list[str]:
+        """
+        Browser-allowed origins: explicit CORS list + FRONTEND_URL + local dev hosts.
+
+        FRONTEND_URL is merged so Render/Vercel only need one of CORS_ALLOWED_ORIGINS
+        or FRONTEND_URL set correctly (both is fine).
+        """
+        seen: set[str] = set()
+        merged: list[str] = []
+        for origin in self.cors_origins_list:
+            if origin and origin not in seen:
+                seen.add(origin)
+                merged.append(origin)
+        frontend = self.normalize_origin(self.frontend_url or "")
+        if frontend and frontend not in seen:
+            seen.add(frontend)
+            merged.append(frontend)
+        if self.environment.lower() in ("development", "dev", "test", "staging"):
+            for origin in ("http://localhost:3000", "http://127.0.0.1:3000"):
+                if origin not in seen:
+                    seen.add(origin)
+                    merged.append(origin)
+        return merged
 
     @property
     def scim_endpoint(self) -> Optional[str]:
