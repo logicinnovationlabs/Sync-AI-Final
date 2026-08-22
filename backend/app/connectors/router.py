@@ -134,10 +134,25 @@ async def get_connector_status(
 
     runtime = status_store.get_status(tenant_id, source_type)
     token_store = PersistentGoogleTokenStore(tenant_id)
-    has_token = token_store.get_token(f"google_oauth:{tenant_id}") is not None
+    token_blob = token_store.get_token(f"google_oauth:{tenant_id}")
+    has_token = token_blob is not None and bool(
+        token_blob.get("refresh_token") or token_blob.get("access_token")
+    )
     connection_status = runtime.get("connection_status") or "not_connected"
     if connection_status == "not_connected" and (cursor or has_token):
         connection_status = "active" if cursor else "syncing"
+    elif connection_status == "needs_reauth" and has_token:
+        # Stale Redis flag from a non-auth ingest failure (e.g. VaultError)
+        # must not outrank a stored OAuth blob. Keep needs_reauth when the
+        # last error was an actual credential failure.
+        last_error = str(runtime.get("last_error") or "")
+        if last_error not in (
+            "token_refresh_failed",
+            "UnauthorizedError",
+            "InvalidTokenError",
+            "RevokedTokenError",
+        ):
+            connection_status = "active" if cursor else "syncing"
 
     details: Dict[str, Any] = {
         "connection_status": connection_status,

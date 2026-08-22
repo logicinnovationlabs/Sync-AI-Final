@@ -29,6 +29,13 @@ celery_app.conf.beat_schedule = {
             "expires": 7200,
         },
     },
+    "poll-drive-acl-delta": {
+        "task": "app.workers.tasks.poll_drive_acl_delta",
+        "schedule": float(getattr(settings, "drive_acl_poll_seconds", 180) or 180),
+        "options": {
+            "expires": 120,
+        },
+    },
 }
 
 # Timezone

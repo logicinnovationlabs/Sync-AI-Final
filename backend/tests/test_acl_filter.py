@@ -11,9 +11,9 @@ def test_fail_closed_empty_acl():
     assert not document_is_visible([], ["user:alice"])
 
 
-def test_public_doc_visible():
-    assert document_is_visible(["user:alice"], [])
-    assert document_is_visible(["user:alice"], None)
+def test_missing_acl_terms_are_deny():
+    assert not document_is_visible(["user:alice"], [])
+    assert not document_is_visible(["user:alice"], None)
 
 
 def test_allow_match():

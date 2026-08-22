@@ -28,6 +28,25 @@ from app.connectors.google.services.gmail_service import GmailConnector
 from app.connectors.google.oauth import GoogleOAuthManager
 
 
+def _bind_indexer_mocks(indexer, *, allowed_keys=None, embed_side_effect=None):
+    mock_embed = MagicMock()
+    mock_embed.get_dimension = MagicMock(return_value=768)
+    if embed_side_effect is not None:
+        mock_embed.embed_texts = AsyncMock(side_effect=embed_side_effect)
+    else:
+        mock_embed.embed_texts = AsyncMock(return_value=[[0.1] * 768])
+    mock_qdrant = MagicMock()
+    mock_qdrant.upsert_documents = AsyncMock()
+    mock_registry = MagicMock()
+    mock_registry.get_allowed_metadata_keys = MagicMock(
+        return_value=list(allowed_keys or [])
+    )
+    indexer.embedding_service = mock_embed
+    indexer.qdrant = mock_qdrant
+    indexer.registry = mock_registry
+    return mock_embed, mock_qdrant, mock_registry
+
+
 # ---------- Fixtures (same as core_functions) ----------
 class DictTokenStore:
     def __init__(self):
@@ -120,13 +139,14 @@ async def test_drive_permissions_deleted_user(drive_connector):
 
 @pytest.mark.asyncio
 async def test_drive_permissions_public(drive_connector):
-    """_resolve_permissions must handle 'anyone' type as user:*."""
+    """'anyone' must not become a universal ACL; owner fallback still applies."""
     file = {
         "permissions": [{"type": "anyone", "emailAddress": ""}],
         "owners": [{"emailAddress": "owner@x.com"}],
     }
     perms = await drive_connector._resolve_permissions(file)
-    assert "user:*" in perms
+    assert "user:*" not in perms
+    assert "user:owner@x.com" in perms
 
 @pytest.mark.asyncio
 async def test_drive_permissions_malformed_type(drive_connector):
@@ -226,13 +246,10 @@ async def test_drive_fetch_deleted_ids_mixed_types(drive_connector):
 async def test_indexer_allowlist_unusual_keys():
     """Indexer must strip metadata with special characters, null bytes, etc."""
     indexer = Indexer()
-    with patch("app.services.indexer.embedding_service") as mock_embed, \
-         patch("app.services.indexer.qdrant_client") as mock_qdrant, \
-         patch("app.services.indexer.connector_registry") as mock_registry:
-        mock_embed.get_dimension = MagicMock(return_value=768)
-        mock_embed.embed_texts = AsyncMock(return_value=[[0.1]*768])
-        mock_registry.get_allowed_metadata_keys = MagicMock(return_value=["safe_key"])
-
+    mock_embed, mock_qdrant, mock_registry = _bind_indexer_mocks(
+        indexer, allowed_keys=["safe_key"]
+    )
+    with patch.object(indexer, "_fanout_search_pipeline", new_callable=AsyncMock):
         doc = UnifiedDocument(
             id="test",
             title="T",
@@ -306,13 +323,8 @@ async def test_drive_get_valid_token_refresh(drive_connector, mock_oauth_manager
 async def test_indexer_tenant_isolation():
     """Indexer must attach tenant_id to every document payload."""
     indexer = Indexer()
-    with patch("app.services.indexer.embedding_service") as mock_embed, \
-         patch("app.services.indexer.qdrant_client") as mock_qdrant, \
-         patch("app.services.indexer.connector_registry") as mock_registry:
-        mock_embed.get_dimension = MagicMock(return_value=768)
-        mock_embed.embed_texts = AsyncMock(return_value=[[0.1]*768])
-        mock_registry.get_allowed_metadata_keys = MagicMock(return_value=[])
-
+    mock_embed, mock_qdrant, mock_registry = _bind_indexer_mocks(indexer)
+    with patch.object(indexer, "_fanout_search_pipeline", new_callable=AsyncMock):
         doc = UnifiedDocument(
             id="t1",
             title="T",
@@ -339,14 +351,10 @@ async def test_indexer_large_content_handling():
     """Indexer must handle oversized content gracefully (truncate or raise clear error)."""
     indexer = Indexer()
     huge_content = "A" * 10_000_000  # 10 MB
-    with patch("app.services.indexer.embedding_service") as mock_embed, \
-         patch("app.services.indexer.qdrant_client") as mock_qdrant, \
-         patch("app.services.indexer.connector_registry") as mock_registry:
-        mock_embed.get_dimension = MagicMock(return_value=768)
-        # Simulate embedding service raising a clear error for oversized content
-        mock_embed.embed_texts = AsyncMock(side_effect=ValueError("Content too large for embedding"))
-        mock_registry.get_allowed_metadata_keys = MagicMock(return_value=[])
-
+    mock_embed, mock_qdrant, mock_registry = _bind_indexer_mocks(
+        indexer, embed_side_effect=ValueError("Content too large for embedding")
+    )
+    with patch.object(indexer, "_fanout_search_pipeline", new_callable=AsyncMock):
         doc = UnifiedDocument(
             id="big",
             title="Big Doc",
@@ -361,7 +369,6 @@ async def test_indexer_large_content_handling():
         )
         with pytest.raises(ValueError, match="Content too large"):
             await indexer.bulk_index([doc], "tenant")
-        # The embedding service mock should be called with the large content
         mock_embed.embed_texts.assert_called_once()
 
 
@@ -373,13 +380,8 @@ async def test_indexer_large_content_handling():
 async def test_indexer_idempotent_upsert():
     """Indexing the same document twice should not create duplicates (Qdrant upsert)."""
     indexer = Indexer()
-    with patch("app.services.indexer.embedding_service") as mock_embed, \
-         patch("app.services.indexer.qdrant_client") as mock_qdrant, \
-         patch("app.services.indexer.connector_registry") as mock_registry:
-        mock_embed.get_dimension = MagicMock(return_value=768)
-        mock_embed.embed_texts = AsyncMock(return_value=[[0.1]*768])
-        mock_registry.get_allowed_metadata_keys = MagicMock(return_value=[])
-
+    mock_embed, mock_qdrant, mock_registry = _bind_indexer_mocks(indexer)
+    with patch.object(indexer, "_fanout_search_pipeline", new_callable=AsyncMock):
         doc = UnifiedDocument(
             id="idempotent",
             title="Same Doc",
@@ -392,12 +394,9 @@ async def test_indexer_idempotent_upsert():
             source_updated_at=datetime.now(timezone.utc),
             structured_metadata={},
         )
-        # Index twice
         await indexer.bulk_index([doc], "tenant")
         await indexer.bulk_index([doc], "tenant")
-        # Qdrant upsert should have been called exactly twice, but the ID remains the same
         assert mock_qdrant.upsert_documents.call_count == 2
-        # The payload ID is the same in both calls
         args1 = mock_qdrant.upsert_documents.call_args_list[0][0][0]
         args2 = mock_qdrant.upsert_documents.call_args_list[1][0][0]
         assert args1[0]["id"] == args2[0]["id"] == "idempotent"

@@ -20,6 +20,7 @@ import base64
 from datetime import datetime, timezone
 from urllib.parse import urlencode
 import jwt as pyjwt
+import logging
 
 from app.core.config import settings
 from app.services.token_service import token_service
@@ -29,6 +30,8 @@ from app.services.admin.scopes import scopes_for_role
 from app.services.oauth_service import oauth_service
 from app.storage.tenant_db import tenant_db_manager
 from app.storage.redis_client import redis_client
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -162,6 +165,19 @@ async def native_login(request: NativeLoginRequest):
             str(user.principal_id),
             db_session,
         )
+
+        try:
+            from app.storage.canonical_repo import bind_pending_drive_shares
+
+            await bind_pending_drive_shares(
+                db_session, tenant_id, user.email, user.principal_id
+            )
+        except Exception:
+            logger.exception(
+                "pending identity drain failed at login email=%s tenant_id=%s",
+                user.email,
+                tenant_id,
+            )
 
         return NativeLoginResponse(
             access_token=access_token,
@@ -367,6 +383,18 @@ async def sso_callback(
             str(user.principal_id),
             db_session,
         )
+        try:
+            from app.storage.canonical_repo import bind_pending_drive_shares
+
+            await bind_pending_drive_shares(
+                db_session, UUID(str(tenant_id)), user.email, user.principal_id
+            )
+        except Exception:
+            logger.exception(
+                "pending identity drain failed at sso email=%s tenant_id=%s",
+                user.email,
+                tenant_id,
+            )
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,

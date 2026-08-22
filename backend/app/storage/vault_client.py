@@ -14,11 +14,14 @@ The system auto-selects MockVaultClient if VAULT_URL is blank.
 
 from abc import ABC, abstractmethod
 from typing import Optional
+import logging
 import os
 
 from app.core.backends import mock_backends_allowed
 from app.core.config import settings
 from app.core.exceptions import VaultError
+
+logger = logging.getLogger(__name__)
 
 
 class PlatformSecretKeys:
@@ -94,6 +97,38 @@ class VaultClient(ABC):
         ...
 
 
+def azure_secret_name(key_name: str) -> str:
+    """Map app key names (kv/tenant-id/db_password) to Azure secret names.
+
+    Azure allows only ``[0-9a-zA-Z-]``, 1–127 chars. Slashes and underscores
+    become hyphens. Callers still pass the original key name.
+    """
+    raw = (key_name or "").strip()
+    chars = [ch if ch.isalnum() or ch == "-" else "-" for ch in raw]
+    name = "".join(chars)
+    while "--" in name:
+        name = name.replace("--", "-")
+    name = name.strip("-")[:127].rstrip("-")
+    if not name:
+        raise VaultError("Azure secret name is empty after sanitizing key_name")
+    return name
+
+
+def _tenant_db_password_fallback(key_name: str) -> Optional[str]:
+    """When Azure has no tenant DB secret, reuse the control-plane DB_PASSWORD.
+
+    Hosted Supabase uses one database for control-plane and tenant rows, so the
+    Postgres password is already in settings.
+    """
+    if "db_password" not in (key_name or ""):
+        return None
+    password = (settings.db_password or "").strip()
+    if not password:
+        return None
+    logger.warning("Azure Key Vault miss for tenant DB password; using DB_PASSWORD")
+    return password
+
+
 class AzureKeyVaultClient(VaultClient):
     """
     Real Azure Key Vault client.
@@ -136,9 +171,14 @@ class AzureKeyVaultClient(VaultClient):
             # Azure Key Vault requires synchronous calls; wrap in executor for async
             import asyncio
             loop = asyncio.get_event_loop()
-            secret = await loop.run_in_executor(None, self.client.get_secret, key_name)
+            secret = await loop.run_in_executor(
+                None, self.client.get_secret, azure_secret_name(key_name)
+            )
             return secret.value
         except Exception as e:
+            fallback = _tenant_db_password_fallback(key_name)
+            if fallback is not None:
+                return fallback
             raise VaultError(f"Failed to get secret '{key_name}': {e}")
 
     async def set_secret(self, key_name: str, secret_value: str) -> None:
@@ -155,19 +195,24 @@ class AzureKeyVaultClient(VaultClient):
         try:
             import asyncio
             loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, self.client.set_secret, key_name, secret_value)
+            await loop.run_in_executor(
+                None, self.client.set_secret, azure_secret_name(key_name), secret_value
+            )
         except Exception as e:
             raise VaultError(f"Failed to set secret '{key_name}': {e}")
 
     def get(self, key_name: str) -> str:
         try:
-            return self.client.get_secret(key_name).value
+            return self.client.get_secret(azure_secret_name(key_name)).value
         except Exception as e:
+            fallback = _tenant_db_password_fallback(key_name)
+            if fallback is not None:
+                return fallback
             raise VaultError(f"Failed to get secret '{key_name}': {e}")
 
     def set(self, key_name: str, value: str) -> None:
         try:
-            self.client.set_secret(key_name, value)
+            self.client.set_secret(azure_secret_name(key_name), value)
         except Exception as e:
             raise VaultError(f"Failed to set secret '{key_name}': {e}")
 
@@ -203,7 +248,7 @@ class MockVaultClient(VaultClient):
             return boot
         if settings.environment in ("development", "test") and "db_password" in key_name:
             if mock_backends_allowed():
-                return "postgres"
+                return (settings.db_password or "postgres")
         if mock_backends_allowed() and key_name in _OPTIONAL_DEV_SECRETS:
             return ""
         raise VaultError(
@@ -244,6 +289,7 @@ def get_vault_client() -> VaultClient:
             raise VaultError(
                 "VAULT_URL is set but missing VAULT_TENANT_ID, VAULT_CLIENT_ID, or VAULT_CLIENT_SECRET"
             )
+        logger.info("Vault client: AzureKeyVaultClient")
         return AzureKeyVaultClient(
             vault_url=settings.vault_url,
             tenant_id=settings.vault_tenant_id,
@@ -255,6 +301,7 @@ def get_vault_client() -> VaultClient:
             raise VaultError(
                 "VAULT_URL is not configured; MockVaultClient is not allowed outside development/test"
             )
+        logger.info("Vault client: MockVaultClient")
         return MockVaultClient()
 
 

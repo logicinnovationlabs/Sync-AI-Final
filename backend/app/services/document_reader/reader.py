@@ -64,7 +64,8 @@ async def read_document(
     K2: Streaming for large docs
     K3: Structure preservation
     """
-    # K1: Re-check ACL on every access
+    # K1: Re-check live acl_entries on every access (deny-wins, fail-closed).
+    # No request-path cache. Checker is Mock/HTTP/Postgres; production uses Postgres.
     allowed = await check_acl(acl_checker, tenant_id, principal_id, doc_id)
     if not allowed:
         raise HTTPException(status_code=403, detail="Access denied")

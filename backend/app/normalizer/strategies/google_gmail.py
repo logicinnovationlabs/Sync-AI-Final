@@ -14,6 +14,22 @@ from app.core.models import IdentityHint, PermissionLevel
 
 logger = logging.getLogger(__name__)
 
+_GHOST_MAILBOX = "user@example.com"
+
+
+def mailbox_owner_email(raw: Dict[str, Any]) -> str | None:
+    """Real mailbox only. Never the historical placeholder owner."""
+    headers = raw.get("payload", {}).get("headers", [])
+    header_dict = {
+        h["name"].lower(): h["value"] for h in headers if isinstance(h, dict)
+    }
+    delivered_to = (header_dict.get("delivered-to") or "").strip()
+    configured = str(raw.get("_mailbox_email") or "").strip()
+    email = (delivered_to or configured).strip().lower()
+    if not email or email == _GHOST_MAILBOX:
+        return None
+    return email
+
 
 class GoogleGmailNormalizer(NormalizerStrategy):
     """
@@ -123,6 +139,7 @@ class GoogleGmailNormalizer(NormalizerStrategy):
             "label_ids": raw.get("labelIds", []),
             "has_attachments": self._has_attachments(raw.get("payload", {})),
             "message_size_bytes": raw.get("sizeEstimate", 0),
+            "visibility_mode": "restricted",
         }
         
         return metadata
@@ -142,14 +159,11 @@ class GoogleGmailNormalizer(NormalizerStrategy):
         
         Gmail has no sharing model — always exactly one entry: mailbox owner with OWNER permission.
         """
-        # Get mailbox email from metadata or config
-        # For now, extract from "Delivered-To" header or use a placeholder
-        headers = raw.get("payload", {}).get("headers", [])
-        header_dict = {h["name"].lower(): h["value"] for h in headers if isinstance(h, dict)}
-        
-        delivered_to = header_dict.get("delivered-to", "")
-        mailbox_email = delivered_to or raw.get("_mailbox_email", "user@example.com")
-        
+        mailbox_email = mailbox_owner_email(raw)
+        if not mailbox_email:
+            logger.warning("gmail ACL skipped: no mailbox owner email")
+            return []
+
         hint = IdentityHint(
             source_type="google_gmail",
             external_id=mailbox_email,
@@ -181,21 +195,21 @@ class GoogleGmailNormalizer(NormalizerStrategy):
         headers = raw.get("payload", {}).get("headers", [])
         header_dict = {h["name"].lower(): h["value"] for h in headers if isinstance(h, dict)}
         
-        delivered_to = header_dict.get("delivered-to", "")
-        mailbox_email = delivered_to or raw.get("_mailbox_email", "user@example.com")
+        mailbox_email = mailbox_owner_email(raw)
         from_email = header_dict.get("from", "")
         
         # Parse from header to extract email (may be in "Name <email>" format)
         from_email_clean = self._extract_email(from_email)
         from_name = self._extract_name(from_email)
         
-        # Owner: mailbox owner
-        hints["owner"] = IdentityHint(
-            source_type="google_gmail",
-            external_id=mailbox_email,
-            email=mailbox_email,
-            name=None,
-        )
+        # Owner: mailbox owner (omit rather than mint user@example.com)
+        if mailbox_email:
+            hints["owner"] = IdentityHint(
+                source_type="google_gmail",
+                external_id=mailbox_email,
+                email=mailbox_email,
+                name=None,
+            )
         
         # Creator: sender
         if from_email_clean:

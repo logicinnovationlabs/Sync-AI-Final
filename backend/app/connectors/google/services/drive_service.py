@@ -14,6 +14,7 @@ Methods:
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import asyncio
+import logging
 import re
 
 from app.core.base_connector import (
@@ -26,6 +27,8 @@ from app.core.base_connector import (
 from app.connectors.google.oauth import GoogleOAuthManager
 from app.connectors.google.clients.drive_client import DriveClient
 from app.connectors.google.content import SKIP_MIME_TYPES, extract_drive_text
+
+logger = logging.getLogger(__name__)
 
 
 class DriveConnector(BaseConnector):
@@ -68,8 +71,12 @@ class DriveConnector(BaseConnector):
         """
         if not self.oauth_manager:
             raise Exception("OAuth manager not configured")
-        
-        return await self.oauth_manager.get_valid_token(self.tenant_id)
+        from app.connectors.google.drive_credentials import get_drive_access_token
+
+        try:
+            return await get_drive_access_token(str(self.tenant_id), self.oauth_manager)
+        except Exception:
+            return await get_drive_access_token(str(self.tenant_id), self.oauth_manager)
     
     async def fetch_delta(self, since: datetime, cursor: Optional[str]) -> DeltaResult:
         """
@@ -287,6 +294,7 @@ class DriveConnector(BaseConnector):
         """
         permissions_list = []
         permissions = file.get("permissions", [])
+        skipped_non_user = 0
         
         for perm in permissions:
             perm_type = perm.get("type", "")
@@ -298,11 +306,15 @@ class DriveConnector(BaseConnector):
             
             if perm_type == "user" and email:
                 permissions_list.append(f"user:{email}")
-            elif perm_type == "group" and email:
-                permissions_list.append(f"group:{email}")
-            elif perm_type == "anyone":
-                # Public file - use special permission
-                permissions_list.append("user:*")
+            elif perm_type in ("group", "anyone", "domain"):
+                skipped_non_user += 1
+
+        if skipped_non_user:
+            logger.info(
+                "skipped %s non-user Drive permission(s) file_id=%s",
+                skipped_non_user,
+                file.get("id"),
+            )
         
         # If no permissions found, default to owner
         if not permissions_list:
@@ -330,26 +342,41 @@ class DriveConnector(BaseConnector):
             List of changed items with id and type
         """
         token = await self.get_valid_token()
-        _ = (since, token)
-        return []
+        from app.services.cursor_store import cursor_store
+
+        page_token = await cursor_store.get_cursor(str(self.tenant_id), "google_drive")
+        if not page_token:
+            _ = (since, token)
+            return []
+        delta = await self.fetch_since_page_token(page_token)
+        items: List[Dict[str, Any]] = []
+        for file in delta.documents or []:
+            file_id = file.get("id")
+            if file_id:
+                items.append({"id": file_id, "type": "document"})
+        for deleted_id in getattr(delta, "deleted_ids", None) or []:
+            items.append({"id": deleted_id, "type": "document", "removed": True})
+        return items
     
     async def _hydrate_files(
         self, access_token: str, files: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        """Fetch missing ACLs and extract text (bounded worker pool)."""
+        """Always re-list ACLs via permissions.list, then extract text."""
         semaphore = asyncio.Semaphore(5)
 
         async def _one(file: Dict[str, Any]) -> Dict[str, Any]:
             async with semaphore:
-                if not file.get("permissions"):
-                    try:
-                        perms = await self.drive_client.list_permissions(
-                            access_token, file.get("id", "")
-                        )
-                        if perms:
-                            file["permissions"] = perms
-                    except Exception:
-                        pass
+                try:
+                    perms = await self.drive_client.list_permissions(
+                        access_token, file.get("id", "")
+                    )
+                    file["permissions"] = perms or []
+                except Exception:
+                    logger.warning(
+                        "permissions.list failed file_id=%s; compiling with empty ACL list",
+                        file.get("id"),
+                    )
+                    file["permissions"] = []
                 text = await extract_drive_text(self.drive_client, access_token, file)
                 file["_extracted_text"] = text
                 return file

@@ -10,11 +10,12 @@ X-SnyQ-Setup-Token / TENANT_BOOTSTRAP_TOKEN.
 
 from fastapi import APIRouter
 
-from app.api.v1.admin import audit, connectors, sessions, tenant, users
+from app.api.v1.admin import audit, connectors, pending_identities, sessions, tenant, users
 
 admin_router = APIRouter(prefix="/admin", tags=["admin"])
 admin_router.include_router(users.router)
 admin_router.include_router(connectors.router)
+admin_router.include_router(pending_identities.router)
 admin_router.include_router(audit.router)
 admin_router.include_router(sessions.router)
 admin_router.include_router(tenant.router)

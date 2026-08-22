@@ -19,6 +19,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _ENV_FILE = None if os.getenv("SNYQ_IGNORE_ENV_FILE") == "1" else ".env"
 
 
+def _default_acl_backend() -> str:
+    env = (os.getenv("ENVIRONMENT") or "development").strip().lower()
+    if env in {"test"}:
+        return "mock"
+    return "postgres"
+
+
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
@@ -165,7 +172,7 @@ class Settings(BaseSettings):
         ),
     )
     embedding_dimensions: int = Field(
-        default=360,
+        default=3072,
         validation_alias=AliasChoices("EMBEDDING_DIMENSIONS", "embedding_dimensions"),
     )
     azure_openai_endpoint: Optional[str] = Field(default=None)
@@ -253,6 +260,28 @@ class Settings(BaseSettings):
     google_refresh_token: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("GOOGLE_REFRESH_TOKEN", "google_refresh_token"),
+    )
+    google_drive_credential_mode: str = Field(
+        default="oauth",
+        validation_alias=AliasChoices(
+            "GOOGLE_DRIVE_CREDENTIAL_MODE", "google_drive_credential_mode"
+        ),
+    )
+    google_dwd_impersonate_email: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "GOOGLE_DWD_IMPERSONATE_EMAIL", "google_dwd_impersonate_email"
+        ),
+    )
+    google_service_account_vault_key: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "GOOGLE_SERVICE_ACCOUNT_VAULT_KEY", "google_service_account_vault_key"
+        ),
+    )
+    drive_acl_poll_seconds: int = Field(
+        default=180,
+        validation_alias=AliasChoices("DRIVE_ACL_POLL_SECONDS", "drive_acl_poll_seconds"),
     )
     google_pubsub_verification_token: Optional[str] = Field(
         default=None,
@@ -364,7 +393,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("EMBEDDING_BATCH_SIZE", "embedding_batch_size"),
     )
     embedding_dimensions: int = Field(
-        default=360,  # Fixed: Match production default and fixture dimensions
+        default=3072,  # Match live `documents` collection and embedding_dimension
         validation_alias=AliasChoices("EMBEDDING_DIMENSIONS", "embedding_dimensions"),
     )
     
@@ -537,7 +566,7 @@ class Settings(BaseSettings):
     storage_secure: bool = Field(default=False)
     stream_threshold_bytes: int = Field(default=10 * 1024 * 1024)  # 10MB
     stream_chunk_bytes: int = Field(default=8192)
-    acl_backend: str = Field(default="mock")  # "mock" | "http"
+    acl_backend: str = Field(default_factory=_default_acl_backend)  # "mock" | "http" | "postgres"
     acl_service_url: str = Field(default="http://localhost:8000/acl")
 
     @model_validator(mode="after")

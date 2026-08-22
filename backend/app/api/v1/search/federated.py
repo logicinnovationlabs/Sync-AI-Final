@@ -93,11 +93,33 @@ async def _safe_call_vector(
     return [], status
 
 
+def _logical_document_id(doc: Dict[str, Any]) -> str:
+    """Prefer the parent document id over a chunk hash / ``doc:chunk`` id."""
+    raw = str(doc.get("document_id") or doc.get("id") or "").strip()
+    chunk_id = str(doc.get("chunk_id") or "").strip()
+    if raw and ":" in raw:
+        parent, suffix = raw.split(":", 1)
+        if parent and len(suffix) == 16 and all(c in "0123456789abcdef" for c in suffix.lower()):
+            return parent
+    if (not raw or (len(raw) == 16 and all(c in "0123456789abcdef" for c in raw.lower()))) and ":" in chunk_id:
+        parent = chunk_id.split(":", 1)[0].strip()
+        if parent:
+            return parent
+    return raw
+
+
 def _payload_to_hit(payload: Dict[str, Any], score: float) -> Dict[str, Any]:
     body = str(payload.get("content") or payload.get("body_text") or payload.get("snippet") or "")
+    doc_id = _logical_document_id(
+        {
+            "document_id": payload.get("document_id"),
+            "id": payload.get("id"),
+            "chunk_id": payload.get("chunk_id"),
+        }
+    )
     return {
-        "document_id": str(payload.get("id") or payload.get("document_id") or ""),
-        "title": str(payload.get("title") or payload.get("id") or ""),
+        "document_id": doc_id,
+        "title": str(payload.get("title") or doc_id or payload.get("id") or ""),
         "snippet": body[:400],
         "score": score,
         "sources": ["indexed"],
@@ -177,7 +199,9 @@ def _merge_and_rank(
     k = 60  # RRF constant
     
     for rank, doc in enumerate(lexical_results, 1):
-        doc_id = doc.get("document_id") or doc.get("id", "")
+        doc_id = _logical_document_id(doc)
+        if not doc_id:
+            continue
         scores[doc_id] = scores.get(doc_id, 0) + 1 / (k + rank)
         if doc_id not in metadata:
             metadata[doc_id] = {
@@ -190,7 +214,9 @@ def _merge_and_rank(
             metadata[doc_id]["sources"].append("lexical")
     
     for rank, doc in enumerate(vector_results, 1):
-        doc_id = doc.get("document_id") or doc.get("id", "")
+        doc_id = _logical_document_id(doc)
+        if not doc_id:
+            continue
         scores[doc_id] = scores.get(doc_id, 0) + 1 / (k + rank)
         if doc_id not in metadata:
             metadata[doc_id] = {

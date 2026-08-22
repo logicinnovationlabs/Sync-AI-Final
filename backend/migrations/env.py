@@ -11,6 +11,7 @@ import asyncio
 
 from app.models.base import Base
 from app.core.config import settings
+from app.storage.postgres_connect import connect_args_for_url
 
 # Import all models so Alembic can see them
 from app.models.tenant import Tenant
@@ -28,6 +29,7 @@ from app.models.canonical import (  # noqa: F401 — Block C metadata
     ACLEntryRow,
     ContainerACLEntryRow,
     ContainerEdgeRow,
+    PendingIdentityQueueRow,
 )
 
 # this is the Alembic Config object
@@ -70,6 +72,7 @@ async def run_async_migrations() -> None:
         configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=connect_args_for_url(settings.control_plane_database_url or ""),
     )
 
     async with connectable.connect() as connection:

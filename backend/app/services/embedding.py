@@ -42,7 +42,7 @@ class GeminiEmbeddingProvider:
     Uses Google's Gemini embedding model via the genai SDK.
     """
     
-    def __init__(self, api_key: str, model: str = "gemini-embedding-001", dimension: int = 768):
+    def __init__(self, api_key: str, model: str = "gemini-embedding-001", dimension: int = 3072):
         """
         Initialize Gemini provider.
         
@@ -79,6 +79,7 @@ class GeminiEmbeddingProvider:
             result = self.genai.embed_content(
                 model=self.model,
                 content=truncated_text,
+                output_dimensionality=self.dimension,
             )
             
             embeddings.append(result["embedding"])
@@ -97,7 +98,7 @@ class FakeEmbeddingProvider:
     Generates consistent embeddings based on text hash.
     """
     
-    def __init__(self, dimension: int = 768):
+    def __init__(self, dimension: int = 3072):
         """
         Initialize fake provider.
         
@@ -166,9 +167,12 @@ class EmbeddingService:
                 getattr(settings, "embedding_model", None)
                 or getattr(settings, "EMBEDDING_MODEL", "gemini-embedding-001")
             )
+            # Prefer EMBEDDING_DIMENSIONS (plural, QdrantVectorStore) so a leftover
+            # EMBEDDING_DIMENSION=768 cannot silently undersize vectors vs the
+            # live 3072-d `documents` collection.
             dimension = (
-                getattr(settings, "embedding_dimension", None)
-                or getattr(settings, "EMBEDDING_DIMENSION", 768)
+                getattr(settings, "embedding_dimensions", None)
+                or 3072
             )
             
             if not api_key:
@@ -178,8 +182,8 @@ class EmbeddingService:
         
         elif provider_name == "fake":
             dimension = (
-                getattr(settings, "embedding_dimension", None)
-                or getattr(settings, "EMBEDDING_DIMENSION", 768)
+                getattr(settings, "embedding_dimensions", None)
+                or 3072
             )
             self.provider = FakeEmbeddingProvider(dimension)
         

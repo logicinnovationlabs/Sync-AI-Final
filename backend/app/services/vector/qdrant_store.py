@@ -288,6 +288,49 @@ class QdrantVectorStore(VectorStore):
         logger.info(f"Upserted {len(points)} chunks to {name}")
         
         return len(points)
+
+    def find_parent_document_id(
+        self, tenant_id: str, chunk_or_doc_id: str
+    ) -> Optional[str]:
+        """Return the parent document_id for a chunk id, if this tenant has it.
+
+        Does not create or recreate collections.
+        """
+        ident = str(chunk_or_doc_id or "").strip()
+        if not ident or not tenant_id:
+            return None
+        name = self._collection_name(tenant_id)
+        try:
+            self._client.get_collection(collection_name=name)
+        except Exception:
+            return None
+        for field in ("document_id", "chunk_id"):
+            try:
+                points, _ = self._client.scroll(
+                    collection_name=name,
+                    scroll_filter=self.qm.Filter(
+                        must=[
+                            self.qm.FieldCondition(
+                                key=field,
+                                match=self.qm.MatchValue(value=ident),
+                            )
+                        ]
+                    ),
+                    limit=1,
+                    with_payload=True,
+                    with_vectors=False,
+                )
+            except Exception as exc:
+                logger.debug(
+                    "chunk parent lookup %s=%s failed: %s", field, ident, exc
+                )
+                continue
+            if not points:
+                continue
+            parent = str((points[0].payload or {}).get("document_id") or "").strip()
+            if parent:
+                return parent
+        return None
     
     async def delete_chunk(
         self,

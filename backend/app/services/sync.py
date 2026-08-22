@@ -17,6 +17,7 @@ from typing import Callable, List, Optional
 import logging
 
 from app.core.base_connector import BaseConnector
+from app.core.exceptions import TenantNotFoundError, VaultError
 from app.services.registry import connector_registry
 from app.services.indexer import indexer
 from app.connectors.google.token_store import google_credential_ref
@@ -26,6 +27,29 @@ logger = logging.getLogger(__name__)
 
 # Callback invoked after each successfully indexed/deleted page with the next cursor.
 CursorUpdateCallback = Callable[[str], None]
+
+
+def _is_tenant_routing_failure(exc: BaseException) -> bool:
+    """True when tenant Postgres cannot be reached. Crawl must fail closed.
+
+    Distinguishes routing/session unavailability from per-document compile
+    surprises, which still fall back to connector.transform().
+    """
+    if isinstance(exc, (TenantNotFoundError, VaultError)):
+        return True
+    if isinstance(exc, ValueError):
+        msg = str(exc).lower()
+        return "uuid" in msg or "badly formed hexadecimal" in msg
+    if isinstance(exc, TypeError):
+        return "uuid" in str(exc).lower()
+    if isinstance(exc, RuntimeError):
+        msg = str(exc)
+        return (
+            "webhook ACL compile aborted" in msg
+            or "postgres routing unavailable" in msg
+            or "tenant session was not opened" in msg
+        )
+    return False
 
 
 class SyncOrchestrator:
@@ -124,7 +148,10 @@ class SyncOrchestrator:
                     from app.connectors.google.pipeline_bridge import process_raw_batch
 
                     piped = await process_raw_batch(
-                        result.documents, connector.source_type, tenant_id
+                        result.documents,
+                        connector.source_type,
+                        tenant_id,
+                        require_postgres=True,
                     )
                     if piped:
                         docs = piped
@@ -145,6 +172,8 @@ class SyncOrchestrator:
                             tenant_id,
                         )
                 except Exception as exc:
+                    if _is_tenant_routing_failure(exc):
+                        raise
                     stats["pipeline"] = "fallback_transform"
                     logger.warning(
                         "pipeline=fallback_transform n=%s source=%s tenant=%s "
@@ -263,7 +292,10 @@ class SyncOrchestrator:
                         from app.connectors.google.pipeline_bridge import process_raw_batch
 
                         piped = await process_raw_batch(
-                            delta_res.documents, connector.source_type, tenant_id
+                            delta_res.documents,
+                            connector.source_type,
+                            tenant_id,
+                            require_postgres=True,
                         )
                         if piped:
                             docs = piped
@@ -284,6 +316,8 @@ class SyncOrchestrator:
                                 tenant_id,
                             )
                     except Exception as exc:
+                        if _is_tenant_routing_failure(exc):
+                            raise
                         stats["pipeline"] = "fallback_transform"
                         logger.warning(
                             "pipeline=fallback_transform n=%s source=%s tenant=%s "
@@ -324,8 +358,12 @@ class SyncOrchestrator:
 
         try:
             return asyncio.run(_async_sync())
-        except RuntimeError:
-            # Nested event loop (e.g. Jupyter / some test runners)
+        except RuntimeError as exc:
+            # Nested event loop (e.g. Jupyter / some test runners).
+            # Do not swallow routing RuntimeError from process_raw_batch
+            # (require_postgres=True) — that must fail closed.
+            if "running event loop" not in str(exc):
+                raise
             loop = asyncio.get_event_loop()
             return loop.run_until_complete(_async_sync())
 
