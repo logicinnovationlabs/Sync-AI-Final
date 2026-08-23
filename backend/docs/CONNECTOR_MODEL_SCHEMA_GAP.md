@@ -164,6 +164,8 @@ Ach: Choose between Option A (schema migration to enable true per-user connectio
 
 ## Verification Status (2026-08-23)
 
+**Branch:** `feature/drive-mirrored-acl` (not `integrate-drive-acl` - that branch has failing tests)
+
 **Completed with Evidence:**
 - ✅ Schema migration applied (007_split_google_connectors) - Alembic upgrade successful
 - ✅ ACL enforcement tests passed (8/8 tests in test_drive_permission_signoff.py) - No regression
@@ -179,3 +181,8 @@ Ach: Choose between Option A (schema migration to enable true per-user connectio
 
 **Known Bug Fixed:**
 - Frontend was calling `/api/v1/connectors/admin/google/organization/...` but backend registers at `/api/v1/admin/google/organization/...` (via admin_router). Fixed in frontend/lib/api/connectors.ts.
+
+**Branch Note:**
+- `feature/drive-mirrored-acl` is the correct branch with passing tests (8/8 Drive permission signoff tests)
+- `integrate-drive-acl` exists but has failing tests (1/8 Drive permission signoff tests)
+- Work committed to `feature/drive-mirrored-acl` - rebase onto `origin/Pratham` has conflicts and was not completed per user request
