@@ -32,5 +32,5 @@ export function listAdminUsers(token: string) {
 }
 
 export function listAuditLogs(token: string) {
-  return apiFetch<AuditLogPage>("/admin/audit?page=1&page_size=20", { token })
+  return apiFetch<AuditLogPage>("/api/v1/admin/audit?page=1&page_size=20", { token })
 }

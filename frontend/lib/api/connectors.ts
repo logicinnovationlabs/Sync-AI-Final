@@ -74,7 +74,7 @@ export interface OrganizationConnectResponse {
 }
 
 export function connectOrganizationConnector(token: string, request: OrganizationConnectRequest) {
-  return apiFetch<OrganizationConnectResponse>("/api/v1/admin/google/organization/connect", {
+  return apiFetch<OrganizationConnectResponse>("/api/v1/connectors/admin/google/organization/connect", {
     method: "POST",
     token,
     body: request,
@@ -83,7 +83,7 @@ export function connectOrganizationConnector(token: string, request: Organizatio
 
 export function disconnectOrganizationConnector(token: string) {
   return apiFetch<{ status: string; tenant_id: string }>(
-    "/api/v1/admin/google/organization/disconnect",
+    "/api/v1/connectors/admin/google/organization/disconnect",
     { method: "POST", token }
   )
 }
@@ -99,7 +99,7 @@ export interface OrganizationToggleResponse {
 }
 
 export function toggleOrganizationConnector(token: string, request: OrganizationToggleRequest) {
-  return apiFetch<OrganizationToggleResponse>("/api/v1/admin/google/organization/toggle", {
+  return apiFetch<OrganizationToggleResponse>("/api/v1/connectors/admin/google/organization/toggle", {
     method: "POST",
     token,
     body: request,
