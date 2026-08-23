@@ -134,14 +134,7 @@ async def get_connector_status(
 
     watch_info = None
     try:
-        if source_type == "google_drive":
-            watch_info = await cursor_store.get_watch_by_channel(
-                f"drive-{scope_id}", "resource"
-            )
-        elif source_type == "google_gmail":
-            watch_info = await cursor_store.get_watch_by_email(
-                f"user@{scope_id}.com", source_type
-            )
+        watch_info = await cursor_store.get_watch_info(tenant_id, source_type)
     except Exception:
         watch_info = None
 

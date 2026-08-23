@@ -69,15 +69,16 @@ class IdentityResolver:
         # Normalize email if present
         normalized_email = self._normalize_email(hint.email) if hint.email else None
 
-        # Mirror bind: users table is canonical. Compiler passes document_id.
-        # Owner/creator, /identity/resolve, and existing tests omit document_id
-        # and keep create-on-miss.
-        if hint.source_type in MIRROR_BIND_SOURCES and document_id and normalized_email:
+        # Mirror bind: users table is canonical. For Drive/Gmail sources, always
+        # use the mirror bind path (queue unmatched emails) regardless of whether
+        # document_id was passed. This prevents auto-provisioning of external users
+        # if a caller forgets to pass document_id (defense-in-depth).
+        if hint.source_type in MIRROR_BIND_SOURCES and normalized_email:
             return await self._resolve_drive_share(
                 hint,
                 tenant_id,
                 normalized_email,
-                document_id,
+                document_id or "unknown",  # Use placeholder if not provided
                 source_account_id,
             )
         

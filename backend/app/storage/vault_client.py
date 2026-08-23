@@ -208,6 +208,8 @@ class AzureKeyVaultClient(VaultClient):
             fallback = _tenant_db_password_fallback(key_name)
             if fallback is not None:
                 return fallback
+            if mock_backends_allowed() and key_name in _OPTIONAL_DEV_SECRETS:
+                return ""
             raise VaultError(f"Failed to get secret '{key_name}': {e}")
 
     def set(self, key_name: str, value: str) -> None:

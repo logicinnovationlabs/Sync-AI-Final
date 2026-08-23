@@ -55,7 +55,8 @@ class MockLexicalStore(LexicalStore):
         
         # Filter visible matching docs
         visible_docs = []
-        for doc_id, doc_data in docs.items():
+        results = []
+        for doc_id, doc_data in self.documents[tenant_id].items():
             # Check ACL
             if not document_is_visible(acl_terms, doc_data.get("acl_filter_terms") or []):
                 continue
