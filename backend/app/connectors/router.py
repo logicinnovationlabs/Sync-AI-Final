@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 import logging
 
-from app.api.deps import get_current_user, get_tenant, require_scope
+from app.api.deps import get_current_user, get_tenant, require_scope, require_admin
 from app.services.tenant_resolver import TenantRouting
 from app.workers.tasks import backfill_source, backfill_tenant_source
 from app.services.cursor_store import cursor_store
@@ -118,6 +118,7 @@ async def trigger_backfill(
 )
 async def get_connector_status(
     source_type: str,
+    connection_scope: str = Query("personal", description="Connection scope (personal or organization)"),
     current_user: Dict[str, Any] = Depends(get_current_user),
     tenant: TenantRouting = Depends(get_tenant),
 ):
@@ -129,7 +130,7 @@ async def get_connector_status(
         raise HTTPException(status_code=403, detail="Cross-tenant execution rejected")
 
     user_id = _user_id(current_user)
-    scope_id = cursor_scope_id(tenant_id, user_id)
+    scope_id = cursor_scope_id(tenant_id, user_id) if connection_scope == "personal" else f"{tenant_id}_organization"
     cursor = await cursor_store.get_cursor(scope_id, source_type)
 
     watch_info = None
@@ -138,7 +139,8 @@ async def get_connector_status(
     except Exception:
         watch_info = None
 
-    runtime = status_store.get_status(tenant_id, source_type, user_id=user_id)
+    runtime_user_id = user_id if connection_scope == "personal" else "organization"
+    runtime = status_store.get_status(tenant_id, source_type, user_id=runtime_user_id)
     token_store = PersistentGoogleTokenStore(tenant_id)
     has_token = token_store.get_token(google_oauth_token_key(tenant_id, user_id)) is not None
     if not has_token:
@@ -153,6 +155,7 @@ async def get_connector_status(
         "last_sync_at": runtime.get("last_sync_at"),
         "last_error": runtime.get("last_error"),
         "token_present": has_token,
+        "connection_scope": connection_scope,
     }
     if watch_info:
         details["watch_info"] = watch_info
@@ -355,6 +358,7 @@ async def _record_connector_rows(tenant_id: str, user_id: str, mailbox_email: st
                     select(TenantConnector).where(
                         TenantConnector.tenant_id == tenant_uuid,
                         TenantConnector.source_type == source_type,
+                        TenantConnector.connection_scope == "personal",
                     )
                 )
                 row = result.scalar_one_or_none()
@@ -364,6 +368,7 @@ async def _record_connector_rows(tenant_id: str, user_id: str, mailbox_email: st
                         TenantConnector(
                             tenant_id=tenant_uuid,
                             source_type=source_type,
+                            connection_scope="personal",
                             enabled=True,
                             config=config,
                             setup_by=actor_uuid,
@@ -380,3 +385,309 @@ async def _record_connector_rows(tenant_id: str, user_id: str, mailbox_email: st
             await session.commit()
     except Exception:
         return
+
+
+@router.post(
+    "/admin/google/organization/connect",
+    summary="Connect organization Google Workspace service account",
+    dependencies=[Depends(require_scope("connectors.write")), Depends(require_admin)],
+)
+async def connect_organization_connector(
+    request: OrganizationConnectRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    tenant: TenantRouting = Depends(get_tenant),
+):
+    """
+    Connect organization Google Workspace connector using a service account.
+
+    Admin-only endpoint. Stores the service account credential reference in Vault
+    and creates organization-scoped TenantConnector rows.
+    """
+    tenant_id = current_user.get("tenant_id")
+    if not tenant_id or str(tenant.tenant_id) != tenant_id:
+        raise HTTPException(status_code=403, detail="Cross-tenant execution rejected")
+
+    try:
+        from app.services.tenant_resolver import tenant_resolver
+        from app.storage.tenant_db import tenant_db_manager
+        from app.storage.vault_client import vault_client
+        from app.models.tenant_connector import TenantConnector
+
+        tenant_uuid = UUID(tenant_id)
+        actor_uuid = UUID(current_user.get("sub") or current_user.get("principal_id") or tenant_id)
+
+        # Verify the vault key exists and contains valid service account JSON
+        try:
+            raw = await vault_client.get_secret(request.vault_key)
+            if isinstance(raw, (bytes, bytearray)):
+                raw = raw.decode("utf-8")
+            import json
+            info = json.loads(raw) if isinstance(raw, str) else raw
+            if not isinstance(info, dict):
+                raise HTTPException(status_code=400, detail="Vault secret is not a valid JSON object")
+            # Validate it's a service account key (has project_id, private_key, etc.)
+            if not all(k in info for k in ["project_id", "private_key_id", "private_key"]):
+                raise HTTPException(status_code=400, detail="Vault secret is not a valid service account JSON")
+        except Exception as e:
+            logger.exception("Vault validation failed for organization connector")
+            raise HTTPException(status_code=400, detail=f"Invalid vault secret: {str(e)}")
+
+        routing = await tenant_resolver.resolve(tenant_id)
+        factory = tenant_db_manager.get_session_factory(
+            routing.db_host,
+            routing.db_name,
+            routing.db_user,
+            routing.db_password,
+            str(routing.tenant_id),
+        )
+
+        async with factory() as session:
+            for source_type in GOOGLE_SOURCES:
+                result = await session.execute(
+                    select(TenantConnector).where(
+                        TenantConnector.tenant_id == tenant_uuid,
+                        TenantConnector.source_type == source_type,
+                        TenantConnector.connection_scope == "organization",
+                    )
+                )
+                row = result.scalar_one_or_none()
+                config = {
+                    "credential_mode": "service_account_dwd",
+                    "impersonate_user_email": request.impersonate_email,
+                }
+                if row is None:
+                    session.add(
+                        TenantConnector(
+                            tenant_id=tenant_uuid,
+                            source_type=source_type,
+                            connection_scope="organization",
+                            enabled=True,
+                            config=config,
+                            setup_by=actor_uuid,
+                            credential_ref=request.vault_key,
+                        )
+                    )
+                else:
+                    row.enabled = True
+                    row.config = config
+                    row.credential_ref = request.vault_key
+                    row.setup_by = actor_uuid
+            await session.commit()
+
+        return {
+            "status": "connected",
+            "tenant_id": tenant_id,
+            "vault_key": request.vault_key,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Organization connector connection failed")
+        raise HTTPException(status_code=500, detail=f"Connection failed: {str(e)}")
+
+
+@router.post(
+    "/admin/google/organization/disconnect",
+    summary="Disconnect organization Google Workspace connector",
+    dependencies=[Depends(require_scope("connectors.write")), Depends(require_admin)],
+)
+async def disconnect_organization_connector(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    tenant: TenantRouting = Depends(get_tenant),
+):
+    """
+    Disconnect organization Google Workspace connector.
+
+    Admin-only endpoint. Removes organization-scoped TenantConnector rows.
+    Does not delete the service account from Vault.
+    """
+    tenant_id = current_user.get("tenant_id")
+    if not tenant_id or str(tenant.tenant_id) != tenant_id:
+        raise HTTPException(status_code=403, detail="Cross-tenant execution rejected")
+
+    try:
+        from app.services.tenant_resolver import tenant_resolver
+        from app.storage.tenant_db import tenant_db_manager
+        from app.models.tenant_connector import TenantConnector
+
+        tenant_uuid = UUID(tenant_id)
+
+        routing = await tenant_resolver.resolve(tenant_id)
+        factory = tenant_db_manager.get_session_factory(
+            routing.db_host,
+            routing.db_name,
+            routing.db_user,
+            routing.db_password,
+            str(routing.tenant_id),
+        )
+
+        async with factory() as session:
+            for source_type in GOOGLE_SOURCES:
+                result = await session.execute(
+                    select(TenantConnector).where(
+                        TenantConnector.tenant_id == tenant_uuid,
+                        TenantConnector.source_type == source_type,
+                        TenantConnector.connection_scope == "organization",
+                    )
+                )
+                row = result.scalar_one_or_none()
+                if row:
+                    await session.delete(row)
+            await session.commit()
+
+        return {
+            "status": "disconnected",
+            "tenant_id": tenant_id,
+        }
+    except Exception as e:
+        logger.exception("Organization connector disconnection failed")
+        raise HTTPException(status_code=500, detail=f"Disconnection failed: {str(e)}")
+
+
+@router.post(
+    "/admin/google/organization/toggle",
+    summary="Enable or disable organization Google Workspace connector",
+    dependencies=[Depends(require_scope("connectors.write")), Depends(require_admin)],
+)
+async def toggle_organization_connector(
+    request: OrganizationToggleRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    tenant: TenantRouting = Depends(get_tenant),
+):
+    """
+    Enable or disable organization Google Workspace connector for the tenant.
+
+    Admin-only endpoint. Sets the tenant-level flag that controls availability
+    to members. Does not delete the underlying connection.
+    """
+    tenant_id = current_user.get("tenant_id")
+    if not tenant_id or str(tenant.tenant_id) != tenant_id:
+        raise HTTPException(status_code=403, detail="Cross-tenant execution rejected")
+
+    try:
+        from app.services.tenant_resolver import tenant_resolver
+        from app.storage.tenant_db import tenant_db_manager
+        from app.models.tenant import Tenant
+
+        tenant_uuid = UUID(tenant_id)
+
+        routing = await tenant_resolver.resolve(tenant_id)
+        factory = tenant_db_manager.get_session_factory(
+            routing.db_host,
+            routing.db_name,
+            routing.db_user,
+            routing.db_password,
+            str(routing.tenant_id),
+        )
+
+        async with factory() as session:
+            result = await session.execute(
+                select(Tenant).where(Tenant.tenant_id == tenant_uuid)
+            )
+            tenant_row = result.scalar_one_or_none()
+            if tenant_row:
+                tenant_row.google_org_workspace_enabled = request.enabled
+                await session.commit()
+
+        return {
+            "status": "toggled",
+            "tenant_id": tenant_id,
+            "enabled": request.enabled,
+        }
+    except Exception as e:
+        logger.exception("Organization connector toggle failed")
+        raise HTTPException(status_code=500, detail=f"Toggle failed: {str(e)}")
+
+
+@router.get(
+    "/google/organization/status",
+    summary="Get organization Google Workspace connector status",
+    response_model=ConnectorStatusResponse,
+    dependencies=[Depends(require_scope("connectors.read"))],
+)
+async def get_organization_connector_status(
+    source_type: str = Query(..., description="Source type (google_drive or google_gmail)"),
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    tenant: TenantRouting = Depends(get_tenant),
+):
+    """
+    Get organization connector status (read-only for members).
+
+    Returns connection state, enabled state, and sync status without exposing
+    admin-only actions or credentials.
+    """
+    tenant_id = current_user.get("tenant_id")
+    if not tenant_id or str(tenant.tenant_id) != tenant_id:
+        raise HTTPException(status_code=403, detail="Cross-tenant execution rejected")
+
+    try:
+        from app.services.tenant_resolver import tenant_resolver
+        from app.storage.tenant_db import tenant_db_manager
+        from app.models.tenant_connector import TenantConnector
+        from app.models.tenant import Tenant
+
+        tenant_uuid = UUID(tenant_id)
+
+        routing = await tenant_resolver.resolve(tenant_id)
+        factory = tenant_db_manager.get_session_factory(
+            routing.db_host,
+            routing.db_name,
+            routing.db_user,
+            routing.db_password,
+            str(routing.tenant_id),
+        )
+
+        async with factory() as session:
+            # Check tenant-level enabled flag
+            tenant_result = await session.execute(
+                select(Tenant).where(Tenant.tenant_id == tenant_uuid)
+            )
+            tenant_row = tenant_result.scalar_one_or_none()
+            org_enabled = tenant_row.google_org_workspace_enabled if tenant_row else False
+
+            # Get organization connector row
+            result = await session.execute(
+                select(TenantConnector).where(
+                    TenantConnector.tenant_id == tenant_uuid,
+                    TenantConnector.source_type == source_type,
+                    TenantConnector.connection_scope == "organization",
+                )
+            )
+            row = result.scalar_one_or_none()
+
+            # Get cursor and watch info
+            scope_id = f"{tenant_id}_organization"
+            cursor = await cursor_store.get_cursor(scope_id, source_type)
+            watch_info = None
+            try:
+                watch_info = await cursor_store.get_watch_info(tenant_id, source_type)
+            except Exception:
+                watch_info = None
+
+            # Get runtime status
+            runtime = status_store.get_status(tenant_id, source_type, user_id="organization")
+            connection_status = runtime.get("connection_status") or "not_connected"
+            if connection_status == "not_connected" and (cursor or row):
+                connection_status = "active" if cursor else "syncing"
+
+            details: Dict[str, Any] = {
+                "connection_status": connection_status,
+                "files_indexed": runtime.get("files_indexed") or 0,
+                "last_sync_at": runtime.get("last_sync_at"),
+                "last_error": runtime.get("last_error"),
+                "org_enabled": org_enabled,
+                "connected": row is not None,
+            }
+            if watch_info:
+                details["watch_info"] = watch_info
+
+            return ConnectorStatusResponse(
+                tenant_id=tenant_id,
+                source_type=source_type,
+                cursor=cursor,
+                watch_active=watch_info is not None,
+                details=details,
+            )
+    except Exception as e:
+        logger.exception("Organization connector status fetch failed")
+        raise HTTPException(status_code=500, detail=f"Status fetch failed: {str(e)}")

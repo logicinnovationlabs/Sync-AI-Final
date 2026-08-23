@@ -79,10 +79,12 @@ function TallyMark({ className }: { className?: string }) {
 }
 
 const MARKS: Record<
-  ConnectorSourceType,
+  string,
   (props: { className?: string }) => React.ReactElement
 > = {
   google: GoogleMark,
+  google_personal: GoogleMark,
+  google_organization: GoogleMark,
   outlook: MicrosoftMark,
   whatsapp: WhatsAppMark,
   tally: TallyMark,
@@ -94,11 +96,11 @@ export function ConnectorLogo({
   className,
   bare = false,
 }: {
-  source: ConnectorSourceType
+  source: ConnectorSourceType | string
   className?: string
   bare?: boolean
 }) {
-  const Mark = MARKS[source]
+  const Mark = MARKS[source] || GoogleMark
 
   if (bare) return <Mark className={cn("size-4 shrink-0", className)} />
 

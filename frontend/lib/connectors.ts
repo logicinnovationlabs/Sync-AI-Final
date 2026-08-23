@@ -1,6 +1,6 @@
 import { HardDrive, Mail, MessageCircle, Receipt } from "lucide-react"
 
-export type ConnectorSourceType = "google" | "outlook" | "whatsapp" | "tally"
+export type ConnectorSourceType = "google_personal" | "google_organization" | "outlook" | "whatsapp" | "tally"
 
 export type ConnectionModel = "oauth" | "webhook" | "agent-token"
 
@@ -21,13 +21,24 @@ export interface ConnectorMeta {
 
 export const CONNECTORS: ConnectorMeta[] = [
   {
-    source: "google",
-    name: "Google Workspace",
-    shortLabel: "Google",
+    source: "google_personal",
+    name: "Google Workspace (Personal)",
+    shortLabel: "Google Personal",
     description: "Your Drive and Gmail. Only you can search what you connect.",
     connectionModel: "oauth",
     handshake: "OAuth consent",
     cadence: "Polled every ~3 min",
+    icon: HardDrive,
+    available: true,
+  },
+  {
+    source: "google_organization",
+    name: "Google Workspace (Organization)",
+    shortLabel: "Google Org",
+    description: "Company Drive and Gmail, shared across your organization with ACL-mirrored permissions.",
+    connectionModel: "oauth",
+    handshake: "Service account",
+    cadence: "Real-time webhooks",
     icon: HardDrive,
     available: true,
   },

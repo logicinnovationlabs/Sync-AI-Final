@@ -44,18 +44,21 @@ class DriveConnector(BaseConnector):
         config: Dict[str, Any],
         token_store: TokenStore,
         oauth_manager: Optional[GoogleOAuthManager] = None,
+        connection_scope: str = "personal",
     ):
         """
         Initialize Drive connector.
-        
+
         Args:
             config: Connector configuration (tenant_id, etc.)
             token_store: Token storage
             oauth_manager: Shared OAuth manager (optional, will create if not provided)
+            connection_scope: Connection scope ("personal" or "organization")
         """
         super().__init__(config, token_store)
         self.tenant_id = config.get("tenant_id")
         self.oauth_manager = oauth_manager
+        self.connection_scope = connection_scope
         self.drive_client = DriveClient()
     
     def get_source_type(self) -> str:
@@ -65,7 +68,7 @@ class DriveConnector(BaseConnector):
     async def get_valid_token(self) -> str:
         """
         Get a valid access token (delegates to GoogleOAuthManager).
-        
+
         Returns:
             Valid bearer token string
         """
@@ -74,9 +77,9 @@ class DriveConnector(BaseConnector):
         from app.connectors.google.drive_credentials import get_drive_access_token
 
         try:
-            return await get_drive_access_token(str(self.tenant_id), self.oauth_manager)
+            return await get_drive_access_token(str(self.tenant_id), self.oauth_manager, self.connection_scope)
         except Exception:
-            return await get_drive_access_token(str(self.tenant_id), self.oauth_manager)
+            return await get_drive_access_token(str(self.tenant_id), self.oauth_manager, self.connection_scope)
     
     async def fetch_delta(self, since: datetime, cursor: Optional[str]) -> DeltaResult:
         """

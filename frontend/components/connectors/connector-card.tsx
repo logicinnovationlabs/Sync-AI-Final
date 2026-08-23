@@ -11,6 +11,7 @@ import {
   disconnectConnector,
   getConnectorStatus,
   getGoogleAuthorizeUrl,
+  getOrganizationConnectorStatus,
   triggerBackfill,
   type BackendSourceType,
   type ConnectorStatus,
@@ -40,6 +41,11 @@ import { cn } from "@/lib/utils"
  */
 
 const GOOGLE_SOURCES: { id: BackendSourceType; label: string }[] = [
+  { id: "google_drive", label: "Drive" },
+  { id: "google_gmail", label: "Gmail" },
+]
+
+const GOOGLE_ORGANIZATION_SOURCES: { id: BackendSourceType; label: string }[] = [
   { id: "google_drive", label: "Drive" },
   { id: "google_gmail", label: "Gmail" },
 ]
@@ -194,6 +200,112 @@ function GoogleSource({ id, label }: { id: BackendSourceType; label: string }) {
   )
 }
 
+function GoogleOrganizationSource({ id, label }: { id: BackendSourceType; label: string }) {
+  const hydrated = useAuthHydrated()
+  const token = useAuthStore((s) => s.accessToken)
+  const canRead = useAuthStore((s) =>
+    hasScope(s.effectiveScopes(), SCOPES.CONNECTORS_READ)
+  )
+  const canWrite = useAuthStore((s) =>
+    hasScope(s.effectiveScopes(), SCOPES.CONNECTORS_WRITE)
+  )
+  const queryClient = useQueryClient()
+
+  const status = useQuery({
+    queryKey: ["connector-status", "organization", id],
+    queryFn: () => getOrganizationConnectorStatus(token!, id),
+    enabled: hydrated && Boolean(token) && canRead,
+    retry: false,
+  })
+
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ["connector-status", "organization", id] })
+
+  const started = Boolean(status.data?.details?.connected)
+  const orgEnabled = Boolean(status.data?.details?.org_enabled)
+  const watching = Boolean(status.data?.watch_active)
+  const connectionStatus = String(status.data?.details?.connection_status || "")
+  const filesIndexed = Number(status.data?.details?.files_indexed || 0)
+  const statusLabel = !hydrated
+    ? "Checking…"
+    : !canRead
+      ? "Needs connectors.read"
+      : status.isPending
+        ? "Checking…"
+        : !orgEnabled
+          ? "Disabled by admin"
+          : connectionStatus === "syncing"
+            ? "Syncing"
+            : connectionStatus === "error"
+              ? "Error"
+              : started || connectionStatus === "active"
+                ? "Connected"
+                : "Not connected"
+
+  return (
+    <div className="flex flex-col gap-2.5 rounded-[1rem] bg-surface p-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[0.8125rem] font-medium">{label}</span>
+        {status.error ? (
+          <span className="text-[0.75rem] text-destructive">
+            {status.error instanceof ApiError
+              ? status.error.message
+              : "Couldn't reach the API"}
+          </span>
+        ) : (
+          <span className="text-[0.75rem] text-muted-foreground">
+            {statusLabel}
+          </span>
+        )}
+      </div>
+
+      <div className="flex gap-2">
+        <StatTile
+          label="Ingestion"
+          value={
+            connectionStatus === "syncing"
+              ? "Syncing"
+              : filesIndexed > 0
+                ? `${filesIndexed} indexed`
+                : started
+                  ? "Started"
+                  : "Not started"
+          }
+          on={started || connectionStatus === "syncing"}
+        />
+        <StatTile
+          label="Live updates"
+          value={watching ? "On" : "Off"}
+          on={watching}
+        />
+      </div>
+
+      {hydrated && canWrite && !status.error && (
+        <div className="flex justify-end gap-1.5">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!orgEnabled}
+          >
+            <RefreshCw className="size-3.5" />
+            Resync
+          </Button>
+          {started && (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={!orgEnabled}
+            >
+              <Unplug className="size-3.5" />
+              Disconnect
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function ConnectorCard({
   connector,
   index,
@@ -212,22 +324,43 @@ export function ConnectorCard({
 
   const searchParams = useSearchParams()
   const queryClient = useQueryClient()
-  const googleLive = connector.source === "google" && connector.available
+  const isGooglePersonal = connector.source === "google_personal"
+  const isGoogleOrganization = connector.source === "google_organization"
+  const googleLive = (isGooglePersonal || isGoogleOrganization) && connector.available
+
+  // Personal Google status queries
   const driveStatus = useQuery({
     queryKey: ["connector-status", "google_drive"],
-    queryFn: () => getConnectorStatus(token!, "google_drive"),
-    enabled: googleLive && hydrated && Boolean(token) && canRead,
+    queryFn: () => getConnectorStatus(token!, "google_drive", "personal"),
+    enabled: isGooglePersonal && googleLive && hydrated && Boolean(token) && canRead,
     retry: false,
   })
   const gmailStatus = useQuery({
     queryKey: ["connector-status", "google_gmail"],
-    queryFn: () => getConnectorStatus(token!, "google_gmail"),
-    enabled: googleLive && hydrated && Boolean(token) && canRead,
+    queryFn: () => getConnectorStatus(token!, "google_gmail", "personal"),
+    enabled: isGooglePersonal && googleLive && hydrated && Boolean(token) && canRead,
     retry: false,
   })
+
+  // Organization Google status is read-only for members
+  const orgDriveStatus = useQuery({
+    queryKey: ["connector-status", "organization", "google_drive"],
+    queryFn: () => getOrganizationConnectorStatus(token!, "google_drive"),
+    enabled: isGoogleOrganization && googleLive && hydrated && Boolean(token) && canRead,
+    retry: false,
+  })
+  const orgGmailStatus = useQuery({
+    queryKey: ["connector-status", "organization", "google_gmail"],
+    queryFn: () => getOrganizationConnectorStatus(token!, "google_gmail"),
+    enabled: isGoogleOrganization && googleLive && hydrated && Boolean(token) && canRead,
+    retry: false,
+  })
+
   const googleLinked =
+    isGooglePersonal &&
     googleLive &&
     (sourceIsLinked(driveStatus.data) || sourceIsLinked(gmailStatus.data))
+
   const authorize = useMutation({
     mutationFn: () => getGoogleAuthorizeUrl(token!),
     onSuccess: (data) => {
@@ -236,11 +369,11 @@ export function ConnectorCard({
   })
 
   useEffect(() => {
-    if (connector.source !== "google") return
+    if (!isGooglePersonal) return
     const google = searchParams.get("google")
     if (!google) return
     queryClient.invalidateQueries({ queryKey: ["connector-status"] })
-  }, [connector.source, queryClient, searchParams])
+  }, [connector.source, queryClient, searchParams, isGooglePersonal])
 
   const live = connector.available
 
@@ -280,8 +413,11 @@ export function ConnectorCard({
 
       {live ? (
         <div className="flex flex-col gap-2">
-          {GOOGLE_SOURCES.map((source) => (
+          {isGooglePersonal && GOOGLE_SOURCES.map((source) => (
             <GoogleSource key={source.id} {...source} />
+          ))}
+          {isGoogleOrganization && GOOGLE_ORGANIZATION_SOURCES.map((source) => (
+            <GoogleOrganizationSource key={source.id} {...source} />
           ))}
         </div>
       ) : (
@@ -295,7 +431,7 @@ export function ConnectorCard({
         <p className="font-mono text-[0.6875rem] text-muted-foreground">
           {connector.handshake} · {connector.cadence}
         </p>
-        {live ? (
+        {live && isGooglePersonal ? (
           hydrated && canWrite && (
             <Button
               size="sm"
@@ -311,6 +447,11 @@ export function ConnectorCard({
                   : "Connect"}
             </Button>
           )
+        ) : live && isGoogleOrganization ? (
+          <Button size="sm" variant="outline" disabled>
+            <Plug className="size-3.5" />
+            Admin-managed
+          </Button>
         ) : (
           <Button size="sm" variant="outline" disabled>
             <Plug className="size-3.5" />
@@ -319,7 +460,7 @@ export function ConnectorCard({
         )}
       </div>
 
-      {authorize.error && (
+      {authorize.error && isGooglePersonal && (
         <p role="alert" className="text-[0.8125rem] text-destructive">
           {authorize.error instanceof ApiError
             ? authorize.error.message

@@ -45,7 +45,7 @@ async def _tenant_session(tenant_id: str):
         return
 
 
-async def load_drive_connector_row(tenant_id: str):
+async def load_drive_connector_row(tenant_id: str, connection_scope: str = "personal"):
     from app.models.tenant_connector import TenantConnector
 
     try:
@@ -54,6 +54,7 @@ async def load_drive_connector_row(tenant_id: str):
                 select(TenantConnector).where(
                     TenantConnector.tenant_id == tid,
                     TenantConnector.source_type == "google_drive",
+                    TenantConnector.connection_scope == connection_scope,
                 )
             )
             return result.scalar_one_or_none()
@@ -62,19 +63,19 @@ async def load_drive_connector_row(tenant_id: str):
     except (TypeError, ValueError):
         return None
     except Exception:
-        logger.exception("load Drive connector row failed tenant=%s", tenant_id)
+        logger.exception("load Drive connector row failed tenant=%s scope=%s", tenant_id, connection_scope)
         return None
     return None
 
 
-async def drive_ingest_paused(tenant_id: str) -> bool:
-    row = await load_drive_connector_row(tenant_id)
+async def drive_ingest_paused(tenant_id: str, connection_scope: str = "personal") -> bool:
+    row = await load_drive_connector_row(tenant_id, connection_scope)
     if row is None:
         return False
     return bool((row.config or {}).get("ingest_paused"))
 
 
-async def set_drive_ingest_paused(tenant_id: str, paused: bool, reason: str = "") -> None:
+async def set_drive_ingest_paused(tenant_id: str, paused: bool, reason: str = "", connection_scope: str = "personal") -> None:
     from app.models.tenant_connector import TenantConnector
 
     try:
@@ -83,13 +84,15 @@ async def set_drive_ingest_paused(tenant_id: str, paused: bool, reason: str = ""
                 select(TenantConnector).where(
                     TenantConnector.tenant_id == tid,
                     TenantConnector.source_type == "google_drive",
+                    TenantConnector.connection_scope == connection_scope,
                 )
             )
             row = result.scalar_one_or_none()
             if row is None:
                 logger.warning(
-                    "cannot pause Drive ingest: no tenant_connectors row tenant=%s",
+                    "cannot pause Drive ingest: no tenant_connectors row tenant=%s scope=%s",
                     tenant_id,
+                    connection_scope,
                 )
                 return
             config = dict(row.config or {})
@@ -151,14 +154,14 @@ async def mint_dwd_access_token(tenant_id: str, row) -> str:
     return str(token)
 
 
-async def get_drive_access_token(tenant_id: str, oauth_manager) -> str:
+async def get_drive_access_token(tenant_id: str, oauth_manager, connection_scope: str = "personal") -> str:
     try:
         UUID(str(tenant_id))
         uuid_tenant = True
     except (TypeError, ValueError):
         uuid_tenant = False
 
-    row = await load_drive_connector_row(tenant_id) if uuid_tenant else None
+    row = await load_drive_connector_row(tenant_id, connection_scope) if uuid_tenant else None
     mode = _credential_mode(row)
     if uuid_tenant and mode == MODE_DWD:
         return await mint_dwd_access_token(tenant_id, row)
