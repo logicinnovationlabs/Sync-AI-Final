@@ -25,12 +25,11 @@ QWEN_TIMEOUT_S = 90.0
 MAX_SOURCE_CHARS = 900
 MAX_CONTEXT_CHARS = 6000
 MAX_HISTORY_TURNS = 6
-TOP_K_SOURCES = 4
-# Cosine / ANN similarity (Qdrant). Weak neighbors are noise.
-MIN_COSINE_SCORE = 0.12
+TOP_K_SOURCES = 6
+# Cosine / ANN similarity (Qdrant). Keep a low floor — empty context is worse.
+MIN_COSINE_SCORE = 0.02
 # Federator RRF uses k=60, so rank-1 is ~1/61 ≈ 0.016 — not cosine.
-# The old 0.12 cutoff dropped every fused hit and the model always refused.
-MIN_RRF_SCORE = 0.008
+MIN_RRF_SCORE = 0.001
 
 REFUSE_TEXT = (
     "I don't have enough information in the provided context to answer that accurately."
@@ -50,12 +49,14 @@ Voice (Claude-like):
 
 Grounding rules (authoritative):
 - Treat the retrieved sources as the only authoritative evidence. Do not use world knowledge.
+- The sources below were already selected for this question by search. Use them.
+- If sources partially answer the question, say what they show and what is missing — do not invent the rest.
 - Users often omit dates, document names, or account names. Infer from the most relevant / most recent matching item in the sources when the default is obvious.
 - Prior conversation is only for resolving references ("that one"). It is not evidence and must never override retrieved sources.
 - If several sources conflict and you cannot tell which one they mean, ask one short clarification.
 - If the question is about which email/account/mailbox the user is using, answer from Signed-in account and From/To headers in the sources.
-- If nothing in the sources (or signed-in account, for mailbox identity only) is related to the question, reply with exactly: I don't have enough information in the provided context to answer that accurately.
-- Never invent facts, citations, file names, numbers, policies, dates, or steps that are not in the sources.
+- Reply with exactly: I don't have enough information in the provided context to answer that accurately. — ONLY when the sources section is "(no authorized sources)" or the sources contain zero usable text for the question.
+- Never invent facts, citations, file names, numbers, policies, dates, people, or steps that are not in the sources.
 - Cite important claims with source ids in square brackets, e.g. [1] or [1, p.3]. Use at most 2–3 citations.
 - Prefer a precise, short answer over a dump of snippets."""
 
@@ -208,7 +209,7 @@ def filter_relevant_hits(
     min_score: float = MIN_COSINE_SCORE,
     limit: int = TOP_K_SOURCES,
 ) -> List[Dict[str, Any]]:
-    """Keep hits strong enough to ground an answer (cosine or RRF)."""
+    """Keep top federator hits for grounding (federator already ranked)."""
     kept: List[Dict[str, Any]] = []
     for hit in ranked_hits:
         sources = hit.get("sources") or []
@@ -218,24 +219,27 @@ def filter_relevant_hits(
                 break
             continue
 
-        score_f = _hit_numeric_score(hit)
-        snippet = str(hit.get("snippet") or hit.get("body") or "").strip()
-        if score_f is None:
-            if snippet:
-                kept.append(dict(hit))
-            if len(kept) >= limit:
-                break
+        snippet = str(
+            hit.get("snippet") or hit.get("body") or hit.get("title") or ""
+        ).strip()
+        if not snippet and not hit.get("document_id"):
             continue
 
-        if _is_rrf_score(score_f):
-            if score_f < MIN_RRF_SCORE:
+        score_f = _hit_numeric_score(hit)
+        if score_f is not None:
+            floor = MIN_RRF_SCORE if _is_rrf_score(score_f) else min_score
+            # Always allow the first few federator hits through even if weak.
+            if score_f < floor and len(kept) >= 2:
                 continue
-        elif score_f < min_score:
-            continue
 
         kept.append(dict(hit))
         if len(kept) >= limit:
             break
+
+    if not kept and ranked_hits:
+        for hit in list(ranked_hits)[:limit]:
+            if hit.get("document_id") or str(hit.get("snippet") or "").strip():
+                kept.append(dict(hit))
     return kept[:limit]
 
 
@@ -296,9 +300,11 @@ def assemble_chat_messages(
         "Prior conversation (not evidence; do not invent facts from it; "
         "sources above win if they conflict):\n"
         f"{history_text}\n\n"
-        "Answer the question directly and briefly. Do not summarize every source. "
-        "Use only sources that actually answer the question. "
-        "Ask a clarifying question only if the sources conflict or do not cover the topic.\n\n"
+        "Answer the question directly and briefly using the retrieved sources. "
+        "Do not summarize every source. "
+        "If the sources do not mention the asked person/topic, say so clearly from the sources "
+        "(e.g. none of the retrieved emails mention that name) — do not invent. "
+        "Ask a clarifying question only if the sources conflict.\n\n"
         f"Question:\n{user_prompt}"
     )
     messages = [
