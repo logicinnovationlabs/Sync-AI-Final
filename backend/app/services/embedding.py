@@ -155,7 +155,9 @@ class EmbeddingService:
         provider_name = (
             getattr(settings, "embedding_provider", None)
             or getattr(settings, "EMBEDDING_PROVIDER", "fake")
+            or "fake"
         )
+        provider_name = str(provider_name).strip().lower()
         
         if provider_name == "gemini":
             api_key = (
@@ -184,7 +186,7 @@ class EmbeddingService:
             self.provider = FakeEmbeddingProvider(dimension)
         
         else:
-            raise ValueError(f"Unknown embedding provider: {provider_name}")
+            raise ValueError(f"Unknown embedding provider: {provider_name!r}")
     
     async def embed_texts(self, texts: List[str]) -> List[List[float]]:
         """
