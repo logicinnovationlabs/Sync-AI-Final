@@ -8,7 +8,6 @@ Per Vishwas §28.2, we implement namespace-based partitioning: tenant:{tenant_id
 from typing import Any, Optional
 import json
 import logging
-import ssl
 
 import redis.asyncio as aioredis
 
@@ -18,21 +17,73 @@ from app.core.exceptions import SnyQException
 logger = logging.getLogger(__name__)
 
 
-def _normalized_redis_url(url: str) -> str:
-    return (url or "").strip().strip('"').strip("'")
+def normalized_redis_url(url: str) -> str:
+    """Strip quotes and drop ssl_cert_reqs from the query string.
+
+    redis-py only accepts query/kwarg values ``none`` / ``optional`` / ``required``.
+    ``CERT_NONE`` (Celery/kombu style) raises Invalid SSL Certificate Requirements.
+    Celery broker URLs can keep ``?ssl_cert_reqs=CERT_NONE``; this client uses
+    ``ssl_cert_reqs=\"none\"`` via kwargs instead.
+    """
+    cleaned = (url or "").strip().strip('"').strip("'")
+    if not cleaned or "ssl_cert_reqs" not in cleaned.lower():
+        return cleaned
+    from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+
+    parsed = urlparse(cleaned)
+    query = [
+        (k, v)
+        for k, v in parse_qsl(parsed.query, keep_blank_values=True)
+        if k.lower() != "ssl_cert_reqs"
+    ]
+    return urlunparse(parsed._replace(query=urlencode(query)))
 
 
-def _from_url_kwargs(url: str) -> dict:
-    """Upstash from Render needs TLS + timeouts longer than 0.5s."""
+def redis_from_url_kwargs(
+    url: str,
+    *,
+    decode_responses: bool = True,
+    socket_connect_timeout: float = 8,
+    socket_timeout: float = 8,
+) -> dict:
+    """Shared from_url kwargs for async + sync Redis (Upstash rediss://)."""
     kwargs: dict = {
-        "encoding": "utf-8",
-        "decode_responses": True,
-        "socket_connect_timeout": 8,
-        "socket_timeout": 8,
+        "decode_responses": decode_responses,
+        "socket_connect_timeout": socket_connect_timeout,
+        "socket_timeout": socket_timeout,
         "health_check_interval": 30,
     }
     if url.lower().startswith("rediss://"):
-        kwargs["ssl_cert_reqs"] = ssl.CERT_NONE
+        # String "none" — not ssl.CERT_NONE. Passing the enum breaks redis-py:
+        # RedisSSLContext object has no attribute 'cert_reqs'.
+        kwargs["ssl_cert_reqs"] = "none"
+        kwargs["ssl_check_hostname"] = False
+    return kwargs
+
+
+def create_sync_redis_client(url: str | None = None):
+    """Sync Redis client for Google token/status stores (Celery + API)."""
+    import redis as sync_redis
+
+    resolved = normalized_redis_url(
+        url
+        or getattr(settings, "redis_url", None)
+        or settings.session_store_redis_url
+    )
+    client = sync_redis.Redis.from_url(
+        resolved, **redis_from_url_kwargs(resolved)
+    )
+    client.ping()
+    return client
+
+
+# Back-compat aliases used inside this module
+_normalized_redis_url = normalized_redis_url
+
+
+def _from_url_kwargs(url: str) -> dict:
+    kwargs = redis_from_url_kwargs(url)
+    kwargs["encoding"] = "utf-8"
     return kwargs
 
 

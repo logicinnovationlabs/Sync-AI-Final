@@ -36,21 +36,30 @@ REQUEST_DURATION = None
 SPAN_PROCESSOR = None
 
 
-def otlp_grpc_endpoint() -> str:
-    """Resolve gRPC target from OTLP_ENDPOINT (HTTP :4318 is mapped to :4317)."""
+def otlp_grpc_endpoint() -> str | None:
+    """Resolve gRPC target from OTLP_ENDPOINT (HTTP :4318 is mapped to :4317).
+
+    Returns None when unset or pointed at localhost — there is no collector on
+    Render/Railway, and exporting there floods logs with UNAVAILABLE retries.
+    """
     raw = os.getenv("OTLP_ENDPOINT")
     if not raw:
         try:
             from app.core.config import settings
             raw = settings.otlp_endpoint
         except Exception:
-            raw = "http://otel-collector:4317"
+            return None
+    raw = (raw or "").strip()
+    if not raw:
+        return None
     parsed = urlparse(raw if "://" in raw else f"http://{raw}")
-    host = parsed.hostname or "otel-collector"
+    host = (parsed.hostname or "").lower()
+    if host in ("localhost", "127.0.0.1", "::1"):
+        return None
     port = parsed.port or 4317
     if port == 4318:
         port = 4317
-    return f"{host}:{port}"
+    return f"{host or 'otel-collector'}:{port}"
 
 
 def setup_telemetry(service_name: str = "snyq-backend") -> None:
@@ -68,24 +77,48 @@ def setup_telemetry(service_name: str = "snyq-backend") -> None:
     endpoint = otlp_grpc_endpoint()
 
     provider = TracerProvider(resource=resource)
-    exporter = OTLPSpanExporter(endpoint=endpoint, insecure=True, timeout=2)
-    batch = BatchSpanProcessor(
-        exporter,
-        max_queue_size=2048,
-        schedule_delay_millis=5000,
-        max_export_batch_size=512,
-        export_timeout_millis=2000,
-    )
-    SPAN_PROCESSOR = SafeSpanProcessor(batch)
-    provider.add_span_processor(SPAN_PROCESSOR)
+    if endpoint:
+        exporter = OTLPSpanExporter(endpoint=endpoint, insecure=True, timeout=2)
+        batch = BatchSpanProcessor(
+            exporter,
+            max_queue_size=2048,
+            schedule_delay_millis=5000,
+            max_export_batch_size=512,
+            export_timeout_millis=2000,
+        )
+        SPAN_PROCESSOR = SafeSpanProcessor(batch)
+        provider.add_span_processor(SPAN_PROCESSOR)
+    else:
+        # Keep a redacting processor so callers/tests always see SPAN_PROCESSOR,
+        # but do not attach a failing localhost OTLP exporter.
+        from opentelemetry.sdk.trace import SpanProcessor as _SpanProcessor
+
+        class _NoExportProcessor(_SpanProcessor):
+            def on_start(self, span, parent_context=None):
+                return None
+
+            def on_end(self, span):
+                return None
+
+            def shutdown(self):
+                return None
+
+            def force_flush(self, timeout_millis: int = 30000):
+                return True
+
+        SPAN_PROCESSOR = SafeSpanProcessor(_NoExportProcessor())
+        provider.add_span_processor(SPAN_PROCESSOR)
     trace.set_tracer_provider(provider)
 
-    metric_reader = PeriodicExportingMetricReader(
-        OTLPMetricExporter(endpoint=endpoint, insecure=True, timeout=2),
-        export_interval_millis=10_000,
-        export_timeout_millis=2000,
-    )
-    meter_provider = MeterProvider(resource=resource, metric_readers=[metric_reader])
+    if endpoint:
+        metric_reader = PeriodicExportingMetricReader(
+            OTLPMetricExporter(endpoint=endpoint, insecure=True, timeout=2),
+            export_interval_millis=10_000,
+            export_timeout_millis=2000,
+        )
+        meter_provider = MeterProvider(resource=resource, metric_readers=[metric_reader])
+    else:
+        meter_provider = MeterProvider(resource=resource)
     metrics.set_meter_provider(meter_provider)
 
     meter = metrics.get_meter("snyq.http")

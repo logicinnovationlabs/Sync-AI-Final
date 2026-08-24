@@ -24,14 +24,9 @@ def _sync_redis():
         return _REDIS
     _REDIS_INIT = True
     try:
-        import redis
+        from app.storage.redis_client import create_sync_redis_client
 
-        url = getattr(settings, "redis_url", None) or settings.session_store_redis_url
-        client = redis.Redis.from_url(
-            url, decode_responses=True, socket_connect_timeout=0.2, socket_timeout=0.2
-        )
-        client.ping()
-        _REDIS = client
+        _REDIS = create_sync_redis_client()
         return _REDIS
     except Exception:
         _REDIS = None
