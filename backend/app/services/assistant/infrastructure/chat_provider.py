@@ -14,7 +14,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Protocol, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Protocol, Sequence
 
 from app.core.config import settings
 
@@ -26,8 +26,11 @@ MAX_SOURCE_CHARS = 900
 MAX_CONTEXT_CHARS = 6000
 MAX_HISTORY_TURNS = 6
 TOP_K_SOURCES = 4
-# Drop weak federator/RRF noise so we do not dump unrelated mail into the answer.
-MIN_SOURCE_SCORE = 0.12
+# Cosine / ANN similarity (Qdrant). Weak neighbors are noise.
+MIN_COSINE_SCORE = 0.12
+# Federator RRF uses k=60, so rank-1 is ~1/61 ≈ 0.016 — not cosine.
+# The old 0.12 cutoff dropped every fused hit and the model always refused.
+MIN_RRF_SCORE = 0.008
 
 REFUSE_TEXT = (
     "I don't have enough information in the provided context to answer that accurately."
@@ -50,7 +53,8 @@ Grounding rules (authoritative):
 - Users often omit dates, document names, or account names. Infer from the most relevant / most recent matching item in the sources when the default is obvious.
 - Prior conversation is only for resolving references ("that one"). It is not evidence and must never override retrieved sources.
 - If several sources conflict and you cannot tell which one they mean, ask one short clarification.
-- If nothing in the sources is related to the question, reply with exactly: I don't have enough information in the provided context to answer that accurately.
+- If the question is about which email/account/mailbox the user is using, answer from Signed-in account and From/To headers in the sources.
+- If nothing in the sources (or signed-in account, for mailbox identity only) is related to the question, reply with exactly: I don't have enough information in the provided context to answer that accurately.
 - Never invent facts, citations, file names, numbers, policies, dates, or steps that are not in the sources.
 - Cite important claims with source ids in square brackets, e.g. [1] or [1, p.3]. Use at most 2–3 citations.
 - Prefer a precise, short answer over a dump of snippets."""
@@ -177,27 +181,58 @@ def debug_source_chunks(ranked_hits: Sequence[Dict[str, Any]]) -> List[Dict[str,
     return chunks
 
 
+def _hit_numeric_score(hit: Mapping[str, Any]) -> Optional[float]:
+    meta = hit.get("meta") if isinstance(hit.get("meta"), dict) else {}
+    for key in ("boosted_score", "score", "base_score", "fusion_score", "vector_score"):
+        for src in (hit, meta):
+            if not isinstance(src, dict) or key not in src:
+                continue
+            raw = src.get(key)
+            if raw is None:
+                continue
+            try:
+                return float(raw)
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
+def _is_rrf_score(score: float) -> bool:
+    """RRF(k=60) tops out well below typical cosine similarity."""
+    return 0.0 < score < 0.05
+
+
 def filter_relevant_hits(
     ranked_hits: Sequence[Dict[str, Any]],
     *,
-    min_score: float = MIN_SOURCE_SCORE,
+    min_score: float = MIN_COSINE_SCORE,
     limit: int = TOP_K_SOURCES,
 ) -> List[Dict[str, Any]]:
-    """Keep only hits strong enough to ground an answer."""
+    """Keep hits strong enough to ground an answer (cosine or RRF)."""
     kept: List[Dict[str, Any]] = []
     for hit in ranked_hits:
-        score = hit.get("boosted_score", hit.get("score", hit.get("base_score")))
-        try:
-            score_f = float(score) if score is not None else 0.0
-        except (TypeError, ValueError):
-            score_f = 0.0
-        # Always keep explicit document-reader evidence.
         sources = hit.get("sources") or []
         if "document_reader" in sources or "document_reader_fallback" in sources:
             kept.append(dict(hit))
+            if len(kept) >= limit:
+                break
             continue
-        if score_f < min_score:
+
+        score_f = _hit_numeric_score(hit)
+        snippet = str(hit.get("snippet") or hit.get("body") or "").strip()
+        if score_f is None:
+            if snippet:
+                kept.append(dict(hit))
+            if len(kept) >= limit:
+                break
             continue
+
+        if _is_rrf_score(score_f):
+            if score_f < MIN_RRF_SCORE:
+                continue
+        elif score_f < min_score:
+            continue
+
         kept.append(dict(hit))
         if len(kept) >= limit:
             break
@@ -209,6 +244,7 @@ def assemble_chat_messages(
     ranked_hits: List[Dict[str, Any]],
     *,
     conversation_history: Optional[Sequence[Dict[str, Any]]] = None,
+    account_email: Optional[str] = None,
 ) -> tuple[List[Dict[str, str]], str]:
     """Build chat messages from the user prompt + already-ACL-filtered hits.
 
@@ -248,9 +284,15 @@ def assemble_chat_messages(
         else "(none)"
     )
 
+    account_line = (
+        f"Signed-in account: {account_email.strip().lower()}\n"
+        if (account_email or "").strip()
+        else "Signed-in account: (not provided)\n"
+    )
     user = (
         "Authoritative retrieved sources (the only allowed evidence):\n"
         f"{sources_text}\n\n"
+        f"{account_line}"
         "Prior conversation (not evidence; do not invent facts from it; "
         "sources above win if they conflict):\n"
         f"{history_text}\n\n"
@@ -290,6 +332,8 @@ class FakeChatProvider:
         question = ""
         if "Question:\n" in prompt:
             question = prompt.rsplit("Question:\n", 1)[-1].strip()
+        else:
+            question = prompt.strip()
         from app.services.assistant.core.intent_router import is_greeting_or_chitchat
 
         if is_greeting_or_chitchat(question):

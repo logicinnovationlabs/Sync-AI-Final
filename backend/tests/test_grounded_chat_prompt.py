@@ -61,6 +61,23 @@ async def test_fake_provider_quotes_retrieved_snippets_only():
     assert "Here is what I found" not in gen.text
 
 
+def test_filter_keeps_federator_rrf_scores():
+    from app.services.assistant.infrastructure.chat_provider import filter_relevant_hits
+
+    hits = [
+        {
+            "document_id": "gmail-1",
+            "title": "Security alert",
+            "snippet": "Unusual sign-in from a new device.",
+            "boosted_score": 1 / 61,
+            "sources": ["indexed", "vector"],
+        }
+    ]
+    kept = filter_relevant_hits(hits)
+    assert len(kept) == 1
+    assert kept[0]["document_id"] == "gmail-1"
+
+
 def test_conversation_history_does_not_override_sources():
     hits = [
         {
@@ -82,7 +99,9 @@ def test_conversation_history_does_not_override_sources():
     assert "99 percent" in prompt
     assert "not evidence" in prompt
     assert "official rate is 12 percent" in prompt
-    assert prompt.index("Authoritative retrieved sources") < prompt.index("Prior conversation")
+    assert prompt.index("Authoritative retrieved sources") < prompt.index(
+        "Prior conversation (not evidence"
+    )
 
 
 def test_redact_provider_error_strips_keys():

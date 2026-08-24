@@ -10,12 +10,17 @@ import json
 import logging
 from typing import Any, AsyncIterator, Dict, List, Optional
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_tenant_session
+from app.models.user import User
 from app.acl.filter import acl_terms_from_jwt, is_fail_closed
 from app.services.assistant.core.graph import OrchestratorGraph, default_acl_from_claims
 from app.services.assistant.domain.models import BlobRef, OrchestratorRequest
@@ -116,6 +121,7 @@ async def orchestrator_chat(
     request: Request,
     current_user: Dict[str, Any] = Depends(get_current_user),
     graph: OrchestratorGraph = Depends(get_graph),
+    db_session: AsyncSession = Depends(get_tenant_session),
 ):
     """Streaming chat — session-aware orchestration."""
     logger.info(
@@ -140,12 +146,23 @@ async def orchestrator_chat(
         acl_terms = [f"user:{user_id}"]
     acl_bytes = default_acl_from_claims(acl_terms)
 
+    account_email = str(current_user.get("email") or "").strip() or None
+    if not account_email:
+        try:
+            result = await db_session.execute(
+                select(User.email).where(User.principal_id == UUID(user_id))
+            )
+            account_email = result.scalar_one_or_none()
+        except Exception:
+            account_email = None
+
     orch_request = OrchestratorRequest(
         tenant_id=tenant_id,
         user_id=user_id,
         session_id=body.session_id,
         prompt=body.prompt,
         attachments=body.attachments,
+        account_email=str(account_email or "") or None,
     )
     authorization = request.headers.get("Authorization")
 

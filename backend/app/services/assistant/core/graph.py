@@ -447,9 +447,15 @@ class OrchestratorGraph:
         from app.core.config import settings as _settings
 
         intent = state.get("intent")
-        hits = filter_relevant_hits(list(state.get("ranked_hits") or []))
+        raw_hits = list(state.get("ranked_hits") or [])
+        hits = filter_relevant_hits(raw_hits)
         req = state.get("request") or {}
         user_prompt = str(req.get("prompt") or "")
+        logger.info(
+            "[assistant.pipeline] grounding hits raw=%s kept=%s",
+            len(raw_hits),
+            len(hits),
+        )
         session = state.get("session") or {}
         history = list(session.get("history") or [])
 
@@ -490,6 +496,7 @@ class OrchestratorGraph:
             user_prompt,
             hits,
             conversation_history=history,
+            account_email=str(req.get("account_email") or "") or None,
         )
         record_prompt(
             {
