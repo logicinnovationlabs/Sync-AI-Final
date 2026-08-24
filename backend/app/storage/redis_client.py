@@ -5,12 +5,35 @@ Critical for Signoff A7: each tenant's cache must be isolated - never a shared c
 Per Vishwas §28.2, we implement namespace-based partitioning: tenant:{tenant_id}:*
 """
 
-from typing import Optional, Any
+from typing import Any, Optional
 import json
+import logging
+import ssl
+
 import redis.asyncio as aioredis
 
 from app.core.config import settings
 from app.core.exceptions import SnyQException
+
+logger = logging.getLogger(__name__)
+
+
+def _normalized_redis_url(url: str) -> str:
+    return (url or "").strip().strip('"').strip("'")
+
+
+def _from_url_kwargs(url: str) -> dict:
+    """Upstash from Render needs TLS + timeouts longer than 0.5s."""
+    kwargs: dict = {
+        "encoding": "utf-8",
+        "decode_responses": True,
+        "socket_connect_timeout": 8,
+        "socket_timeout": 8,
+        "health_check_interval": 30,
+    }
+    if url.lower().startswith("rediss://"):
+        kwargs["ssl_cert_reqs"] = ssl.CERT_NONE
+    return kwargs
 
 
 class TenantPartitionedRedisClient:
@@ -22,26 +45,25 @@ class TenantPartitionedRedisClient:
     """
 
     def __init__(self, redis_url: str = settings.redis_url):
-        self.redis_url = redis_url
+        self.redis_url = _normalized_redis_url(redis_url)
         self._client: Optional[aioredis.Redis] = None
         self._fallback_store: dict = {}
         self._fallback_sets: dict = {}
 
     async def connect(self):
         """Initialize Redis connection pool."""
-        if self._client is None:
-            try:
-                client = aioredis.from_url(
-                    self.redis_url,
-                    encoding="utf-8",
-                    decode_responses=True,
-                    socket_connect_timeout=0.5,
-                    socket_timeout=0.5,
-                )
-                await client.ping()
-                self._client = client
-            except Exception:
-                self._client = None
+        if self._client is not None:
+            return
+        url = _normalized_redis_url(self.redis_url or settings.redis_url)
+        self.redis_url = url
+        try:
+            client = aioredis.from_url(url, **_from_url_kwargs(url))
+            await client.ping()
+            self._client = client
+            logger.info("Redis ping ok")
+        except Exception as exc:
+            logger.warning("Redis connect failed (%s): %s", type(exc).__name__, exc)
+            self._client = None
 
     async def disconnect(self):
         """Close Redis connection."""

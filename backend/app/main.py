@@ -69,7 +69,10 @@ async def lifespan(app: FastAPI):
         logger.critical("Startup configuration invalid: %s", exc)
         raise
     await redis_client.connect()
-    logger.info("Connected to Redis")
+    if redis_client._client is None:
+        logger.warning("Redis unavailable — running in in-memory fallback")
+    else:
+        logger.info("Connected to Redis")
     await mcp_revocation_listener.start()
 
     yield
