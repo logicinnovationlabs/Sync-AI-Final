@@ -14,7 +14,8 @@ Models:
 """
 
 from enum import Enum
-from pydantic import BaseModel, UUID4, Field
+from uuid import UUID
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
@@ -38,7 +39,8 @@ class CanonicalDocument(BaseModel):
     id: str                              # f"{source_type}_{source_id}", stable across re-processing
     source_type: str
     source_id: str
-    tenant_id: UUID4
+    # Any UUID version — seeded tenants often use uuid5, not uuid4.
+    tenant_id: UUID
 
     title: str
     content: str                          # extracted plain text, bounded length (MAX_EXTRACTED_CHARS)
@@ -53,9 +55,9 @@ class CanonicalDocument(BaseModel):
     updated_at: datetime
     source_updated_at: datetime
 
-    owner_principal_id: Optional[UUID4] = None
-    creator_principal_id: Optional[UUID4] = None
-    last_modifier_principal_id: Optional[UUID4] = None
+    owner_principal_id: Optional[UUID] = None
+    creator_principal_id: Optional[UUID] = None
+    last_modifier_principal_id: Optional[UUID] = None
 
     structured_metadata: Dict[str, Any] = Field(default_factory=dict)   # allowlisted upstream in Block B
     parent_ids: List[str] = Field(default_factory=list)                 # container IDs for inheritance
@@ -69,8 +71,8 @@ class Principal(BaseModel):
     Same email seen across Drive + Gmail + Outlook resolves to the same principal_id
     within a tenant, but never merges across tenants.
     """
-    id: UUID4
-    tenant_id: UUID4
+    id: UUID
+    tenant_id: UUID
     email: str                            # normalized (lowercase, stripped)
     name: Optional[str] = None
     source_identities: Dict[str, str] = Field(default_factory=dict)     # {source_type: external_id}
@@ -85,14 +87,14 @@ class Group(BaseModel):
     Groups can contain both individual principals and other groups.
     Cycle-safe expansion is required.
     """
-    id: UUID4
-    tenant_id: UUID4
+    id: UUID
+    tenant_id: UUID
     name: str
     email: Optional[str] = None
     source_type: str
     source_id: str
-    member_principal_ids: List[UUID4] = Field(default_factory=list)
-    member_group_ids: List[UUID4] = Field(default_factory=list)          # nested groups — cycle-checked
+    member_principal_ids: List[UUID] = Field(default_factory=list)
+    member_group_ids: List[UUID] = Field(default_factory=list)          # nested groups — cycle-checked
     created_at: datetime
     updated_at: datetime
 
@@ -105,14 +107,14 @@ class ACLEntry(BaseModel):
     One of principal_id or group_id must be set (mutually exclusive).
     """
     document_id: str
-    principal_id: Optional[UUID4] = None   # set if grant is to an individual
-    group_id: Optional[UUID4] = None       # set if grant is to a group (mutually exclusive with principal_id)
+    principal_id: Optional[UUID] = None   # set if grant is to an individual
+    group_id: Optional[UUID] = None       # set if grant is to a group (mutually exclusive with principal_id)
     permission: PermissionLevel
     granted_via: str                       # "direct" | "inherited" | "group_membership"
     source_container_id: Optional[str] = None   # which container the inheritance came from
     is_deny: bool = False                  # explicit deny override
     source_type: str
-    tenant_id: UUID4
+    tenant_id: UUID
     created_at: datetime
     updated_at: datetime
 
@@ -125,12 +127,12 @@ class ContainerACLEntry(BaseModel):
     permissions without having to re-parse documents.
     """
     container_id: str                      # folder/mailbox ID
-    principal_id: Optional[UUID4] = None
-    group_id: Optional[UUID4] = None
+    principal_id: Optional[UUID] = None
+    group_id: Optional[UUID] = None
     permission: PermissionLevel
     is_deny: bool = False
     source_type: str
-    tenant_id: UUID4
+    tenant_id: UUID
     created_at: datetime
     updated_at: datetime
 
@@ -144,7 +146,7 @@ class ContainerEdge(BaseModel):
     """
     parent_container_id: str
     child_container_id: str
-    tenant_id: UUID4
+    tenant_id: UUID
     source_type: str
     created_at: datetime
 
@@ -168,7 +170,7 @@ class ResolvedIdentity(BaseModel):
     
     Contains the resolved principal and metadata about the match.
     """
-    principal_id: UUID4
+    principal_id: UUID
     principal: Principal
     confidence: float                      # 0.0-1.0
     matched_on: str                        # "email" | "username" | "new"

@@ -15,6 +15,14 @@ import hashlib
 from app.core.config import settings
 
 
+def _normalize_gemini_model_name(model: str | None) -> str:
+    """google-generativeai requires models/ or tunedModels/ prefix."""
+    name = (model or "").strip() or "gemini-embedding-001"
+    if name.startswith("models/") or name.startswith("tunedModels/"):
+        return name
+    return f"models/{name}"
+
+
 class EmbeddingProvider(Protocol):
     """Protocol for embedding providers."""
     
@@ -48,11 +56,11 @@ class GeminiEmbeddingProvider:
         
         Args:
             api_key: Gemini API key
-            model: Model name
+            model: Model name (with or without models/ prefix)
             dimension: Embedding dimension
         """
         self.api_key = api_key
-        self.model = model
+        self.model = _normalize_gemini_model_name(model)
         self.dimension = dimension
         
         # Import here to avoid requiring google-generativeai in tests
@@ -71,13 +79,14 @@ class GeminiEmbeddingProvider:
             List of embedding vectors
         """
         embeddings = []
+        model = _normalize_gemini_model_name(self.model)
         
         for text in texts:
             # Truncate if too long (Gemini has token limits)
             truncated_text = text[:10000]
             
             result = self.genai.embed_content(
-                model=self.model,
+                model=model,
                 content=truncated_text,
             )
             
@@ -166,11 +175,17 @@ class EmbeddingService:
             )
             model = (
                 getattr(settings, "embedding_model", None)
-                or getattr(settings, "EMBEDDING_MODEL", "gemini-embedding-001")
+                or getattr(settings, "model_version", None)
+                or getattr(settings, "EMBEDDING_MODEL", None)
+                or getattr(settings, "MODEL_VERSION", None)
+                or "gemini-embedding-001"
             )
             dimension = (
                 getattr(settings, "embedding_dimension", None)
-                or getattr(settings, "EMBEDDING_DIMENSION", 768)
+                or getattr(settings, "embedding_dimensions", None)
+                or getattr(settings, "EMBEDDING_DIMENSION", None)
+                or getattr(settings, "EMBEDDING_DIMENSIONS", None)
+                or 768
             )
             
             if not api_key:
