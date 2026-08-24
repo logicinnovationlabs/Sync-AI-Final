@@ -133,3 +133,77 @@ def test_completion_text_rejects_empty_payload():
     text, err = _completion_text(Empty())
     assert text == ""
     assert err == "empty_choices"
+
+
+def test_completion_text_reads_list_content_and_reasoning():
+    class ChoiceList:
+        message = type(
+            "M",
+            (),
+            {"content": [{"type": "text", "text": "From [1]: unusual sign-in."}]},
+        )()
+        finish_reason = "stop"
+
+    class RespList:
+        choices = [ChoiceList()]
+        error = None
+
+    text, err = _completion_text(RespList())
+    assert err is None
+    assert "unusual sign-in" in text
+
+    class ChoiceReasoning:
+        message = type(
+            "M",
+            (),
+            {"content": "", "reasoning": "Yes — Microsoft Entra flagged a new device [1]."},
+        )()
+        finish_reason = "stop"
+
+    class RespReasoning:
+        choices = [ChoiceReasoning()]
+        error = None
+
+    text, err = _completion_text(RespReasoning())
+    assert err is None
+    assert "Entra" in text
+
+
+def test_completion_text_from_openrouter_dict():
+    text, err = _completion_text(
+        {
+            "choices": [
+                {
+                    "finish_reason": "stop",
+                    "message": {
+                        "content": None,
+                        "reasoning": "Microsoft Entra flagged a new sign-in [1].",
+                    },
+                }
+            ]
+        }
+    )
+    assert err is None
+    assert "Entra" in text
+
+
+def test_plain_source_text_strips_gmail_html():
+    from app.services.assistant.infrastructure.chat_provider import (
+        format_source_block,
+        plain_source_text,
+        source_text_is_usable,
+    )
+
+    html_mail = (
+        "<style>.x{color:red}</style><p>Security alert: unusual sign-in</p>"
+        "<div>Location: Mumbai</div>"
+    )
+    assert "Security alert" in plain_source_text(html_mail)
+    assert ".x{" not in plain_source_text(html_mail)
+    assert source_text_is_usable(html_mail)
+    block = format_source_block(
+        {"document_id": "mail-1", "title": "Alert", "snippet": html_mail},
+        1,
+    )
+    assert "Security alert" in block
+    assert "<style" not in block

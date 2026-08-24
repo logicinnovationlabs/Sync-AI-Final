@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import html
 import logging
+import re
 import time
 from typing import Any, Dict, List, Optional
 
@@ -20,6 +22,20 @@ from app.models.federated import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["search-federated"])
+
+
+async def _query_embedding_for_search(query: str) -> Optional[List[float]]:
+    """One Gemini call shared by indexed + vector backends."""
+    if not query or query.strip() in {"*", "all"}:
+        return None
+    try:
+        from app.services.embedding import embedding_service
+
+        vec = await embedding_service.embed_text(query)
+        return list(vec) if vec else None
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Shared query embedding failed: %s", exc)
+        return None
 
 
 async def _safe_call_lexical(
@@ -56,7 +72,11 @@ async def _safe_call_lexical(
 
 
 async def _safe_call_vector(
-    query: str, tenant_id: str, acl_terms: List[str], size: int
+    query: str,
+    tenant_id: str,
+    acl_terms: List[str],
+    size: int,
+    query_embedding: Optional[List[float]] = None,
 ) -> tuple[List[Dict[str, Any]], BackendStatus]:
     """Call vector search with error handling."""
     started = time.perf_counter()
@@ -68,13 +88,15 @@ async def _safe_call_vector(
         from app.core.config import settings
         
         if settings.qdrant_url:
-            query_embedding = await embedding_service.embed_text(query)
-            if not query_embedding:
+            vec = list(query_embedding) if query_embedding else None
+            if not vec:
+                vec = await embedding_service.embed_text(query)
+            if not vec:
                 raise ValueError("embedding service returned an empty vector")
             store = QdrantVectorStore()
             results = await store.search(
                 tenant_id=tenant_id,
-                query_embedding=query_embedding,
+                query_embedding=vec,
                 acl_terms=acl_terms,
                 top_k=size * 2,
             )
@@ -95,6 +117,10 @@ async def _safe_call_vector(
 
 def _payload_to_hit(payload: Dict[str, Any], score: float) -> Dict[str, Any]:
     body = str(payload.get("content") or payload.get("body_text") or payload.get("snippet") or "")
+    body = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", body)
+    body = re.sub(r"<[^>]+>", " ", body)
+    body = html.unescape(body)
+    body = re.sub(r"\s+", " ", body).strip()
     return {
         "document_id": str(payload.get("id") or payload.get("document_id") or ""),
         "title": str(payload.get("title") or payload.get("id") or ""),
@@ -105,7 +131,11 @@ def _payload_to_hit(payload: Dict[str, Any], score: float) -> Dict[str, Any]:
 
 
 async def _safe_call_indexed(
-    query: str, tenant_id: str, acl_terms: List[str], size: int
+    query: str,
+    tenant_id: str,
+    acl_terms: List[str],
+    size: int,
+    query_embedding: Optional[List[float]] = None,
 ) -> tuple[List[Dict[str, Any]], BackendStatus]:
     """Read the Block B `documents` collection that Celery actually upserts."""
     started = time.perf_counter()
@@ -132,14 +162,16 @@ async def _safe_call_indexed(
             )
             raw = [(p.payload or {}, 1.0) for p in points]
         else:
-            from app.services.embedding import embedding_service
+            vec = list(query_embedding) if query_embedding else None
+            if not vec:
+                from app.services.embedding import embedding_service
 
-            query_embedding = await embedding_service.embed_text(query)
-            if not query_embedding:
+                vec = await embedding_service.embed_text(query)
+            if not vec:
                 raise ValueError("embedding service returned an empty vector")
             scored = qdrant_client.client.search(
                 collection_name=qdrant_client.collection_name,
-                query_vector=query_embedding,
+                query_vector=vec,
                 query_filter=tenant_filter,
                 limit=size * 2,
             )
@@ -221,6 +253,49 @@ def _merge_and_rank(
     ]
 
 
+async def run_federated_backends(
+    query: str,
+    tenant_id: str,
+    acl_terms: List[str],
+    size: int,
+    *,
+    enable_lexical: bool = True,
+    enable_vector: bool = True,
+) -> tuple[List[ResultItem], List[BackendStatus]]:
+    """Parallel indexed + lexical + vector with a single shared query embedding."""
+    embedding = await _query_embedding_for_search(query)
+    tasks = [
+        _safe_call_indexed(
+            query, tenant_id, acl_terms, size, query_embedding=embedding
+        )
+    ]
+    if enable_lexical:
+        tasks.append(_safe_call_lexical(query, tenant_id, acl_terms, size))
+    if enable_vector:
+        tasks.append(
+            _safe_call_vector(
+                query, tenant_id, acl_terms, size, query_embedding=embedding
+            )
+        )
+    results = await asyncio.gather(*tasks)
+    indexed_results = results[0][0]
+    rest = results[1:]
+    lexical_results: List[Dict[str, Any]] = []
+    vector_results: List[Dict[str, Any]] = []
+    if enable_lexical and rest:
+        lexical_results = rest[0][0]
+        rest = rest[1:]
+    if enable_vector and rest:
+        vector_results = rest[0][0]
+    statuses = [r[1] for r in results]
+    merged = _merge_and_rank(
+        indexed_results + lexical_results,
+        vector_results,
+        size,
+    )
+    return merged, statuses
+
+
 @router.post("/search/federated", response_model=FederatedSearchResponse)
 async def federated_search(
     body: FederatedSearchRequest,
@@ -249,35 +324,17 @@ async def federated_search(
             query=body.query,
         )
     
-    tasks = [
-        _safe_call_indexed(body.query, tenant_id, acl_terms, body.size),
-    ]
-    if body.enable_lexical:
-        tasks.append(_safe_call_lexical(body.query, tenant_id, acl_terms, body.size))
-    if body.enable_vector:
-        tasks.append(_safe_call_vector(body.query, tenant_id, acl_terms, body.size))
-
-    results = await asyncio.gather(*tasks)
-    indexed_results = results[0][0]
-    rest = results[1:]
-    lexical_results: List[Dict[str, Any]] = []
-    vector_results: List[Dict[str, Any]] = []
-    if body.enable_lexical and rest:
-        lexical_results = rest[0][0]
-        rest = rest[1:]
-    if body.enable_vector and rest:
-        vector_results = rest[0][0]
-
-    statuses = [r[1] for r in results]
+    merged, statuses = await run_federated_backends(
+        body.query,
+        tenant_id,
+        acl_terms,
+        body.size,
+        enable_lexical=body.enable_lexical,
+        enable_vector=body.enable_vector,
+    )
 
     if not any(s.ok for s in statuses):
         raise HTTPException(status_code=503, detail="All search backends unavailable")
-
-    merged = _merge_and_rank(
-        indexed_results + lexical_results,
-        vector_results,
-        body.size,
-    )
     
     # Pagination
     start = body.from_

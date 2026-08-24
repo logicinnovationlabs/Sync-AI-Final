@@ -10,6 +10,7 @@ client at OpenRouter, model from ``QWEN_MODEL``).
 
 from __future__ import annotations
 
+import html
 import logging
 import re
 import time
@@ -143,9 +144,28 @@ def _hit_meta(hit: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def plain_source_text(text: str, *, limit: int = 0) -> str:
+    """Strip HTML/CSS so Gmail bodies are readable evidence, not stylesheet junk."""
+    raw = str(text or "")
+    cleaned = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", raw)
+    cleaned = re.sub(r"(?i)<br\s*/?>", "\n", cleaned)
+    cleaned = re.sub(r"(?i)</p>", "\n", cleaned)
+    cleaned = re.sub(r"<[^>]+>", " ", cleaned)
+    cleaned = html.unescape(cleaned)
+    cleaned = re.sub(r"[ \t]+", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+    if limit and len(cleaned) > limit:
+        return cleaned[:limit].rstrip() + "…"
+    return cleaned
+
+
+def source_text_is_usable(text: str, *, min_chars: int = 40) -> bool:
+    return len(plain_source_text(text)) >= min_chars
+
+
 def format_source_block(hit: Dict[str, Any], index: int) -> str:
     meta = _hit_meta(hit)
-    snippet = str(hit.get("snippet") or hit.get("body") or "").strip()
+    snippet = plain_source_text(str(hit.get("snippet") or hit.get("body") or "").strip())
     if len(snippet) > MAX_SOURCE_CHARS:
         snippet = snippet[:MAX_SOURCE_CHARS].rstrip() + "…"
     header_parts = [f"[{index}]", f"document_id={meta['document_id'] or 'unknown'}"]
@@ -165,7 +185,7 @@ def debug_source_chunks(ranked_hits: Sequence[Dict[str, Any]]) -> List[Dict[str,
     chunks: List[Dict[str, Any]] = []
     for i, hit in enumerate(list(ranked_hits)[:TOP_K_SOURCES], start=1):
         meta = _hit_meta(hit)
-        snippet = str(hit.get("snippet") or hit.get("body") or "").strip()
+        snippet = plain_source_text(str(hit.get("snippet") or hit.get("body") or "").strip())
         chunks.append(
             {
                 "source_id": f"[{i}]",
@@ -362,7 +382,7 @@ class FakeChatProvider:
             )
 
         top = hits_meta[0]
-        snippet = str(top.get("snippet") or "").strip().replace("\n", " ")
+        snippet = plain_source_text(str(top.get("snippet") or "")).replace("\n", " ")
         title = str(top.get("title") or top.get("document_id") or "your document").strip()
         if len(snippet) > 280:
             snippet = snippet[:280].rstrip() + "…"
@@ -375,24 +395,111 @@ class FakeChatProvider:
         )
 
 
+def _text_from_value(value: Any) -> str:
+    """Coerce OpenAI/OpenRouter content (string, list, or part objects) to text."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, list):
+        parts: List[str] = []
+        for item in value:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict):
+                parts.append(str(item.get("text") or item.get("content") or ""))
+            else:
+                parts.append(
+                    str(
+                        getattr(item, "text", None)
+                        or getattr(item, "content", None)
+                        or ""
+                    )
+                )
+        return "".join(parts).strip()
+    return str(value).strip()
+
+
+def _message_fields(message: Any) -> Dict[str, Any]:
+    if message is None:
+        return {}
+    dump = getattr(message, "model_dump", None)
+    if callable(dump):
+        try:
+            data = dump(exclude_none=True)
+            if isinstance(data, dict):
+                extra = data.get("model_extra") if isinstance(data.get("model_extra"), dict) else {}
+                merged = dict(data)
+                if extra:
+                    merged.update(extra)
+                return merged
+        except Exception:  # noqa: BLE001
+            pass
+    fields: Dict[str, Any] = {}
+    extra = getattr(message, "model_extra", None)
+    if isinstance(extra, dict):
+        fields.update(extra)
+    for key in ("content", "reasoning", "reasoning_content", "reasoning_details", "refusal"):
+        val = getattr(message, key, None)
+        if val is not None:
+            fields[key] = val
+    return fields
+
+
+def _as_mapping(value: Any) -> Optional[Dict[str, Any]]:
+    if isinstance(value, dict):
+        return value
+    dump = getattr(value, "model_dump", None)
+    if callable(dump):
+        try:
+            data = dump()
+            return data if isinstance(data, dict) else None
+        except Exception:  # noqa: BLE001
+            return None
+    return None
+
+
+def _choice_mapping(choice: Any) -> Dict[str, Any]:
+    data = _as_mapping(choice)
+    if data is not None:
+        return data
+    message = getattr(choice, "message", None) or getattr(choice, "delta", None)
+    fields = _message_fields(message)
+    return {
+        "finish_reason": getattr(choice, "finish_reason", None)
+        or getattr(choice, "native_finish_reason", None),
+        "message": fields,
+        "delta": fields,
+    }
+
+
 def _completion_text(response: Any) -> tuple[str, Optional[str]]:
     """Extract assistant text from a non-stream OpenAI-compatible payload."""
-    choices = getattr(response, "choices", None)
+    data = _as_mapping(response)
+    if data is None:
+        error = getattr(response, "error", None)
+        choices = getattr(response, "choices", None) or []
+        data = {"error": error, "choices": choices}
+    error = data.get("error")
+    if error:
+        return "", f"provider_error:{error}"
+    choices = data.get("choices")
     if not choices:
         return "", "empty_choices"
-    choice = choices[0]
-    message = getattr(choice, "message", None)
-    content = getattr(message, "content", None) if message is not None else None
-    if isinstance(content, list):
-        parts = []
-        for item in content:
-            if isinstance(item, dict) and item.get("type") == "text":
-                parts.append(str(item.get("text") or ""))
-            elif isinstance(item, str):
-                parts.append(item)
-        content = "".join(parts)
-    text = (content or "").strip()
-    finish = getattr(choice, "finish_reason", None)
+    choice = _choice_mapping(choices[0])
+    message = choice.get("message") or choice.get("delta") or {}
+    if not isinstance(message, dict):
+        message = _message_fields(message)
+    text = _text_from_value(message.get("content"))
+    if not text:
+        text = _text_from_value(message.get("reasoning") or message.get("reasoning_content"))
+    if not text:
+        details = message.get("reasoning_details")
+        if isinstance(details, list):
+            text = _text_from_value(
+                [item.get("text") if isinstance(item, dict) else item for item in details]
+            )
+    finish = choice.get("finish_reason") or choice.get("native_finish_reason")
     if not text:
         return "", f"empty_content:{finish or 'unknown'}"
     return text, None
@@ -409,15 +516,24 @@ class OpenRouterChatProvider:
         model: str,
         base_url: str = OPENROUTER_DEFAULT_BASE_URL,
         timeout_s: float = QWEN_TIMEOUT_S,
+        *,
+        http_referer: Optional[str] = None,
     ) -> None:
         # Import here so fake/unit tests do not require the openai package.
         from openai import AsyncOpenAI
 
         self.model = model
+        referer = (http_referer or getattr(settings, "frontend_url", None) or "").strip()
+        if not referer:
+            referer = "https://synq.app"
         self._client = AsyncOpenAI(
             api_key=api_key,
             base_url=base_url,
             timeout=timeout_s,
+            default_headers={
+                "HTTP-Referer": referer,
+                "X-Title": "SynQ",
+            },
         )
 
     @classmethod
@@ -432,7 +548,35 @@ class OpenRouterChatProvider:
             raise ValueError("OPENROUTER_API_KEY not configured")
         if not model:
             raise ValueError("QWEN_MODEL not configured")
-        return cls(api_key=str(api_key), model=str(model), base_url=str(base_url))
+        return cls(
+            api_key=str(api_key),
+            model=str(model),
+            base_url=str(base_url),
+            http_referer=str(getattr(cfg, "frontend_url", "") or ""),
+        )
+
+    @staticmethod
+    def _may_reason(model: str) -> bool:
+        lowered = (model or "").lower()
+        return any(token in lowered for token in ("qwen3", "thinking", "reason"))
+
+    async def _create_completion(self, **kwargs: Any) -> Any:
+        """Prefer raw JSON so OpenRouter `reasoning` fields are not dropped."""
+        raw_api = getattr(self._client.chat.completions, "with_raw_response", None)
+        if raw_api is not None:
+            raw = await raw_api.create(**kwargs)
+            http_resp = getattr(raw, "http_response", None)
+            if http_resp is not None:
+                try:
+                    payload = http_resp.json()
+                    if isinstance(payload, dict):
+                        return payload
+                except Exception:  # noqa: BLE001
+                    pass
+            parse = getattr(raw, "parse", None)
+            if callable(parse):
+                return parse()
+        return await self._client.chat.completions.create(**kwargs)
 
     async def generate(
         self,
@@ -443,6 +587,9 @@ class OpenRouterChatProvider:
         max_tokens = kwargs.get("max_tokens")
         if max_tokens is None:
             max_tokens = getattr(settings, "llm_chat_max_tokens", 1024) or 1024
+        # Reasoning models spend the same budget on hidden thinking; 512 often
+        # yields finish_reason=length with an empty content field.
+        token_budget = max(int(max_tokens), 2048 if self._may_reason(self.model) else 1024)
         temperature = kwargs.get("temperature")
         if temperature is None:
             temperature = getattr(settings, "llm_chat_temperature", 0.1)
@@ -452,76 +599,127 @@ class OpenRouterChatProvider:
             temperature = 0.1
 
         logger.info(
-            "[assistant.pipeline] Qwen request started model=%s max_tokens=%s temperature=%s",
+            "[assistant.pipeline] Qwen request started model=%s max_tokens=%s temperature=%s stream=false",
             self.model,
-            int(max_tokens),
+            token_budget,
             temperature,
         )
-        first_token_ms: Optional[float] = None
-        parts: List[str] = []
+
+        create_kwargs: Dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": token_budget,
+            "temperature": temperature,
+            "stream": False,
+            "extra_body": {
+                # Disable hidden thinking so the budget is used for the answer.
+                "reasoning": {"effort": "none", "exclude": True},
+            },
+        }
+
         try:
-            stream = await self._client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                max_tokens=int(max_tokens),
-                temperature=temperature,
-                stream=True,
-            )
-            async for event in stream:
-                choices = getattr(event, "choices", None) or []
-                if not choices:
-                    continue
-                delta = getattr(choices[0], "delta", None)
-                content = getattr(delta, "content", None) if delta is not None else None
-                if not content:
-                    continue
-                if first_token_ms is None:
-                    first_token_ms = (time.perf_counter() - started) * 1000.0
-                    logger.info(
-                        "[assistant.pipeline] first token received ms=%.1f",
-                        first_token_ms,
-                    )
-                parts.append(content)
-        except Exception as exc:  # noqa: BLE001
-            elapsed = (time.perf_counter() - started) * 1000.0
-            err = redact_provider_error(exc)
+            completion = await self._create_completion(**create_kwargs)
+        except Exception as first_exc:  # noqa: BLE001
+            # Some models reject the reasoning extra_body; retry once without it.
             logger.warning(
-                "[assistant.pipeline] Qwen request failed ms=%.1f error=%s",
-                elapsed,
-                err,
+                "[assistant.pipeline] Qwen first request failed; retrying without reasoning extras error=%s",
+                redact_provider_error(first_exc),
             )
-            return ChatGeneration(
-                text="",
-                provider=self.name,
-                error=f"provider_error:{err}",
-                timings_ms={"qwen_completed_ms": elapsed},
+            try:
+                create_kwargs.pop("extra_body", None)
+                completion = await self._create_completion(**create_kwargs)
+            except Exception as exc:  # noqa: BLE001
+                elapsed = (time.perf_counter() - started) * 1000.0
+                err = redact_provider_error(exc)
+                logger.warning(
+                    "[assistant.pipeline] Qwen request failed ms=%.1f error=%s",
+                    elapsed,
+                    err,
+                )
+                return ChatGeneration(
+                    text="",
+                    provider=self.name,
+                    error=f"provider_error:{err}",
+                    timings_ms={"qwen_completed_ms": elapsed},
+                )
+
+        text, err = _completion_text(completion)
+        data = _as_mapping(completion) or {}
+        finish = None
+        choices = data.get("choices") or getattr(completion, "choices", None) or []
+        if choices:
+            c0 = choices[0]
+            if isinstance(c0, dict):
+                finish = c0.get("finish_reason") or c0.get("native_finish_reason")
+            else:
+                finish = getattr(c0, "finish_reason", None)
+        usage = data.get("usage") or getattr(completion, "usage", None)
+        usage_bits = ""
+        if isinstance(usage, dict):
+            usage_bits = (
+                f" prompt={usage.get('prompt_tokens')}"
+                f" completion={usage.get('completion_tokens')}"
+            )
+        elif usage is not None:
+            usage_bits = (
+                f" prompt={getattr(usage, 'prompt_tokens', None)}"
+                f" completion={getattr(usage, 'completion_tokens', None)}"
             )
 
-        text = "".join(parts).strip()
+        if not text:
+            logger.warning(
+                "[assistant.pipeline] Qwen empty payload; retrying once with more tokens finish=%s error=%s",
+                finish,
+                err,
+            )
+            try:
+                retry_kwargs = dict(create_kwargs)
+                retry_kwargs["max_tokens"] = max(token_budget, 2048)
+                retry_kwargs["extra_body"] = {
+                    "reasoning": {"effort": "none", "exclude": True}
+                }
+                completion = await self._create_completion(**retry_kwargs)
+                text, err = _completion_text(completion)
+                data = _as_mapping(completion) or {}
+                choices = data.get("choices") or []
+                if choices and isinstance(choices[0], dict):
+                    finish = choices[0].get("finish_reason") or finish
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "[assistant.pipeline] Qwen retry failed error=%s",
+                    redact_provider_error(exc),
+                )
+
         elapsed = (time.perf_counter() - started) * 1000.0
         if not text:
             logger.warning(
-                "[assistant.pipeline] Qwen returned empty payload ms=%.1f", elapsed
+                "[assistant.pipeline] Qwen returned empty payload ms=%.1f error=%s finish=%s%s",
+                elapsed,
+                err or "empty_content",
+                finish,
+                usage_bits,
             )
             return ChatGeneration(
                 text="",
                 provider=self.name,
-                error="empty_content",
+                error=err or "empty_content",
                 timings_ms={
-                    "qwen_first_token_ms": first_token_ms or elapsed,
+                    "qwen_first_token_ms": elapsed,
                     "qwen_completed_ms": elapsed,
                 },
             )
         logger.info(
-            "[assistant.pipeline] Qwen response completed ms=%.1f chars=%s",
+            "[assistant.pipeline] Qwen response completed ms=%.1f chars=%s finish=%s%s",
             elapsed,
             len(text),
+            finish,
+            usage_bits,
         )
         return ChatGeneration(
             text=text,
             provider=self.name,
             timings_ms={
-                "qwen_first_token_ms": first_token_ms if first_token_ms is not None else elapsed,
+                "qwen_first_token_ms": elapsed,
                 "qwen_completed_ms": elapsed,
             },
         )

@@ -18,12 +18,7 @@ async def federated_search_inprocess(
     enable_vector: bool = True,
 ) -> Dict[str, Any]:
     """Same backends as POST /search/federated, without an HTTP self-call."""
-    from app.api.v1.search.federated import (
-        _merge_and_rank,
-        _safe_call_indexed,
-        _safe_call_lexical,
-        _safe_call_vector,
-    )
+    from app.api.v1.search.federated import run_federated_backends
 
     if acl_terms is None:
         user_ctx = UserContext(
@@ -37,28 +32,13 @@ async def federated_search_inprocess(
         if principal_id and f"user:{principal_id}" not in acl_terms:
             acl_terms = list(acl_terms) + [f"user:{principal_id}"]
 
-    indexed_results, idx_status = await _safe_call_indexed(
-        query, tenant_id, acl_terms, size
-    )
-    lexical_results: List[Dict[str, Any]] = []
-    vector_results: List[Dict[str, Any]] = []
-    statuses = [idx_status]
-
-    if enable_lexical:
-        lexical_results, lex_status = await _safe_call_lexical(
-            query, tenant_id, acl_terms, size
-        )
-        statuses.append(lex_status)
-    if enable_vector:
-        vector_results, vec_status = await _safe_call_vector(
-            query, tenant_id, acl_terms, size
-        )
-        statuses.append(vec_status)
-
-    merged = _merge_and_rank(
-        indexed_results + lexical_results,
-        vector_results,
+    merged, statuses = await run_federated_backends(
+        query,
+        tenant_id,
+        acl_terms,
         size,
+        enable_lexical=enable_lexical,
+        enable_vector=enable_vector,
     )
     degraded = not any(s.ok for s in statuses) or not all(s.ok for s in statuses)
     return {

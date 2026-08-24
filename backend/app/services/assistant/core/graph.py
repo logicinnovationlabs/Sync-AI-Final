@@ -24,14 +24,20 @@ from app.services.assistant.domain.models import (
     ToolResult,
 )
 from app.services.assistant.infrastructure.memory_store import EpisodicMemoryStore
-from app.services.assistant.infrastructure.tools import SearchToolbox, encode_acl_terms
+from app.services.assistant.infrastructure.tools import (
+    SearchToolbox,
+    encode_acl_terms,
+    is_loopback_url,
+)
 from app.services.assistant.infrastructure.chat_provider import (
     GREETING_TEXT,
     ChatService,
     assemble_chat_messages,
     debug_source_chunks,
     filter_relevant_hits,
+    plain_source_text,
     record_prompt,
+    source_text_is_usable,
 )
 
 logger = logging.getLogger(__name__)
@@ -286,29 +292,31 @@ class OrchestratorGraph:
                     "tool_call_rounds": rounds + 1,
                 }
 
-        # Parallel lexical + vector via Federator fan-out wrappers + signal lookup.
-        calls = [
-            ToolCall(
-                tool_name="lexical_search",
-                query_params={"query": prompt, "size": 10},
-                acl_compiled_filter=acl,
-            ),
-            ToolCall(
-                tool_name="vector_search",
-                query_params={"query": prompt, "size": 10},
-                acl_compiled_filter=acl,
-            ),
-            ToolCall(
-                tool_name="signal_lookup",
-                query_params={"user_id": req["user_id"]},
-                acl_compiled_filter=acl,
-            ),
-        ]
-        gathered = await asyncio.gather(
-            *[self.toolbox.execute(c, authorization=auth, tenant_id=tenant_id) for c in calls]
+        # One federated search (indexed + lexical + vector). The old dual
+        # lexical_search + vector_search wrappers each ran the full federator.
+        search_call = ToolCall(
+            tool_name="vector_search",
+            query_params={"query": prompt, "size": 10},
+            acl_compiled_filter=acl,
         )
-        results.extend(gathered)
+        tasks = [
+            self.toolbox.execute(search_call, authorization=auth, tenant_id=tenant_id)
+        ]
         signals: Dict[str, Any] = {}
+        if not is_loopback_url(getattr(self.toolbox, "signals_url", "")):
+            tasks.append(
+                self.toolbox.execute(
+                    ToolCall(
+                        tool_name="signal_lookup",
+                        query_params={"user_id": req["user_id"]},
+                        acl_compiled_filter=acl,
+                    ),
+                    authorization=auth,
+                    tenant_id=tenant_id,
+                )
+            )
+        gathered = await asyncio.gather(*tasks)
+        results.extend(gathered)
         for r in gathered:
             if r.tool_name == "signal_lookup" and r.ok:
                 signals = r.payload
@@ -376,6 +384,10 @@ class OrchestratorGraph:
             retrieval_confidence(boosted) < self.confidence_threshold
             and boosted
             and rounds < self.max_tool_call_rounds
+            and not any(
+                source_text_is_usable(str(h.snippet or h.title or ""))
+                for h in boosted[:3]
+            )
         ):
             top = boosted[0]
             acl = state["acl_compiled_filter"]
@@ -477,7 +489,7 @@ class OrchestratorGraph:
 
         citations: List[Dict[str, Any]] = []
         for i, h in enumerate(hits[:3], start=1):
-            snippet = (h.get("snippet") or "").strip().replace("\n", " ")
+            snippet = plain_source_text(str(h.get("snippet") or ""), limit=200)
             meta = h.get("meta") if isinstance(h.get("meta"), dict) else {}
             citations.append(
                 {
@@ -515,13 +527,13 @@ class OrchestratorGraph:
             getattr(self.chat_service.provider, "name", ""),
             len(hits),
         )
-        max_tokens_raw = getattr(_settings, "llm_chat_max_tokens", 512)
+        max_tokens_raw = getattr(_settings, "llm_chat_max_tokens", 1024)
         temperature_raw = getattr(_settings, "llm_chat_temperature", 0.1)
         generation = await self.chat_service.generate(
             messages,
             ranked_hits=hits,
             used_document_reader=bool(state.get("used_document_reader")),
-            max_tokens=int(max_tokens_raw if max_tokens_raw is not None else 512),
+            max_tokens=int(max_tokens_raw if max_tokens_raw is not None else 1024),
             temperature=float(temperature_raw if temperature_raw is not None else 0.1),
         )
         gen_timings = generation.timings_ms or {}

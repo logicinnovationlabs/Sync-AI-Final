@@ -24,6 +24,18 @@ logger = logging.getLogger(__name__)
 AclCaptureHook = Callable[[str, bytes, Dict[str, Any]], None]
 
 
+def is_loopback_url(url: str) -> bool:
+    lowered = (url or "").lower()
+    return (
+        not lowered
+        or "localhost" in lowered
+        or "127.0.0.1" in lowered
+        or "0.0.0.0" in lowered
+        or "[::1]" in lowered
+        or "://::1" in lowered
+    )
+
+
 def encode_acl_terms(acl_terms: List[str]) -> bytes:
     """Wrap Identity/JWT acl_terms as opaque bytes (JSON array, UTF-8)."""
     return json.dumps(list(acl_terms), separators=(",", ":"), ensure_ascii=False).encode(
@@ -166,13 +178,7 @@ class SearchToolbox:
         )
 
     def _federator_is_loopback(self) -> bool:
-        url = (self.federator_url or "").lower()
-        return (
-            not url
-            or "localhost" in url
-            or "127.0.0.1" in url
-            or "0.0.0.0" in url
-        )
+        return is_loopback_url(self.federator_url)
 
     async def _federated_search(
         self,
@@ -438,6 +444,14 @@ class SearchToolbox:
         self._record(call.tool_name, acl, {"url": url, "headers": headers, "tenant_id": tenant_id})
 
         started = time.perf_counter()
+        if is_loopback_url(self.signals_url):
+            return ToolResult(
+                tool_name=call.tool_name,
+                ok=True,
+                payload={"skipped": True, "reason": "loopback"},
+                acl_bytes_sent=acl,
+                latency_ms=(time.perf_counter() - started) * 1000.0,
+            )
         try:
             resp = await self._request("GET", url, headers=headers)
             latency = (time.perf_counter() - started) * 1000.0
