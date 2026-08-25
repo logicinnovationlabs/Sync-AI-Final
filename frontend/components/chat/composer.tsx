@@ -32,7 +32,7 @@ export function Composer({
     const el = ref.current
     if (!el) return
     el.style.height = "auto"
-    el.style.height = `${Math.min(el.scrollHeight, 160)}px`
+    el.style.height = `${Math.min(el.scrollHeight, 180)}px`
   }
 
   function submit() {
@@ -53,7 +53,7 @@ export function Composer({
         }
         submit()
       }}
-      className="relative flex items-end gap-2 rounded-[1.75rem] border border-border bg-card p-2 pl-4 shadow-[0_2px_24px_-16px_oklch(0.3_0.04_275/0.5)] transition-colors focus-within:border-foreground/25"
+      className="relative flex items-end gap-2 rounded-[1.75rem] border border-neutral-200/90 bg-card px-2 py-2 pl-4 shadow-[0_1px_2px_oklch(0.35_0.02_275/0.04),0_8px_28px_-18px_oklch(0.3_0.03_275/0.28)] transition-colors focus-within:border-neutral-300"
     >
       <label htmlFor="composer" className="sr-only">
         Ask a question
@@ -75,7 +75,7 @@ export function Composer({
             if (!busy) submit()
           }
         }}
-        className="max-h-40 min-h-[2.25rem] flex-1 resize-none self-center bg-transparent py-2 text-[0.9375rem] leading-6 outline-none placeholder:text-muted-foreground/70 disabled:opacity-60"
+        className="max-h-44 min-h-[2.75rem] flex-1 resize-none self-center bg-transparent py-2.5 text-[1rem] leading-[1.55] tracking-[-0.011em] text-neutral-800 outline-none placeholder:text-neutral-400 disabled:opacity-60"
       />
 
       {busy ? (
@@ -83,7 +83,7 @@ export function Composer({
           type="button"
           onClick={() => onStop?.()}
           aria-label="Stop generating"
-          className="grid size-9 shrink-0 place-items-center rounded-full bg-foreground text-background transition-all outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="mb-0.5 grid size-9 shrink-0 place-items-center rounded-full bg-neutral-800 text-white transition-all outline-none hover:bg-neutral-700 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           <Square className="size-3.5 fill-current" />
         </button>
@@ -93,10 +93,10 @@ export function Composer({
           disabled={disabled || !value.trim()}
           aria-label="Send"
           className={cn(
-            "grid size-9 shrink-0 place-items-center rounded-full transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            "mb-0.5 grid size-9 shrink-0 place-items-center rounded-full transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             value.trim() && !disabled
-              ? "bg-primary text-primary-foreground hover:bg-primary/85"
-              : "bg-muted text-muted-foreground"
+              ? "bg-neutral-800 text-white hover:bg-neutral-700"
+              : "bg-neutral-100 text-neutral-400"
           )}
         >
           <ArrowUp className="size-4" />

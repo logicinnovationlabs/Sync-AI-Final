@@ -411,6 +411,8 @@ export function ChatView() {
     )
   const railSources = railTurn?.sources ?? []
   const empty = turns.length === 0
+  const sessionTitle =
+    windows.find((w) => w.id === sessionId)?.title?.trim() || "New chat"
 
   if (!hydrated) {
     return <div className="flex h-full min-h-0" />
@@ -419,8 +421,10 @@ export function ChatView() {
   if (!authenticated) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-        <p className="text-lg font-medium">Sign in to chat</p>
-        <p className="max-w-md text-sm text-muted-foreground">
+        <p className="text-lg font-medium tracking-[-0.01em] text-neutral-800">
+          Sign in to chat
+        </p>
+        <p className="max-w-md text-[0.9375rem] leading-relaxed text-neutral-500">
           Your conversations are saved per account so you can reopen earlier
           windows.
         </p>
@@ -437,19 +441,27 @@ export function ChatView() {
   return (
     <div className="flex h-full min-h-0">
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+        {!empty && (
+          <header className="shrink-0 border-b border-border-subtle/70 px-6 py-3">
+            <h1 className="mx-auto max-w-3xl truncate text-center text-[0.8125rem] font-medium tracking-[-0.01em] text-neutral-500">
+              {sessionTitle}
+            </h1>
+          </header>
+        )}
+
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 sm:px-8">
           {empty ? (
-            <div className="mx-auto flex max-w-2xl flex-col gap-3 pt-16">
-              <h2 className="font-heading text-3xl font-normal tracking-[-0.02em]">
+            <div className="mx-auto flex max-w-3xl flex-col items-center gap-3 pt-[18vh] text-center">
+              <h2 className="font-heading text-[clamp(1.75rem,3.2vw,2.25rem)] font-normal tracking-[-0.03em] text-neutral-800">
                 What do you want to know?
               </h2>
-              <p className="text-sm text-muted-foreground">
+              <p className="max-w-md text-[1rem] leading-[1.65] text-neutral-500">
                 Ask in plain language. Answers come from your indexed documents,
                 with sources in the right-hand rail.
               </p>
             </div>
           ) : (
-            <div className="mx-auto flex max-w-2xl flex-col gap-6">
+            <div className="mx-auto flex max-w-3xl flex-col gap-9 py-8 pb-12">
               {turns.map((turn) =>
                 turn.kind === "user" ? (
                   <motion.div
@@ -459,7 +471,7 @@ export function ChatView() {
                     transition={{ duration: 0.2, ease: EASE_OUT }}
                     className="flex justify-end"
                   >
-                    <div className="max-w-[85%] rounded-2xl bg-muted px-4 py-2 text-[0.9375rem]">
+                    <div className="max-w-[min(85%,36rem)] rounded-[1.35rem] bg-neutral-100 px-4 py-2.5 text-[0.9875rem] leading-[1.55] tracking-[-0.011em] text-neutral-800">
                       {turn.text}
                     </div>
                   </motion.div>
@@ -478,12 +490,16 @@ export function ChatView() {
           )}
         </div>
 
-        <div className="border-t border-border-subtle px-6 py-4">
-          <div className="mx-auto max-w-2xl">
+        <div className="shrink-0 px-4 pb-4 pt-2 sm:px-8 sm:pb-5">
+          <div className="mx-auto max-w-3xl">
             <Composer onSend={ask} onStop={stopGeneration} busy={busy} disabled={busy} />
-            {error && (
-              <p role="alert" className="mt-2 text-xs text-destructive">
+            {error ? (
+              <p role="alert" className="mt-2 text-center text-xs text-destructive">
                 {error}
+              </p>
+            ) : (
+              <p className="mt-2.5 text-center text-[0.6875rem] leading-snug text-neutral-400">
+                SynQ can make mistakes. Check important answers against your sources.
               </p>
             )}
           </div>
@@ -558,7 +574,7 @@ function AnswerTurn({
   const [sourcesMinimized, setSourcesMinimized] = useState(false)
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex w-full min-w-0 flex-col gap-4">
       <AnimatePresence>
         {!turn.settled && !turn.text && !turn.error && (
           <motion.p
@@ -567,7 +583,7 @@ function AnswerTurn({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.14 }}
-            className="flex items-center gap-2.5 text-[0.9375rem] text-muted-foreground"
+            className="flex items-center gap-2.5 text-[0.9875rem] leading-relaxed text-neutral-500"
           >
             <Loader size={16} />
             Searching connected sources…
@@ -576,12 +592,11 @@ function AnswerTurn({
       </AnimatePresence>
 
       {turn.error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-[0.9375rem] leading-relaxed text-destructive">
           {turn.error}
         </p>
       )}
 
-      {/* Sources above the answer — Claude-style: connectors/resources first, then chat. */}
       {turn.sources.length > 0 && turn.settled && (
         <div className="xl:hidden">
           <div className="mb-2 flex items-center justify-between gap-2">
@@ -620,14 +635,14 @@ function AnswerTurn({
       )}
 
       {turn.text && (
-        <div className="text-[0.9375rem] leading-7 whitespace-pre-wrap">
+        <div className="min-w-0 wrap-break-word whitespace-pre-wrap text-[1.0625rem] leading-[1.75] tracking-[-0.014em] text-neutral-800">
           {turn.text}
           {streaming && (
             <motion.span
               aria-hidden
               animate={{ opacity: [1, 0.25, 1] }}
               transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut" }}
-              className="ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[0.18em] rounded-full bg-ink-blue"
+              className="ml-0.5 inline-block h-[1.05em] w-0.5 translate-y-[0.18em] rounded-full bg-ink-blue"
             />
           )}
         </div>
