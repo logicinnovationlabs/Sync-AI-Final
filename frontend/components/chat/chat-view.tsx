@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
-import { Plus } from "lucide-react"
+import { ChevronDown, ChevronUp, Plus } from "lucide-react"
 import { Composer } from "@/components/chat/composer"
 import { SourceCard, type SourceCardData } from "@/components/chat/source-card"
 import { Loader } from "@/components/motion/loader"
@@ -128,6 +128,8 @@ export function ChatView() {
   const sessionRef = useRef("")
   const windowsRef = useRef<ChatWindow[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
+  const [sourcesOpen, setSourcesOpen] = useState(true)
 
   turnsRef.current = turns
   sessionRef.current = sessionId
@@ -135,6 +137,10 @@ export function ChatView() {
 
   const last = turns[turns.length - 1]
   const busy = last?.kind === "answer" && !last.settled
+
+  const stopGeneration = useCallback(() => {
+    abortRef.current?.abort()
+  }, [])
 
   const persist = useCallback(
     (nextSession: string, nextTurns: Turn[], nextWindows: ChatWindow[]) => {
@@ -220,6 +226,7 @@ export function ChatView() {
   const openWindow = useCallback(
     async (id: string) => {
       if (id === sessionRef.current) return
+      abortRef.current?.abort()
       setActiveCite(null)
       setError(null)
       setSessionId(id)
@@ -242,6 +249,7 @@ export function ChatView() {
   )
 
   const startNewChat = useCallback(() => {
+    abortRef.current?.abort()
     const id = newSessionId()
     setActiveCite(null)
     setError(null)
@@ -257,8 +265,13 @@ export function ChatView() {
         setError("Sign in to chat against the live assistant.")
         return
       }
+      abortRef.current?.abort()
+      const controller = new AbortController()
+      abortRef.current = controller
+
       setError(null)
       setActiveCite(null)
+      setSourcesOpen(true)
       const userTurnId = nextId.current++
       const answerId = nextId.current++
       setTurns((prev) => [
@@ -281,6 +294,7 @@ export function ChatView() {
           prompt: text,
           sessionId: sessionRef.current,
           tenantId: claims?.tenant_id,
+          signal: controller.signal,
           onEvent: (event) => {
             if (event.type === "token") {
               setTurns((prev) =>
@@ -326,6 +340,24 @@ export function ChatView() {
           )
         )
       } catch (err) {
+        const aborted =
+          (err instanceof DOMException && err.name === "AbortError") ||
+          (err instanceof Error && err.name === "AbortError") ||
+          controller.signal.aborted
+        if (aborted) {
+          setTurns((prev) =>
+            prev.map((t) =>
+              t.kind === "answer" && t.id === answerId && !t.settled
+                ? {
+                    ...t,
+                    text: t.text || "Stopped.",
+                    settled: true,
+                  }
+                : t
+            )
+          )
+          return
+        }
         const message =
           err instanceof ApiError
             ? err.message
@@ -339,6 +371,8 @@ export function ChatView() {
               : t
           )
         )
+      } finally {
+        if (abortRef.current === controller) abortRef.current = null
       }
     },
     [authenticated, claims?.tenant_id, token]
@@ -487,7 +521,7 @@ export function ChatView() {
 
         <div className="border-t border-border-subtle px-6 py-4">
           <div className="mx-auto max-w-2xl">
-            <Composer onSend={ask} disabled={busy} />
+            <Composer onSend={ask} onStop={stopGeneration} busy={busy} disabled={busy} />
             {error && (
               <p role="alert" className="mt-2 text-xs text-destructive">
                 {error}
@@ -497,28 +531,54 @@ export function ChatView() {
         </div>
       </div>
 
-      <aside className="hidden w-80 shrink-0 border-l border-border-subtle xl:block">
-        <div className="px-4 py-4 text-xs font-medium text-muted-foreground">
-          Sources · {railSources.length}
-        </div>
-        {railSources.length === 0 ? (
-          <p className="px-4 text-sm text-muted-foreground">
-            Records used for the latest answer show up here.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-2 px-3 pb-4">
-            {railSources.map((source) => (
-              <li key={`${railTurn?.id}-${source.n}`}>
-                <SourceCard
-                  source={source}
-                  active={activeCite === source.n}
-                  onActivate={setActiveCite}
-                  onDeactivate={() => setActiveCite(null)}
-                />
-              </li>
-            ))}
-          </ul>
+      <aside
+        className={cn(
+          "hidden shrink-0 border-l border-border-subtle transition-[width] duration-200 xl:block",
+          sourcesOpen ? "w-80" : "w-12"
         )}
+      >
+        <div className="flex items-center justify-between gap-2 px-3 py-4">
+          {sourcesOpen ? (
+            <span className="text-xs font-medium text-muted-foreground">
+              Sources · {railSources.length}
+            </span>
+          ) : (
+            <span className="sr-only">Sources</span>
+          )}
+          <button
+            type="button"
+            onClick={() => setSourcesOpen((open) => !open)}
+            aria-expanded={sourcesOpen}
+            aria-label={sourcesOpen ? "Minimize sources" : "Expand sources"}
+            className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            {sourcesOpen ? (
+              <ChevronUp className="size-4" />
+            ) : (
+              <ChevronDown className="size-4" />
+            )}
+          </button>
+        </div>
+        {sourcesOpen ? (
+          railSources.length === 0 ? (
+            <p className="px-4 text-sm text-muted-foreground">
+              Records used for the latest answer show up here.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2 px-3 pb-4">
+              {railSources.map((source) => (
+                <li key={`${railTurn?.id}-${source.n}`}>
+                  <SourceCard
+                    source={source}
+                    active={activeCite === source.n}
+                    onActivate={setActiveCite}
+                    onDeactivate={() => setActiveCite(null)}
+                  />
+                </li>
+              ))}
+            </ul>
+          )
+        ) : null}
       </aside>
     </div>
   )
@@ -536,6 +596,7 @@ function AnswerTurn({
   reduce: boolean
 }) {
   const streaming = !turn.settled && !turn.error
+  const [sourcesMinimized, setSourcesMinimized] = useState(false)
 
   return (
     <div className="flex flex-col gap-3">
@@ -561,6 +622,44 @@ function AnswerTurn({
         </p>
       )}
 
+      {/* Sources above the answer — Claude-style: connectors/resources first, then chat. */}
+      {turn.sources.length > 0 && turn.settled && (
+        <div className="xl:hidden">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-xs font-medium text-muted-foreground">
+              Sources · {turn.sources.length}
+            </span>
+            <button
+              type="button"
+              onClick={() => setSourcesMinimized((v) => !v)}
+              aria-expanded={!sourcesMinimized}
+              className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+            >
+              {sourcesMinimized ? "Show" : "Minimize"}
+            </button>
+          </div>
+          {!sourcesMinimized && (
+            <ul className="flex flex-col gap-2">
+              {turn.sources.map((source, i) => (
+                <motion.li
+                  key={source.n}
+                  initial={reduce ? false : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2, ease: EASE_OUT, delay: i * 0.04 }}
+                >
+                  <SourceCard
+                    source={source}
+                    active={activeCite === source.n}
+                    onActivate={setActiveCite}
+                    onDeactivate={() => setActiveCite(null)}
+                  />
+                </motion.li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {turn.text && (
         <div className="text-[0.9375rem] leading-7 whitespace-pre-wrap">
           {turn.text}
@@ -573,26 +672,6 @@ function AnswerTurn({
             />
           )}
         </div>
-      )}
-
-      {turn.sources.length > 0 && turn.settled && (
-        <ul className="flex flex-col gap-2 xl:hidden">
-          {turn.sources.map((source, i) => (
-            <motion.li
-              key={source.n}
-              initial={reduce ? false : { opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2, ease: EASE_OUT, delay: i * 0.04 }}
-            >
-              <SourceCard
-                source={source}
-                active={activeCite === source.n}
-                onActivate={setActiveCite}
-                onDeactivate={() => setActiveCite(null)}
-              />
-            </motion.li>
-          ))}
-        </ul>
       )}
     </div>
   )

@@ -11,9 +11,9 @@ import { useAuthHydrated, useAuthStore } from "@/lib/auth/auth-store"
 import { cn } from "@/lib/utils"
 
 const baseItems = [
-  { href: "/chat", label: "Chat", icon: MessageSquare },
   { href: "/documents", label: "Documents", icon: FileText },
   { href: "/connectors", label: "Connectors", icon: Plug },
+  { href: "/chat", label: "Chat", icon: MessageSquare },
 ]
 
 const adminItems = [

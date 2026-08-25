@@ -60,6 +60,7 @@ export async function streamAssistantChat(params: {
   sessionId: string
   tenantId?: string
   debug?: boolean
+  signal?: AbortSignal
   onEvent: (event: AssistantStreamEvent) => void
 }): Promise<void> {
   const debug = params.debug ?? assistantDebugEnabled()
@@ -67,109 +68,122 @@ export async function streamAssistantChat(params: {
     typeof performance !== "undefined" ? performance.now() : Date.now()
   pipelineLog("request_sent", { prompt_len: params.prompt.length, debug })
 
-  const res = await fetch(`${API_BASE_URL}/assistant/orchestrator/chat`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${params.token}`,
-    },
-    body: JSON.stringify({
-      prompt: params.prompt,
-      session_id: params.sessionId,
-      debug,
-      ...(params.tenantId ? { tenant_id: params.tenantId } : {}),
-    }),
-    signal: AbortSignal.timeout(CHAT_TIMEOUT_MS),
-  })
-
-  if (!res.ok) {
-    let message = res.statusText
-    try {
-      message = formatApiError(await res.json()) ?? message
-    } catch {
-      // ignore
-    }
-    if (res.status === 405) {
-      message =
-        "Chat is POST-only. Refresh the page (a leftover service worker can turn this into GET)."
-    }
-    throw new ApiError(res.status, message)
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS)
+  const onExternalAbort = () => controller.abort()
+  if (params.signal) {
+    if (params.signal.aborted) controller.abort()
+    else params.signal.addEventListener("abort", onExternalAbort, { once: true })
   }
 
-  if (!res.body) {
-    throw new ApiError(res.status, "Chat response had no body")
-  }
+  try {
+    const res = await fetch(`${API_BASE_URL}/assistant/orchestrator/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${params.token}`,
+      },
+      body: JSON.stringify({
+        prompt: params.prompt,
+        session_id: params.sessionId,
+        debug,
+        ...(params.tenantId ? { tenant_id: params.tenantId } : {}),
+      }),
+      signal: controller.signal,
+    })
 
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ""
-  let sawToken = false
-  let sawFinal = false
-
-  const handleLine = (line: string) => {
-    const trimmed = line.trim()
-    if (!trimmed) return
-    let event: AssistantStreamEvent
-    try {
-      event = JSON.parse(trimmed) as AssistantStreamEvent
-    } catch {
-      pipelineLog("malformed_ndjson_line")
-      return
-    }
-    if (event.type === "token" && !sawToken) {
-      sawToken = true
-      pipelineLog("first_token_received", {
-        elapsed_ms: Math.round(
-          (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0
-        ),
-      })
-    }
-    if (event.type === "meta") {
-      pipelineLog("meta_received", {
-        provider: event.chat_provider_name,
-        latency_ms: event.latency_ms,
-        timings_ms: event.timings_ms,
-      })
-    }
-    if (event.type === "final") {
-      sawFinal = true
-      if (event.chat_provider_name === "fake") {
-        console.warn(
-          "[assistant.pipeline] chat_provider=fake — Qwen was not called. Set LLM_CHAT_PROVIDER=openrouter on the backend."
-        )
+    if (!res.ok) {
+      let message = res.statusText
+      try {
+        message = formatApiError(await res.json()) ?? message
+      } catch {
+        // ignore
       }
-      if (debug && event.debug_retrieval) {
-        pipelineLog("debug_retrieval", {
-          chunks: event.debug_retrieval,
+      if (res.status === 405) {
+        message =
+          "Chat is POST-only. Refresh the page (a leftover service worker can turn this into GET)."
+      }
+      throw new ApiError(res.status, message)
+    }
+
+    if (!res.body) {
+      throw new ApiError(res.status, "Chat response had no body")
+    }
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ""
+    let sawToken = false
+    let sawFinal = false
+
+    const handleLine = (line: string) => {
+      const trimmed = line.trim()
+      if (!trimmed) return
+      let event: AssistantStreamEvent
+      try {
+        event = JSON.parse(trimmed) as AssistantStreamEvent
+      } catch {
+        pipelineLog("malformed_ndjson_line")
+        return
+      }
+      if (event.type === "token" && !sawToken) {
+        sawToken = true
+        pipelineLog("first_token_received", {
+          elapsed_ms: Math.round(
+            (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0
+          ),
+        })
+      }
+      if (event.type === "meta") {
+        pipelineLog("meta_received", {
+          provider: event.chat_provider_name,
+          latency_ms: event.latency_ms,
           timings_ms: event.timings_ms,
         })
       }
-      pipelineLog("response_rendered", {
-        elapsed_ms: Math.round(
-          (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0
-        ),
-        provider: event.chat_provider_name,
-        generation_error: event.generation_error || undefined,
-      })
+      if (event.type === "final") {
+        sawFinal = true
+        if (event.chat_provider_name === "fake") {
+          console.warn(
+            "[assistant.pipeline] chat_provider=fake — Qwen was not called. Set LLM_CHAT_PROVIDER=openrouter on the backend."
+          )
+        }
+        if (debug && event.debug_retrieval) {
+          pipelineLog("debug_retrieval", {
+            chunks: event.debug_retrieval,
+            timings_ms: event.timings_ms,
+          })
+        }
+        pipelineLog("response_rendered", {
+          elapsed_ms: Math.round(
+            (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0
+          ),
+          provider: event.chat_provider_name,
+          generation_error: event.generation_error || undefined,
+        })
+      }
+      params.onEvent(event)
     }
-    params.onEvent(event)
-  }
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split("\n")
-    buffer = lines.pop() ?? ""
-    for (const line of lines) {
-      handleLine(line)
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split("\n")
+      buffer = lines.pop() ?? ""
+      for (const line of lines) {
+        handleLine(line)
+      }
     }
-  }
-  if (buffer.trim()) {
-    handleLine(buffer)
-  }
-  if (!sawFinal) {
-    throw new ApiError(502, "Incomplete assistant response (no final event).")
+    if (buffer.trim()) {
+      handleLine(buffer)
+    }
+    if (!sawFinal) {
+      throw new ApiError(502, "Incomplete assistant response (no final event).")
+    }
+  } finally {
+    clearTimeout(timeoutId)
+    params.signal?.removeEventListener("abort", onExternalAbort)
   }
 }
 
