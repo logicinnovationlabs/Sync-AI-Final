@@ -18,7 +18,6 @@ import { ApiError } from "@/lib/api/client"
 import { useAuthHydrated, useAuthStore } from "@/lib/auth/auth-store"
 import { useChatSessionStore } from "@/lib/chat/session-store"
 import { EASE_OUT } from "@/lib/ease"
-import { cn } from "@/lib/utils"
 
 type Turn =
   | { kind: "user"; id: number; text: string }
@@ -130,7 +129,7 @@ export function ChatView() {
   const windowsRef = useRef<ChatWindow[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
-  const [sourcesOpen, setSourcesOpen] = useState(true)
+  const [sourcesOpen, setSourcesOpen] = useState(false)
 
   turnsRef.current = turns
   sessionRef.current = sessionId
@@ -296,7 +295,7 @@ export function ChatView() {
 
       setError(null)
       setActiveCite(null)
-      setSourcesOpen(true)
+      setSourcesOpen(false)
       const userTurnId = nextId.current++
       const answerId = nextId.current++
       setTurns((prev) => [
@@ -442,10 +441,25 @@ export function ChatView() {
     <div className="flex h-full min-h-0">
       <div className="flex min-w-0 flex-1 flex-col">
         {!empty && (
-          <header className="shrink-0 border-b border-border-subtle/70 px-6 py-3">
-            <h1 className="mx-auto max-w-3xl truncate text-center text-[0.8125rem] font-medium tracking-[-0.01em] text-neutral-500">
+          <header className="flex shrink-0 items-center gap-3 border-b border-border-subtle/70 px-6 py-3">
+            <h1 className="min-w-0 flex-1 truncate text-center text-[0.8125rem] font-medium tracking-[-0.01em] text-neutral-500">
               {sessionTitle}
             </h1>
+            {railSources.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSourcesOpen((open) => !open)}
+                aria-expanded={sourcesOpen}
+                className="hidden shrink-0 items-center gap-1 rounded-full border border-border-subtle px-2.5 py-1 text-[0.6875rem] font-medium text-neutral-500 transition-colors hover:bg-muted hover:text-neutral-700 xl:inline-flex"
+              >
+                Sources · {railSources.length}
+                {sourcesOpen ? (
+                  <ChevronUp className="size-3.5" />
+                ) : (
+                  <ChevronDown className="size-3.5" />
+                )}
+              </button>
+            )}
           </header>
         )}
 
@@ -506,36 +520,22 @@ export function ChatView() {
         </div>
       </div>
 
-      <aside
-        className={cn(
-          "hidden shrink-0 border-l border-border-subtle transition-[width] duration-200 xl:block",
-          sourcesOpen ? "w-80" : "w-12"
-        )}
-      >
-        <div className="flex items-center justify-between gap-2 px-3 py-4">
-          {sourcesOpen ? (
+      {sourcesOpen && (
+        <aside className="hidden w-80 shrink-0 border-l border-border-subtle xl:block">
+          <div className="flex items-center justify-between gap-2 px-3 py-4">
             <span className="text-xs font-medium text-muted-foreground">
               Sources · {railSources.length}
             </span>
-          ) : (
-            <span className="sr-only">Sources</span>
-          )}
-          <button
-            type="button"
-            onClick={() => setSourcesOpen((open) => !open)}
-            aria-expanded={sourcesOpen}
-            aria-label={sourcesOpen ? "Minimize sources" : "Expand sources"}
-            className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            {sourcesOpen ? (
+            <button
+              type="button"
+              onClick={() => setSourcesOpen(false)}
+              aria-label="Hide sources"
+              className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
               <ChevronUp className="size-4" />
-            ) : (
-              <ChevronDown className="size-4" />
-            )}
-          </button>
-        </div>
-        {sourcesOpen ? (
-          railSources.length === 0 ? (
+            </button>
+          </div>
+          {railSources.length === 0 ? (
             <p className="px-4 text-sm text-muted-foreground">
               Records used for the latest answer show up here.
             </p>
@@ -552,9 +552,9 @@ export function ChatView() {
                 </li>
               ))}
             </ul>
-          )
-        ) : null}
-      </aside>
+          )}
+        </aside>
+      )}
     </div>
   )
 }
@@ -571,7 +571,7 @@ function AnswerTurn({
   reduce: boolean
 }) {
   const streaming = !turn.settled && !turn.error
-  const [sourcesMinimized, setSourcesMinimized] = useState(false)
+  const [sourcesOpen, setSourcesOpen] = useState(false)
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-4">
@@ -597,23 +597,37 @@ function AnswerTurn({
         </p>
       )}
 
+      {turn.text && (
+        <div className="min-w-0 wrap-break-word whitespace-pre-wrap text-[1.0625rem] leading-[1.75] tracking-[-0.014em] text-neutral-800">
+          {turn.text}
+          {streaming && (
+            <motion.span
+              aria-hidden
+              animate={{ opacity: [1, 0.25, 1] }}
+              transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut" }}
+              className="ml-0.5 inline-block h-[1.05em] w-0.5 translate-y-[0.18em] rounded-full bg-ink-blue"
+            />
+          )}
+        </div>
+      )}
+
       {turn.sources.length > 0 && turn.settled && (
         <div className="xl:hidden">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-xs font-medium text-muted-foreground">
-              Sources · {turn.sources.length}
-            </span>
-            <button
-              type="button"
-              onClick={() => setSourcesMinimized((v) => !v)}
-              aria-expanded={!sourcesMinimized}
-              className="text-xs text-muted-foreground underline-offset-2 hover:underline"
-            >
-              {sourcesMinimized ? "Show" : "Minimize"}
-            </button>
-          </div>
-          {!sourcesMinimized && (
-            <ul className="flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => setSourcesOpen((open) => !open)}
+            aria-expanded={sourcesOpen}
+            className="inline-flex items-center gap-1 rounded-full border border-border-subtle px-2.5 py-1 text-[0.6875rem] font-medium text-neutral-500 transition-colors hover:bg-muted hover:text-neutral-700"
+          >
+            Sources · {turn.sources.length}
+            {sourcesOpen ? (
+              <ChevronUp className="size-3.5" />
+            ) : (
+              <ChevronDown className="size-3.5" />
+            )}
+          </button>
+          {sourcesOpen && (
+            <ul className="mt-3 flex flex-col gap-2">
               {turn.sources.map((source, i) => (
                 <motion.li
                   key={source.n}
@@ -630,20 +644,6 @@ function AnswerTurn({
                 </motion.li>
               ))}
             </ul>
-          )}
-        </div>
-      )}
-
-      {turn.text && (
-        <div className="min-w-0 wrap-break-word whitespace-pre-wrap text-[1.0625rem] leading-[1.75] tracking-[-0.014em] text-neutral-800">
-          {turn.text}
-          {streaming && (
-            <motion.span
-              aria-hidden
-              animate={{ opacity: [1, 0.25, 1] }}
-              transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut" }}
-              className="ml-0.5 inline-block h-[1.05em] w-0.5 translate-y-[0.18em] rounded-full bg-ink-blue"
-            />
           )}
         </div>
       )}
