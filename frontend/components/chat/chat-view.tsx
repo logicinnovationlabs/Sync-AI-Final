@@ -1,9 +1,9 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
-import { ChevronDown, ChevronUp, Plus } from "lucide-react"
+import { ChevronDown, ChevronUp } from "lucide-react"
 import { Composer } from "@/components/chat/composer"
 import { SourceCard, type SourceCardData } from "@/components/chat/source-card"
 import { Loader } from "@/components/motion/loader"
@@ -16,6 +16,7 @@ import {
 } from "@/lib/api/assistant"
 import { ApiError } from "@/lib/api/client"
 import { useAuthHydrated, useAuthStore } from "@/lib/auth/auth-store"
+import { useChatSessionStore } from "@/lib/chat/session-store"
 import { EASE_OUT } from "@/lib/ease"
 import { cn } from "@/lib/utils"
 
@@ -142,6 +143,20 @@ export function ChatView() {
     abortRef.current?.abort()
   }, [])
 
+  const syncSessionStore = useChatSessionStore((s) => s.sync)
+  const clearPending = useChatSessionStore((s) => s.clearPending)
+  const pending = useChatSessionStore((s) => s.pending)
+
+  useEffect(() => {
+    if (!ready) return
+    syncSessionStore({
+      sessionId,
+      windows,
+      activeTurnCount: turns.length,
+      ready: true,
+    })
+  }, [ready, sessionId, syncSessionStore, turns.length, windows])
+
   const persist = useCallback(
     (nextSession: string, nextTurns: Turn[], nextWindows: ChatWindow[]) => {
       if (typeof window === "undefined") return
@@ -258,6 +273,16 @@ export function ChatView() {
     nextId.current = 0
     setWindows((prev) => [{ id, title: "New chat", updatedAt: Date.now() }, ...prev.filter((w) => w.id !== id)])
   }, [])
+
+  useEffect(() => {
+    if (!pending || !ready) return
+    if (pending.type === "new") {
+      startNewChat()
+    } else if (pending.type === "open") {
+      void openWindow(pending.id)
+    }
+    clearPending()
+  }, [clearPending, openWindow, pending, ready, startNewChat])
 
   const ask = useCallback(
     async (text: string) => {
@@ -386,10 +411,6 @@ export function ChatView() {
     )
   const railSources = railTurn?.sources ?? []
   const empty = turns.length === 0
-  const historyWindows = useMemo(
-    () => windows.filter((w) => w.id !== sessionId || w.title !== "New chat" || turns.length > 0),
-    [sessionId, turns.length, windows]
-  )
 
   if (!hydrated) {
     return <div className="flex h-full min-h-0" />
@@ -415,69 +436,7 @@ export function ChatView() {
 
   return (
     <div className="flex h-full min-h-0">
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-border-subtle bg-muted/20 md:flex">
-        <div className="p-3">
-          <button
-            type="button"
-            onClick={startNewChat}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-border-subtle bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
-          >
-            <Plus className="size-4" />
-            New chat
-          </button>
-        </div>
-        <div className="px-3 pb-2 text-[0.6875rem] font-medium uppercase tracking-wide text-muted-foreground">
-          Previous
-        </div>
-        <ul className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-4">
-          {historyWindows.length === 0 ? (
-            <li className="px-2 py-3 text-sm text-muted-foreground">
-              No earlier chats yet.
-            </li>
-          ) : (
-            historyWindows.map((w) => (
-              <li key={w.id}>
-                <button
-                  type="button"
-                  onClick={() => void openWindow(w.id)}
-                  className={cn(
-                    "w-full truncate rounded-lg px-3 py-2 text-left text-sm transition-colors",
-                    w.id === sessionId
-                      ? "bg-ink-blue/8 font-medium text-ink-blue"
-                      : "text-foreground hover:bg-muted"
-                  )}
-                >
-                  {w.title || "New chat"}
-                </button>
-              </li>
-            ))
-          )}
-        </ul>
-      </aside>
-
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between gap-2 border-b border-border-subtle px-4 py-3 md:hidden">
-          <button
-            type="button"
-            onClick={startNewChat}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border-subtle px-2.5 py-1.5 text-sm"
-          >
-            <Plus className="size-3.5" />
-            New
-          </button>
-          <select
-            className="max-w-[60%] rounded-lg border border-border-subtle bg-card px-2 py-1.5 text-sm"
-            value={sessionId}
-            onChange={(event) => void openWindow(event.target.value)}
-          >
-            {windows.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.title || "New chat"}
-              </option>
-            ))}
-          </select>
-        </div>
-
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
           {empty ? (
             <div className="mx-auto flex max-w-2xl flex-col gap-3 pt-16">
