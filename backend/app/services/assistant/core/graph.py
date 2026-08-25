@@ -10,6 +10,8 @@ from typing import Any, Dict, List, Optional, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
+from app.services.rag_debug_trace import get_tracer as _get_rag_tracer
+
 from app.services.assistant.core.intent_router import Intent, classify_intent
 from app.services.assistant.core.ranker_boost import (
     RankedHit,
@@ -443,6 +445,21 @@ class OrchestratorGraph:
             len(boosted),
             used_reader,
         )
+
+        # --- Rule #2, Stage 7: reranking (signal boost) ---
+        tracer = _get_rag_tracer()
+        if state.get("signals"):
+            tracer.log_reranking(
+                before=[h.__dict__ for h in base_hits[:20]],
+                after=[h.__dict__ for h in boosted[:20]],
+                dropped=[
+                    h.__dict__ for h in base_hits
+                    if h.document_id not in {b.document_id for b in boosted}
+                ],
+            )
+        else:
+            tracer.log_reranking()  # logs "reranking: disabled"
+
         timings = dict(state.get("timings_ms") or {})
         timings["context_retrieval_completed_ms"] = self._elapsed_ms(state)
         return {

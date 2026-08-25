@@ -11,6 +11,8 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from app.services.rag_debug_trace import get_tracer as _get_rag_tracer
+
 from app.api.deps import require_scope
 from app.acl.filter import acl_terms_from_jwt, document_is_visible, is_fail_closed
 from app.models.federated import (
@@ -32,6 +34,17 @@ async def _query_embedding_for_search(query: str) -> Optional[List[float]]:
         from app.services.embedding import embedding_service
 
         vec = await embedding_service.embed_text(query)
+
+        # --- Rule #2, Stage 3: query embedding model + dimension ---
+        tracer = _get_rag_tracer()
+        model_name = getattr(embedding_service.provider, "model", "unknown")
+        model_version = str(
+            getattr(embedding_service.provider, "model", "")
+            or getattr(embedding_service.provider, "name", "unknown")
+        )
+        dimension = len(vec) if vec else 0
+        tracer.log_query_embedding(model_name, model_version, dimension)
+
         return list(vec) if vec else None
     except Exception as exc:  # noqa: BLE001
         logger.warning("Shared query embedding failed: %s", exc)
@@ -59,6 +72,11 @@ async def _safe_call_lexical(
                 size=size * 2,  # Over-fetch for fusion
             )
             results = payload.get("results", []) if isinstance(payload, dict) else list(payload or [])
+
+            # --- Rule #2, Stage 4: lexical retrieval ---
+            tracer = _get_rag_tracer()
+            tracer.log_lexical_retrieval(query, results)
+
             status.ok = True
             status.hit_count = len(results)
             return results, status
@@ -263,6 +281,12 @@ async def run_federated_backends(
     enable_vector: bool = True,
 ) -> tuple[List[ResultItem], List[BackendStatus]]:
     """Parallel indexed + lexical + vector with a single shared query embedding."""
+    # --- Rule #2, Stage 1: raw query ---
+    tracer = _get_rag_tracer()
+    tracer.log_raw_query(query)
+    # --- Rule #2, Stage 2: query rewriting (not implemented yet) ---
+    tracer.log_rewritten_query(None)
+
     embedding = await _query_embedding_for_search(query)
     tasks = [
         _safe_call_indexed(

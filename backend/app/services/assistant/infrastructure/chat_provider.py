@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Protocol, Sequence
 
 from app.core.config import settings
+from app.services.rag_debug_trace import get_tracer as _get_rag_tracer
 
 logger = logging.getLogger(__name__)
 
@@ -332,6 +333,13 @@ def assemble_chat_messages(
         {"role": "user", "content": user},
     ]
     prompt_text = f"{GROUNDED_SYSTEM_PROMPT}\n\n{user}"
+
+    # --- Rule #2, Stage 8: final assembled context ---
+    tracer = _get_rag_tracer()
+    # Approximate token count: ~4 chars per token for English
+    approx_tokens = len(prompt_text) // 4
+    tracer.log_final_context(prompt_text, approx_tokens)
+
     return messages, prompt_text
 
 
@@ -715,6 +723,11 @@ class OpenRouterChatProvider:
             finish,
             usage_bits,
         )
+
+        # --- Rule #2, Stage 9: raw Qwen response ---
+        tracer = _get_rag_tracer()
+        tracer.log_raw_response(text)
+
         return ChatGeneration(
             text=text,
             provider=self.name,

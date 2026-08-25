@@ -314,6 +314,10 @@ class Settings(BaseSettings):
         default=False,
         validation_alias=AliasChoices("ASSISTANT_DEBUG", "assistant_debug"),
     )
+    rag_debug_trace: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("RAG_DEBUG_TRACE", "rag_debug_trace"),
+    )
 
     environment: str = Field(default="development")
     cors_allowed_origins: str = Field(

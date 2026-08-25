@@ -162,8 +162,8 @@ class Indexer:
                     "deleted": False,
                 }
             )
-            pieces = chunker.chunk(f"{title}\n{body}") or [
-                {"id": "0", "content": f"{title}\n{body}"[:2000]}
+            pieces = chunker.chunk_with_parent(f"{title}\n{body}", parent_doc_id=doc_id) or [
+                {"id": "0", "content": f"{title}\n{body}"[:2000], "parent_doc_id": doc_id}
             ]
             for piece in pieces:
                 vector_chunks.append(
@@ -174,7 +174,11 @@ class Indexer:
                         "model_version": str(model_version),
                         "acl_terms": acl_terms,
                         "chunk_text": piece.get("content") or "",
-                        "metadata": {"source_type": doc.get("source_type"), "title": title},
+                        "metadata": {
+                            "source_type": doc.get("source_type"),
+                            "title": title,
+                            "parent_doc_id": piece.get("parent_doc_id") or doc_id,
+                        },
                     }
                 )
             try:
