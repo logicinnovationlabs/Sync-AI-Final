@@ -165,7 +165,7 @@ class Settings(BaseSettings):
         ),
     )
     embedding_dimensions: int = Field(
-        default=384,
+        default=3072,
         validation_alias=AliasChoices(
             "EMBEDDING_DIMENSIONS",
             "embedding_dimensions",
@@ -268,7 +268,7 @@ class Settings(BaseSettings):
     qdrant_api_key: Optional[str] = Field(default=None)
     gemini_api_key: Optional[str] = Field(default=None)
     embedding_dimension: int = Field(
-        default=384,
+        default=3072,
         validation_alias=AliasChoices("EMBEDDING_DIMENSION", "embedding_dimension"),
     )
 
@@ -301,13 +301,13 @@ class Settings(BaseSettings):
         ),
     )
     llm_chat_temperature: float = Field(
-        default=0.1,
+        default=0.3,
         validation_alias=AliasChoices(
             "LLM_CHAT_TEMPERATURE", "llm_chat_temperature"
         ),
     )
     llm_chat_max_tokens: int = Field(
-        default=1024,
+        default=1500,
         validation_alias=AliasChoices("LLM_CHAT_MAX_TOKENS", "llm_chat_max_tokens"),
     )
     assistant_debug: bool = Field(
@@ -359,11 +359,11 @@ class Settings(BaseSettings):
     # Block E: Chunking & Embeddings
     # ------------------------------------------------------------------
     chunk_size: int = Field(
-        default=512,
+        default=1000,
         validation_alias=AliasChoices("CHUNK_SIZE", "chunk_size"),
     )
     chunk_overlap: int = Field(
-        default=50,
+        default=200,
         validation_alias=AliasChoices("CHUNK_OVERLAP", "chunk_overlap"),
     )
     embedding_model_version: str = Field(
@@ -375,7 +375,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("EMBEDDING_BATCH_SIZE", "embedding_batch_size"),
     )
     embedding_dimensions: int = Field(
-        default=384,
+        default=3072,
         validation_alias=AliasChoices("EMBEDDING_DIMENSIONS", "embedding_dimensions"),
     )
     

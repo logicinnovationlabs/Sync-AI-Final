@@ -33,7 +33,8 @@ async def _query_embedding_for_search(query: str) -> Optional[List[float]]:
     try:
         from app.services.embedding import embedding_service
 
-        vec = await embedding_service.embed_text(query)
+        # Phase 1: always embed queries with retrieval_query task type.
+        vec = await embedding_service.embed_query(query)
 
         # --- Rule #2, Stage 3: query embedding model + dimension ---
         tracer = _get_rag_tracer()
@@ -108,7 +109,7 @@ async def _safe_call_vector(
         if settings.qdrant_url:
             vec = list(query_embedding) if query_embedding else None
             if not vec:
-                vec = await embedding_service.embed_text(query)
+                vec = await embedding_service.embed_query(query)
             if not vec:
                 raise ValueError("embedding service returned an empty vector")
             store = QdrantVectorStore()
@@ -118,12 +119,32 @@ async def _safe_call_vector(
                 acl_terms=acl_terms,
                 top_k=size * 2,
             )
+            enriched: List[Dict[str, Any]] = []
             for doc in results:
-                if not doc.get("snippet"):
-                    doc["snippet"] = doc.get("chunk_text") or ""
+                meta = doc.get("metadata") if isinstance(doc.get("metadata"), dict) else {}
+                snippet = (
+                    doc.get("snippet")
+                    or doc.get("chunk_text")
+                    or ""
+                )
+                # Phase 1 sent ~1000 chars/source to the LLM; keep more for stories.
+                if isinstance(snippet, str) and len(snippet) > 4000:
+                    snippet = snippet[:4000]
+                hit = dict(doc)
+                hit["snippet"] = snippet
+                hit["title"] = str(doc.get("title") or meta.get("title") or "")
+                hit["from_email"] = str(
+                    doc.get("from_email") or meta.get("from_email") or ""
+                )
+                hit["source_type"] = str(
+                    doc.get("source_type") or meta.get("source_type") or ""
+                )
+                if meta:
+                    hit["metadata"] = meta
+                enriched.append(hit)
             status.ok = True
-            status.hit_count = len(results)
-            return results, status
+            status.hit_count = len(enriched)
+            return enriched, status
     except Exception as exc:
         logger.warning("Vector search failed: %s", exc)
         status.error = str(exc)
@@ -133,18 +154,54 @@ async def _safe_call_vector(
     return [], status
 
 
+def _structured_meta(payload: Dict[str, Any]) -> Dict[str, Any]:
+    raw = payload.get("structured_metadata")
+    if isinstance(raw, dict):
+        return raw
+    nested = payload.get("metadata")
+    if isinstance(nested, dict):
+        inner = nested.get("structured_metadata")
+        if isinstance(inner, dict):
+            return inner
+        return nested
+    return {}
+
+
 def _payload_to_hit(payload: Dict[str, Any], score: float) -> Dict[str, Any]:
     body = str(payload.get("content") or payload.get("body_text") or payload.get("snippet") or "")
     body = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", body)
     body = re.sub(r"<[^>]+>", " ", body)
     body = html.unescape(body)
     body = re.sub(r"\s+", " ", body).strip()
+    meta = _structured_meta(payload)
+    from_email = str(
+        payload.get("from_email")
+        or meta.get("from_email")
+        or meta.get("from")
+        or ""
+    )
+    subject = str(payload.get("subject") or meta.get("subject") or "")
+    source_type = str(payload.get("source_type") or meta.get("source_type") or "")
+    hit_meta: Dict[str, Any] = {}
+    if from_email:
+        hit_meta["from_email"] = from_email
+    if subject:
+        hit_meta["subject"] = subject
+    if source_type:
+        hit_meta["source_type"] = source_type
+    to_emails = meta.get("to_emails")
+    if to_emails:
+        hit_meta["to_emails"] = to_emails
     return {
         "document_id": str(payload.get("id") or payload.get("document_id") or ""),
-        "title": str(payload.get("title") or payload.get("id") or ""),
-        "snippet": body[:400],
+        "title": str(payload.get("title") or subject or payload.get("id") or ""),
+        # Phase 1 passed chunk text (~1000+) into the LLM — keep a full passage.
+        "snippet": body[:6000],
         "score": score,
         "sources": ["indexed"],
+        "from_email": from_email,
+        "source_type": source_type,
+        "metadata": hit_meta or None,
     }
 
 
@@ -184,7 +241,7 @@ async def _safe_call_indexed(
             if not vec:
                 from app.services.embedding import embedding_service
 
-                vec = await embedding_service.embed_text(query)
+                vec = await embedding_service.embed_query(query)
             if not vec:
                 raise ValueError("embedding service returned an empty vector")
             scored = qdrant_client.client.search(
@@ -214,6 +271,40 @@ async def _safe_call_indexed(
     return [], status
 
 
+def _prefer_snippet(existing: str, candidate: str) -> str:
+    """Keep the longer usable snippet when fusing backends."""
+    a = (existing or "").strip()
+    b = (candidate or "").strip()
+    if len(b) > len(a):
+        return b
+    return a
+
+
+def _ingest_hit_meta(bucket: Dict[str, Any], doc: Dict[str, Any]) -> None:
+    """Merge title/snippet/from into the fusion metadata bucket."""
+    title = str(doc.get("title") or "")
+    if title and (not bucket.get("title") or len(title) > len(str(bucket.get("title") or ""))):
+        bucket["title"] = title
+    bucket["snippet"] = _prefer_snippet(str(bucket.get("snippet") or ""), str(doc.get("snippet") or ""))
+    from_email = str(doc.get("from_email") or "")
+    if not from_email:
+        meta = doc.get("metadata") if isinstance(doc.get("metadata"), dict) else {}
+        from_email = str(meta.get("from_email") or meta.get("from") or "")
+    if from_email and not bucket.get("from_email"):
+        bucket["from_email"] = from_email
+    source_type = str(doc.get("source_type") or "")
+    if not source_type:
+        meta = doc.get("metadata") if isinstance(doc.get("metadata"), dict) else {}
+        source_type = str(meta.get("source_type") or "")
+    if source_type and not bucket.get("source_type"):
+        bucket["source_type"] = source_type
+    extra = doc.get("metadata") if isinstance(doc.get("metadata"), dict) else None
+    if extra:
+        merged_meta = dict(bucket.get("metadata") or {})
+        merged_meta.update({k: v for k, v in extra.items() if v not in (None, "", [])})
+        bucket["metadata"] = merged_meta
+
+
 def _merge_and_rank(
     lexical_results: List[Dict[str, Any]],
     vector_results: List[Dict[str, Any]],
@@ -228,19 +319,34 @@ def _merge_and_rank(
     
     for rank, doc in enumerate(lexical_results, 1):
         doc_id = doc.get("document_id") or doc.get("id", "")
+        if not doc_id:
+            continue
         scores[doc_id] = scores.get(doc_id, 0) + 1 / (k + rank)
         if doc_id not in metadata:
             metadata[doc_id] = {
                 "title": doc.get("title", ""),
                 "snippet": doc.get("snippet", ""),
                 "lexical_score": doc.get("score", 0),
-                "sources": ["lexical"],
+                "sources": list(doc.get("sources") or ["lexical"]),
+                "from_email": doc.get("from_email") or "",
+                "source_type": doc.get("source_type") or "",
+                "metadata": dict(doc.get("metadata") or {}) if isinstance(doc.get("metadata"), dict) else {},
             }
+            _ingest_hit_meta(metadata[doc_id], doc)
         else:
-            metadata[doc_id]["sources"].append("lexical")
+            src = metadata[doc_id]["sources"]
+            for s in doc.get("sources") or ["lexical"]:
+                if s not in src:
+                    src.append(s)
+            if "lexical" not in src and not doc.get("sources"):
+                src.append("lexical")
+            metadata[doc_id]["lexical_score"] = doc.get("score", 0)
+            _ingest_hit_meta(metadata[doc_id], doc)
     
     for rank, doc in enumerate(vector_results, 1):
         doc_id = doc.get("document_id") or doc.get("id", "")
+        if not doc_id:
+            continue
         scores[doc_id] = scores.get(doc_id, 0) + 1 / (k + rank)
         if doc_id not in metadata:
             metadata[doc_id] = {
@@ -248,27 +354,42 @@ def _merge_and_rank(
                 "snippet": doc.get("snippet", ""),
                 "vector_score": doc.get("score", 0),
                 "sources": ["vector"],
+                "from_email": doc.get("from_email") or "",
+                "source_type": doc.get("source_type") or "",
+                "metadata": dict(doc.get("metadata") or {}) if isinstance(doc.get("metadata"), dict) else {},
             }
+            _ingest_hit_meta(metadata[doc_id], doc)
         else:
-            metadata[doc_id]["sources"].append("vector")
+            if "vector" not in metadata[doc_id]["sources"]:
+                metadata[doc_id]["sources"].append("vector")
             metadata[doc_id]["vector_score"] = doc.get("score", 0)
+            _ingest_hit_meta(metadata[doc_id], doc)
     
     # Sort by fusion score
     ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:size]
     
-    return [
-        ResultItem(
-            document_id=doc_id,
-            score=score,
-            fusion_score=score,
-            title=metadata[doc_id].get("title", ""),
-            snippet=metadata[doc_id].get("snippet", ""),
-            sources=metadata[doc_id].get("sources", []),
-            lexical_score=metadata[doc_id].get("lexical_score"),
-            vector_score=metadata[doc_id].get("vector_score"),
+    items: List[ResultItem] = []
+    for doc_id, score in ranked:
+        meta_bucket = metadata[doc_id]
+        hit_meta = dict(meta_bucket.get("metadata") or {})
+        if meta_bucket.get("from_email"):
+            hit_meta.setdefault("from_email", meta_bucket["from_email"])
+        if meta_bucket.get("source_type"):
+            hit_meta.setdefault("source_type", meta_bucket["source_type"])
+        items.append(
+            ResultItem(
+                document_id=doc_id,
+                score=score,
+                fusion_score=score,
+                title=meta_bucket.get("title", ""),
+                snippet=meta_bucket.get("snippet", ""),
+                sources=meta_bucket.get("sources", []),
+                lexical_score=meta_bucket.get("lexical_score"),
+                vector_score=meta_bucket.get("vector_score"),
+                metadata=hit_meta or None,
+            )
         )
-        for doc_id, score in ranked
-    ]
+    return items
 
 
 async def run_federated_backends(

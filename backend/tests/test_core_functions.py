@@ -230,8 +230,11 @@ async def test_indexer_allowlist_unusual_keys():
          patch("app.services.indexer.qdrant_client") as mock_qdrant, \
          patch("app.services.indexer.connector_registry") as mock_registry:
         mock_embed.get_dimension = MagicMock(return_value=768)
-        mock_embed.embed_texts = AsyncMock(return_value=[[0.1]*768])
+        mock_embed.embed_documents = AsyncMock(return_value=[[0.1]*768])
         mock_registry.get_allowed_metadata_keys = MagicMock(return_value=["safe_key"])
+        indexer.embedding_service = mock_embed
+        indexer.qdrant = mock_qdrant
+        indexer.registry = mock_registry
 
         doc = UnifiedDocument(
             id="test",
@@ -310,8 +313,11 @@ async def test_indexer_tenant_isolation():
          patch("app.services.indexer.qdrant_client") as mock_qdrant, \
          patch("app.services.indexer.connector_registry") as mock_registry:
         mock_embed.get_dimension = MagicMock(return_value=768)
-        mock_embed.embed_texts = AsyncMock(return_value=[[0.1]*768])
+        mock_embed.embed_documents = AsyncMock(return_value=[[0.1]*768])
         mock_registry.get_allowed_metadata_keys = MagicMock(return_value=[])
+        indexer.embedding_service = mock_embed
+        indexer.qdrant = mock_qdrant
+        indexer.registry = mock_registry
 
         doc = UnifiedDocument(
             id="t1",
@@ -344,8 +350,13 @@ async def test_indexer_large_content_handling():
          patch("app.services.indexer.connector_registry") as mock_registry:
         mock_embed.get_dimension = MagicMock(return_value=768)
         # Simulate embedding service raising a clear error for oversized content
-        mock_embed.embed_texts = AsyncMock(side_effect=ValueError("Content too large for embedding"))
+        mock_embed.embed_documents = AsyncMock(
+            side_effect=ValueError("Content too large for embedding")
+        )
         mock_registry.get_allowed_metadata_keys = MagicMock(return_value=[])
+        indexer.embedding_service = mock_embed
+        indexer.qdrant = mock_qdrant
+        indexer.registry = mock_registry
 
         doc = UnifiedDocument(
             id="big",
@@ -362,7 +373,7 @@ async def test_indexer_large_content_handling():
         with pytest.raises(ValueError, match="Content too large"):
             await indexer.bulk_index([doc], "tenant")
         # The embedding service mock should be called with the large content
-        mock_embed.embed_texts.assert_called_once()
+        mock_embed.embed_documents.assert_called_once()
 
 
 # ============================================================
@@ -377,8 +388,11 @@ async def test_indexer_idempotent_upsert():
          patch("app.services.indexer.qdrant_client") as mock_qdrant, \
          patch("app.services.indexer.connector_registry") as mock_registry:
         mock_embed.get_dimension = MagicMock(return_value=768)
-        mock_embed.embed_texts = AsyncMock(return_value=[[0.1]*768])
+        mock_embed.embed_documents = AsyncMock(return_value=[[0.1]*768])
         mock_registry.get_allowed_metadata_keys = MagicMock(return_value=[])
+        indexer.embedding_service = mock_embed
+        indexer.qdrant = mock_qdrant
+        indexer.registry = mock_registry
 
         doc = UnifiedDocument(
             id="idempotent",

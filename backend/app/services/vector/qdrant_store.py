@@ -61,7 +61,7 @@ class QdrantVectorStore(VectorStore):
         self.dimensions = int(
             getattr(settings, "embedding_dimensions", None)
             or getattr(settings, "embedding_dimension", None)
-            or 384
+            or 3072
         )
         self._upsert_batch_size = 50
         self._ensured_collections: set[str] = set()

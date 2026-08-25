@@ -36,6 +36,7 @@ from app.services.assistant.infrastructure.chat_provider import (
     ChatService,
     assemble_chat_messages,
     debug_source_chunks,
+    enrich_hits_with_full_bodies,
     filter_relevant_hits,
     plain_source_text,
     record_prompt,
@@ -345,8 +346,18 @@ class OrchestratorGraph:
                         base_score=1.0,
                         boosted_score=1.0,
                         title=str(payload.get("title") or ""),
-                        snippet=str(payload.get("body") or "")[:500],
+                        snippet=str(payload.get("body") or "")[:2000],
                         sources=["document_reader"],
+                        meta={
+                            "metadata": payload.get("structured_metadata")
+                            or payload.get("metadata")
+                            or {},
+                            "from_email": (
+                                (payload.get("structured_metadata") or {}).get("from_email")
+                                if isinstance(payload.get("structured_metadata"), dict)
+                                else ""
+                            ),
+                        },
                     )
                     timings = dict(state.get("timings_ms") or {})
                     timings["context_retrieval_completed_ms"] = self._elapsed_ms(state)
@@ -414,7 +425,7 @@ class OrchestratorGraph:
                     base_score=top.base_score,
                     boosted_score=max(top.boosted_score, self.confidence_threshold),
                     title=top.title or str((reader.payload or {}).get("title") or ""),
-                    snippet=body[:800] or top.snippet,
+                    snippet=body[:2000] or top.snippet,
                     sources=list(top.sources) + ["document_reader_fallback"],
                     boost_reason="search_vs_read_fallback",
                     meta=dict(top.meta),
@@ -479,6 +490,8 @@ class OrchestratorGraph:
         raw_hits = list(state.get("ranked_hits") or [])
         hits = filter_relevant_hits(raw_hits)
         req = state.get("request") or {}
+        tenant_id = str(req.get("tenant_id") or "")
+        hits = await enrich_hits_with_full_bodies(hits, tenant_id)
         user_prompt = str(req.get("prompt") or "")
         logger.info(
             "[assistant.pipeline] grounding hits raw=%s kept=%s",

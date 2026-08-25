@@ -1,49 +1,38 @@
 """
 Blind Indexer: accepts UnifiedDocument, allowlists metadata, generates embeddings, indexes to Qdrant.
 
-Block B implementation:
-- Metadata allowlisting via registry
-- Embedding generation via embedding service
-- Vector storage via Qdrant
-
-The indexer NEVER imports specific connectors by name.
+Phase 1 parity (critical for answer quality):
+- Each chunk gets its **own** embedding (never reuse the document vector)
+- Document embeddings use ``retrieval_document`` task type
+- Chunk size ~1000 chars with overlap (Phase 1 used ~1000 tokens; chars are a close stand-in)
 """
 
-from typing import List, Optional
+from __future__ import annotations
+
 import logging
+from typing import List, Optional
 
 from app.core.base_connector import UnifiedDocument
-from app.services.registry import connector_registry
-from app.services.embedding import embedding_service
-from app.storage.qdrant_client import qdrant_client
 from app.core.config import settings
+from app.services.embedding import embedding_service
+from app.services.registry import connector_registry
+from app.storage.qdrant_client import qdrant_client
 
 logger = logging.getLogger(__name__)
 
 
 class Indexer:
-    """
-    Blind indexer implementation.
-    
-    Pipeline:
-    1. Allowlist metadata fields per source_type (via registry/manifest)
-    2. Generate embeddings for document content
-    3. Index to Qdrant with vectors
-    4. Handle deletions
-    """
+    """Blind indexer — never imports specific connectors by name."""
 
-    def __init__(self):
-        """Initialize indexer with dependencies."""
+    def __init__(self) -> None:
         self.registry = connector_registry
         self.embedding_service = embedding_service
         self.qdrant = qdrant_client
-        
-        # Ensure Qdrant collection exists
         try:
             dimension = self.embedding_service.get_dimension()
             self.qdrant.ensure_collection(dimension)
         except Exception as e:
-            logger.warning(f"Could not initialize Qdrant collection: {e}")
+            logger.warning("Could not initialize Qdrant collection: %s", e)
 
     async def bulk_index(
         self,
@@ -51,53 +40,40 @@ class Indexer:
         tenant_id: str,
         extra_acl: Optional[List[str]] = None,
     ) -> None:
-        """
-        Index a batch of documents.
-        
-        Args:
-            documents: List of UnifiedDocument instances
-            tenant_id: Tenant UUID
-        """
         if not documents:
             return
-        
-        logger.info(f"Indexing {len(documents)} documents for tenant {tenant_id}")
-        
-        # Allowlist metadata per source_type
+
+        logger.info("Indexing %s documents for tenant %s", len(documents), tenant_id)
+
         processed_docs = []
         for doc in documents:
             allowed_keys = self.registry.get_allowed_metadata_keys(doc.source_type)
-            
-            # Filter metadata to allowed keys only
             filtered_metadata = {
-                k: v for k, v in doc.structured_metadata.items()
+                k: v
+                for k, v in doc.structured_metadata.items()
                 if k in allowed_keys
             }
-            
-            full_content = doc.content or ""
             owner_acl = list(extra_acl or [])
-            doc_dict = {
-                "id": doc.id,
-                "title": doc.title,
-                "content": full_content,
-                "source_type": doc.source_type,
-                "url": doc.url,
-                "permissions": owner_acl or list(doc.permissions),
-                "created_at": doc.created_at.isoformat(),
-                "updated_at": doc.updated_at.isoformat(),
-                "source_updated_at": doc.source_updated_at.isoformat(),
-                "structured_metadata": filtered_metadata,
-                "tenant_id": tenant_id,  # Add tenant_id for filtering
-            }
-            processed_docs.append(doc_dict)
-        
-        # Generate embeddings (cap text length for speed / provider limits)
-        texts = [
-            f"{doc['title']} {doc['content']}"[:12000] for doc in processed_docs
-        ]
-        vectors = await self.embedding_service.embed_texts(texts)
+            processed_docs.append(
+                {
+                    "id": doc.id,
+                    "title": doc.title,
+                    "content": doc.content or "",
+                    "source_type": doc.source_type,
+                    "url": doc.url,
+                    "permissions": owner_acl or list(doc.permissions),
+                    "created_at": doc.created_at.isoformat(),
+                    "updated_at": doc.updated_at.isoformat(),
+                    "source_updated_at": doc.source_updated_at.isoformat(),
+                    "structured_metadata": filtered_metadata,
+                    "tenant_id": tenant_id,
+                }
+            )
 
-        # Block B Qdrant payloads: truncate bodies so large Gmail batches don't timeout
+        # Document-level vectors for the Block B `documents` collection.
+        texts = [f"{doc['title']} {doc['content']}"[:12000] for doc in processed_docs]
+        vectors = await self.embedding_service.embed_documents(texts)
+
         qdrant_docs = []
         for doc in processed_docs:
             payload = dict(doc)
@@ -107,32 +83,38 @@ class Indexer:
             qdrant_docs.append(payload)
 
         await self.qdrant.upsert_documents(qdrant_docs, vectors)
-
-        await self._fanout_search_pipeline(processed_docs, vectors, tenant_id, extra_acl or [])
-        
-        logger.info(f"Successfully indexed {len(documents)} documents for tenant {tenant_id}")
+        await self._fanout_search_pipeline(processed_docs, tenant_id, extra_acl or [])
+        logger.info(
+            "Successfully indexed %s documents for tenant %s",
+            len(documents),
+            tenant_id,
+        )
 
     async def _fanout_search_pipeline(
         self,
         processed_docs: List[dict],
-        vectors: List[List[float]],
         tenant_id: str,
         extra_acl: List[str],
     ) -> None:
-        """Write Block E chunks + F lexical + G vector + K document store + local index."""
-        from app.services.ingest.local_index import local_ingest_index
+        """Chunk + lexical + **per-chunk** vector + document store."""
         from app.services.chunking.prose import ProseChunker
+        from app.services.ingest.local_index import local_ingest_index
 
-        chunker = ProseChunker()
+        # Phase 1 used ~1000 tokens / 200 overlap. Char approx keeps passages usable.
+        chunk_size = int(getattr(settings, "chunk_size", None) or 1000)
+        chunk_overlap = int(getattr(settings, "chunk_overlap", None) or 200)
+        chunker = ProseChunker(chunk_size=chunk_size, overlap=chunk_overlap)
         model_version = (
             getattr(settings, "embedding_model_version", None)
             or getattr(settings, "model_version", None)
             or "default"
         )
-        lexical_docs = []
-        vector_chunks = []
 
-        for doc, vector in zip(processed_docs, vectors):
+        lexical_docs = []
+        pending_chunks: List[dict] = []
+        chunk_embed_texts: List[str] = []
+
+        for doc in processed_docs:
             doc_id = str(doc["id"])
             acl_terms = (
                 _acl_terms(extra_acl, None)
@@ -162,22 +144,37 @@ class Indexer:
                     "deleted": False,
                 }
             )
-            pieces = chunker.chunk_with_parent(f"{title}\n{body}", parent_doc_id=doc_id) or [
-                {"id": "0", "content": f"{title}\n{body}"[:2000], "parent_doc_id": doc_id}
+            pieces = chunker.chunk_with_parent(
+                f"{title}\n{body}", parent_doc_id=doc_id
+            ) or [
+                {
+                    "id": "0",
+                    "content": f"{title}\n{body}"[:2000],
+                    "parent_doc_id": doc_id,
+                }
             ]
+            meta_extra = {
+                k: v
+                for k, v in (doc.get("structured_metadata") or {}).items()
+                if k in ("from_email", "to_emails", "subject", "thread_id")
+                and v not in (None, "", [])
+            }
             for piece in pieces:
-                vector_chunks.append(
+                chunk_body = str(piece.get("content") or "")
+                # Phase 1 embeds the chunk text itself (optionally with title).
+                chunk_embed_texts.append(f"{title}\n{chunk_body}"[:8000])
+                pending_chunks.append(
                     {
                         "chunk_id": f"{doc_id}:{piece.get('id') or '0'}",
                         "document_id": doc_id,
-                        "embedding": vector,
                         "model_version": str(model_version),
                         "acl_terms": acl_terms,
-                        "chunk_text": piece.get("content") or "",
+                        "chunk_text": chunk_body,
                         "metadata": {
                             "source_type": doc.get("source_type"),
                             "title": title,
                             "parent_doc_id": piece.get("parent_doc_id") or doc_id,
+                            **meta_extra,
                         },
                     }
                 )
@@ -193,7 +190,11 @@ class Indexer:
                         body=body,
                         structured_metadata=doc.get("structured_metadata") or {},
                         owner_principal_id=next(
-                            (p.split(":", 1)[-1] for p in acl_terms if ":" in str(p)),
+                            (
+                                p.split(":", 1)[-1]
+                                for p in acl_terms
+                                if ":" in str(p)
+                            ),
                             "",
                         ),
                         created_at=doc.get("created_at"),
@@ -201,7 +202,9 @@ class Indexer:
                         acl_entries=acl_terms,
                     )
             except Exception:
-                logger.warning("document store upsert failed id=%s", doc_id, exc_info=True)
+                logger.warning(
+                    "document store upsert failed id=%s", doc_id, exc_info=True
+                )
 
         try:
             from app.services.lexical.opensearch_store import OpenSearchLexicalStore
@@ -210,10 +213,27 @@ class Indexer:
         except Exception:
             logger.warning("lexical index fan-out skipped", exc_info=True)
 
+        if not pending_chunks:
+            return
+
         try:
+            # ROOT FIX vs dumb Phase 2 answers: embed EACH chunk, not the whole doc once.
+            chunk_vectors = await self.embedding_service.embed_documents(
+                chunk_embed_texts
+            )
+            vector_chunks = []
+            for meta, vec in zip(pending_chunks, chunk_vectors):
+                row = dict(meta)
+                row["embedding"] = vec
+                vector_chunks.append(row)
             from app.services.vector.qdrant_store import QdrantVectorStore
 
             await QdrantVectorStore().upsert_batch(tenant_id, vector_chunks)
+            logger.info(
+                "Upserted %s chunk vectors for tenant %s",
+                len(vector_chunks),
+                tenant_id,
+            )
         except Exception:
             logger.warning("vector index fan-out skipped", exc_info=True)
 
@@ -223,34 +243,23 @@ class Indexer:
         tenant_id: str,
         source_type: str,
     ) -> None:
-        """
-        Delete documents by ID.
-        
-        Args:
-            document_ids: List of document IDs to delete
-            tenant_id: Tenant UUID
-            source_type: Source type
-        """
         if not document_ids:
             return
-        
         logger.info(
-            f"Deleting {len(document_ids)} documents from {source_type} for tenant {tenant_id}"
+            "Deleting %s documents from %s for tenant %s",
+            len(document_ids),
+            source_type,
+            tenant_id,
         )
-        
-        # Delete from Qdrant
         await self.qdrant.delete_by_ids(document_ids, tenant_id=tenant_id)
-        
-        logger.info(
-            f"Successfully deleted {len(document_ids)} documents for tenant {tenant_id}"
-        )
 
 
-# Global indexer instance
 indexer = Indexer()
 
 
-def _acl_terms(permissions: List[str], extra_acl: Optional[List[str]] = None) -> List[str]:
+def _acl_terms(
+    permissions: List[str], extra_acl: Optional[List[str]] = None
+) -> List[str]:
     terms = []
     seen = set()
     for raw in list(permissions or []) + list(extra_acl or []):

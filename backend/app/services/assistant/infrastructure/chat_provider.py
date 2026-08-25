@@ -24,17 +24,18 @@ logger = logging.getLogger(__name__)
 
 OPENROUTER_DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 QWEN_TIMEOUT_S = 90.0
-MAX_SOURCE_CHARS = 900
-MAX_CONTEXT_CHARS = 6000
+# Phase 1 sent ~1000 chars per source; allow more for stories / newsletters.
+MAX_SOURCE_CHARS = 1500
+MAX_CONTEXT_CHARS = 12000
 MAX_HISTORY_TURNS = 6
-TOP_K_SOURCES = 6
+TOP_K_SOURCES = 5
 # Cosine / ANN similarity (Qdrant). Keep a low floor — empty context is worse.
 MIN_COSINE_SCORE = 0.02
 # Federator RRF uses k=60, so rank-1 is ~1/61 ≈ 0.016 — not cosine.
 MIN_RRF_SCORE = 0.001
 
 REFUSE_TEXT = (
-    "I don't have enough information in the provided context to answer that accurately."
+    "I don't have that information in the available documents."
 )
 
 GREETING_TEXT = (
@@ -42,25 +43,19 @@ GREETING_TEXT = (
     "Ask a specific question and I’ll answer from your sources."
 )
 
-GROUNDED_SYSTEM_PROMPT = """You are SynQ, a precise enterprise assistant. Answer only from the supplied context.
+GROUNDED_SYSTEM_PROMPT = """You are SynQ AI, an intelligent business knowledge assistant.
 
-Voice (Claude-like):
-- Be concise, clear, and warm. Prefer 2–5 short sentences or a tight bullet list.
-- Lead with the direct answer. No preamble like "Here is what I found" or dump of every source.
-- Skip filler, speculation, and unrelated documents.
-
-Grounding rules (authoritative):
-- Treat the retrieved sources as the only authoritative evidence. Do not use world knowledge.
-- The sources below were already selected for this question by search. Use them.
-- If sources partially answer the question, say what they show and what is missing — do not invent the rest.
-- Users often omit dates, document names, or account names. Infer from the most relevant / most recent matching item in the sources when the default is obvious.
-- Prior conversation is only for resolving references ("that one"). It is not evidence and must never override retrieved sources.
-- If several sources conflict and you cannot tell which one they mean, ask one short clarification.
-- If the question is about which email/account/mailbox the user is using, answer from Signed-in account and From/To headers in the sources.
-- Reply with exactly: I don't have enough information in the provided context to answer that accurately. — ONLY when the sources section is "(no authorized sources)" or the sources contain zero usable text for the question.
-- Never invent facts, citations, file names, numbers, policies, dates, people, or steps that are not in the sources.
-- Cite important claims with source ids in square brackets, e.g. [1] or [1, p.3]. Use at most 2–3 citations.
-- Prefer a precise, short answer over a dump of snippets."""
+CRITICAL RULES (Phase 1 quality bar):
+- Answer ONLY using the document context provided below. Do NOT use your own knowledge.
+- If the answer is in the documents, extract and present it clearly with specific details (names, numbers, dates, quotes).
+- Cite sources inline as [1], [2], etc. matching the source numbers below (at most 2–3 citations).
+- If the documents do not contain the answer, say exactly: I don't have that information in the available documents.
+- For greetings (hello, hi, hey), respond warmly and mention you can help with their uploaded documents.
+- Be direct, specific, and conversational. Do NOT dump raw document text.
+- When the user asks for a brief / summary / story / lessons, use short bold section labels and bullets — still only from the sources.
+- Source headers (title, from=, subject=) are evidence. For newsletters, From identifies the author; "3MM" means "3 Minute Monday".
+- Answer in the same language as the question.
+- Lead with the answer. No preamble like "Here is what I found" or "Based on the sources"."""
 
 # Inspectable log of prompts actually sent to a chat provider. Tests (L1)
 # assert restricted content never appears here. Entries never include API keys.
@@ -97,7 +92,11 @@ def is_refuse_answer(text: str) -> bool:
         .strip()
         .lower()
     )
-    return "don't have enough information in the provided context" in normalized
+    return (
+        "don't have enough information in the provided context" in normalized
+        or "don't have that information in the available documents" in normalized
+        or "dont have that information in the available documents" in normalized
+    )
 
 
 @dataclass
@@ -127,21 +126,33 @@ def _hit_meta(hit: Dict[str, Any]) -> Dict[str, Any]:
     meta = hit.get("meta") if isinstance(hit.get("meta"), dict) else {}
     nested = meta.get("metadata") if isinstance(meta.get("metadata"), dict) else {}
     extra = hit.get("metadata") if isinstance(hit.get("metadata"), dict) else {}
+    structured = (
+        nested.get("structured_metadata")
+        if isinstance(nested.get("structured_metadata"), dict)
+        else {}
+    )
+    if not structured and isinstance(extra.get("structured_metadata"), dict):
+        structured = extra.get("structured_metadata") or {}
 
     def first(*keys: str) -> Any:
         for key in keys:
-            for src in (hit, meta, nested, extra):
+            for src in (hit, meta, nested, extra, structured):
+                if not isinstance(src, dict):
+                    continue
                 value = src.get(key)
-                if value not in (None, ""):
+                if value not in (None, "", []):
                     return value
         return None
 
+    from_raw = first("from_email", "from", "sender")
     return {
         "document_id": str(first("document_id", "id") or ""),
         "chunk_id": first("chunk_id", "chunkId"),
         "page": first("page", "page_number", "pageNumber"),
-        "title": str(first("title") or ""),
+        "title": str(first("title", "subject") or ""),
         "source": first("source", "source_type", "repository"),
+        "from_email": str(from_raw or ""),
+        "subject": str(first("subject") or ""),
     }
 
 
@@ -165,20 +176,23 @@ def source_text_is_usable(text: str, *, min_chars: int = 40) -> bool:
 
 
 def format_source_block(hit: Dict[str, Any], index: int) -> str:
+    """Phase 1 style: [Source N: title] then body text (with from= when known)."""
     meta = _hit_meta(hit)
     snippet = plain_source_text(str(hit.get("snippet") or hit.get("body") or "").strip())
     if len(snippet) > MAX_SOURCE_CHARS:
         snippet = snippet[:MAX_SOURCE_CHARS].rstrip() + "…"
-    header_parts = [f"[{index}]", f"document_id={meta['document_id'] or 'unknown'}"]
-    if meta["title"]:
-        header_parts.append(f"title={meta['title']}")
-    if meta["chunk_id"]:
-        header_parts.append(f"chunk_id={meta['chunk_id']}")
-    if meta["page"] not in (None, ""):
-        header_parts.append(f"page={meta['page']}")
+    title = meta["title"] or meta["document_id"] or f"Document {index}"
+    header = f"[Source {index}: {title}]"
+    extras: List[str] = []
+    if meta["from_email"]:
+        extras.append(f"from={meta['from_email']}")
+    if meta["subject"] and meta["subject"] != meta["title"]:
+        extras.append(f"subject={meta['subject']}")
     if meta["source"]:
-        header_parts.append(f"source={meta['source']}")
-    return " ".join(header_parts) + "\n" + (snippet or "(empty snippet)")
+        extras.append(f"source={meta['source']}")
+    if extras:
+        header = header + " (" + "; ".join(extras) + ")"
+    return header + "\n" + (snippet or "(empty snippet)")
 
 
 def debug_source_chunks(ranked_hits: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -194,6 +208,7 @@ def debug_source_chunks(ranked_hits: Sequence[Dict[str, Any]]) -> List[Dict[str,
                 "chunk_id": meta["chunk_id"],
                 "page": meta["page"],
                 "title": meta["title"] or None,
+                "from_email": meta["from_email"] or None,
                 "source": meta["source"],
                 "score": hit.get("boosted_score", hit.get("score")),
                 "base_score": hit.get("base_score"),
@@ -264,6 +279,71 @@ def filter_relevant_hits(
     return kept[:limit]
 
 
+async def enrich_hits_with_full_bodies(
+    hits: Sequence[Dict[str, Any]],
+    tenant_id: str,
+    *,
+    min_chars: int = 600,
+    max_chars: int = 6000,
+    limit: int = TOP_K_SOURCES,
+) -> List[Dict[str, Any]]:
+    """Expand thin vector chunks with full stored document bodies (Phase 1 parity)."""
+    if not hits or not (tenant_id or "").strip():
+        return list(hits)
+    try:
+        from app.services.document_reader.store import get_shared_document_store
+
+        store = get_shared_document_store()
+    except Exception:  # noqa: BLE001
+        return list(hits)
+
+    enriched: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+    for hit in list(hits)[:limit]:
+        row = dict(hit)
+        doc_id = str(row.get("document_id") or "")
+        snippet = plain_source_text(str(row.get("snippet") or row.get("body") or ""))
+        if (
+            doc_id
+            and doc_id not in seen
+            and len(snippet) < min_chars
+            and hasattr(store, "get_metadata")
+        ):
+            try:
+                meta = await store.get_metadata(tenant_id, doc_id)
+                object_key = (meta or {}).get("object_key") if meta else None
+                body_text = ""
+                if object_key and hasattr(store, "get_body"):
+                    raw = await store.get_body(str(object_key))
+                    body_text = (
+                        raw.decode("utf-8", errors="ignore")
+                        if isinstance(raw, (bytes, bytearray))
+                        else str(raw or "")
+                    )
+                body_text = plain_source_text(body_text)
+                if len(body_text) > len(snippet):
+                    row["snippet"] = body_text[:max_chars]
+                    if meta and meta.get("title") and not row.get("title"):
+                        row["title"] = meta.get("title")
+                if hasattr(store, "get_structured_metadata"):
+                    sm = await store.get_structured_metadata(tenant_id, doc_id)
+                    if isinstance(sm, dict) and sm:
+                        merged = dict(row.get("metadata") or {})
+                        merged.update(
+                            {k: v for k, v in sm.items() if v not in (None, "", [])}
+                        )
+                        row["metadata"] = merged
+                        if sm.get("from_email"):
+                            row["from_email"] = sm["from_email"]
+                seen.add(doc_id)
+            except Exception:  # noqa: BLE001
+                logger.debug(
+                    "full-body enrich skipped doc_id=%s", doc_id, exc_info=True
+                )
+        enriched.append(row)
+    return enriched
+
+
 def assemble_chat_messages(
     user_prompt: str,
     ranked_hits: List[Dict[str, Any]],
@@ -315,18 +395,15 @@ def assemble_chat_messages(
         else "Signed-in account: (not provided)\n"
     )
     user = (
-        "Authoritative retrieved sources (the only allowed evidence):\n"
+        "DOCUMENTS:\n"
         f"{sources_text}\n\n"
         f"{account_line}"
-        "Prior conversation (not evidence; do not invent facts from it; "
-        "sources above win if they conflict):\n"
+        "Prior conversation (not evidence; sources above win if they conflict):\n"
         f"{history_text}\n\n"
-        "Answer the question directly and briefly using the retrieved sources. "
-        "Do not summarize every source. "
-        "If the sources do not mention the asked person/topic, say so clearly from the sources "
-        "(e.g. none of the retrieved emails mention that name) — do not invent. "
-        "Ask a clarifying question only if the sources conflict.\n\n"
-        f"Question:\n{user_prompt}"
+        f"QUESTION: {user_prompt}\n\n"
+        "Answer based ONLY on the documents above. "
+        "If a From header or title abbreviation matches the person/topic asked about, "
+        "use that source — do not refuse just because the display name is missing from the body."
     )
     messages = [
         {"role": "system", "content": GROUNDED_SYSTEM_PROMPT},
@@ -364,7 +441,9 @@ class FakeChatProvider:
                 prompt = str(msg.get("content") or "")
                 break
         question = ""
-        if "Question:\n" in prompt:
+        if "QUESTION:" in prompt:
+            question = prompt.rsplit("QUESTION:", 1)[-1].strip()
+        elif "Question:\n" in prompt:
             question = prompt.rsplit("Question:\n", 1)[-1].strip()
         else:
             question = prompt.strip()
@@ -390,11 +469,20 @@ class FakeChatProvider:
             )
 
         top = hits_meta[0]
+        meta = _hit_meta(top)
         snippet = plain_source_text(str(top.get("snippet") or "")).replace("\n", " ")
-        title = str(top.get("title") or top.get("document_id") or "your document").strip()
+        title = str(meta.get("title") or top.get("title") or top.get("document_id") or "your document").strip()
+        sender = str(meta.get("from_email") or "").strip()
         if len(snippet) > 280:
             snippet = snippet[:280].rstrip() + "…"
-        text = f"From **{title}**: {snippet} [1]"
+        if sender:
+            # Prefer display name before <email> when present.
+            display = sender
+            if "<" in sender:
+                display = sender.split("<", 1)[0].strip().strip('"') or sender
+            text = f"From **{display}** ({title}): {snippet} [1]"
+        else:
+            text = f"From **{title}**: {snippet} [1]"
         elapsed = (time.perf_counter() - started) * 1000.0
         return ChatGeneration(
             text=text,
@@ -566,7 +654,7 @@ class OpenRouterChatProvider:
     @staticmethod
     def _may_reason(model: str) -> bool:
         lowered = (model or "").lower()
-        return any(token in lowered for token in ("qwen3", "thinking", "reason"))
+        return any(token in lowered for token in ("qwen3", "qwq", "thinking", "reason"))
 
     async def _create_completion(self, **kwargs: Any) -> Any:
         """Prefer raw JSON so OpenRouter `reasoning` fields are not dropped."""
@@ -594,17 +682,19 @@ class OpenRouterChatProvider:
         started = time.perf_counter()
         max_tokens = kwargs.get("max_tokens")
         if max_tokens is None:
-            max_tokens = getattr(settings, "llm_chat_max_tokens", 1024) or 1024
-        # Reasoning models spend the same budget on hidden thinking; 512 often
-        # yields finish_reason=length with an empty content field.
-        token_budget = max(int(max_tokens), 2048 if self._may_reason(self.model) else 1024)
+            max_tokens = getattr(settings, "llm_chat_max_tokens", 1500) or 1500
+        # Reasoning models spend budget on hidden thinking; keep a healthy floor
+        # so finish_reason=length does not yield empty content.
+        token_floor = 2048 if self._may_reason(self.model) else 1024
+        token_budget = max(int(max_tokens), token_floor)
         temperature = kwargs.get("temperature")
         if temperature is None:
-            temperature = getattr(settings, "llm_chat_temperature", 0.1)
+            temperature = getattr(settings, "llm_chat_temperature", 0.3)
         try:
-            temperature = min(0.2, max(0.0, float(temperature)))
+            # Phase 1 used 0.3 — allow up to 0.4 for natural prose.
+            temperature = min(0.4, max(0.0, float(temperature)))
         except (TypeError, ValueError):
-            temperature = 0.1
+            temperature = 0.3
 
         logger.info(
             "[assistant.pipeline] Qwen request started model=%s max_tokens=%s temperature=%s stream=false",
@@ -619,11 +709,13 @@ class OpenRouterChatProvider:
             "max_tokens": token_budget,
             "temperature": temperature,
             "stream": False,
-            "extra_body": {
-                # Disable hidden thinking so the budget is used for the answer.
-                "reasoning": {"effort": "none", "exclude": True},
-            },
         }
+        # Only send reasoning controls to models that support them (Qwen3/thinking).
+        # Qwen 2.5 instruct can fail or return empty when this extra_body is present.
+        if self._may_reason(self.model):
+            create_kwargs["extra_body"] = {
+                "reasoning": {"effort": "none", "exclude": True},
+            }
 
         try:
             completion = await self._create_completion(**create_kwargs)
@@ -683,9 +775,8 @@ class OpenRouterChatProvider:
             try:
                 retry_kwargs = dict(create_kwargs)
                 retry_kwargs["max_tokens"] = max(token_budget, 2048)
-                retry_kwargs["extra_body"] = {
-                    "reasoning": {"effort": "none", "exclude": True}
-                }
+                # Do not re-introduce reasoning extras on empty-content retry.
+                retry_kwargs.pop("extra_body", None)
                 completion = await self._create_completion(**retry_kwargs)
                 text, err = _completion_text(completion)
                 data = _as_mapping(completion) or {}
