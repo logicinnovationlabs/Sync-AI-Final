@@ -169,12 +169,78 @@ class TextExtractor:
             return ""
     
     def _extract_docx(self, content_bytes: bytes) -> str:
-        """Extract text from DOCX."""
+        """Extract text from DOCX.
+
+        Rule #3 — walks body paragraphs, tables, text boxes (w:txbxContent),
+        headers, and footers.  Plain ``doc.paragraphs`` misses text in tables
+        and text boxes, which is a confirmed gap for python-docx.
+        """
         try:
             from docx import Document
-            
+
             doc = Document(io.BytesIO(content_bytes))
-            text_parts = [para.text for para in doc.paragraphs]
+            text_parts: list[str] = []
+
+            # 1. Body paragraphs (reading order)
+            for para in doc.paragraphs:
+                text = para.text.strip()
+                if text:
+                    text_parts.append(text)
+
+            # 2. Tables — iterate rows → cells → paragraphs
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for para in cell.paragraphs:
+                            text = para.text.strip()
+                            if text:
+                                text_parts.append(text)
+
+            # 3. Headers and footers — iterate sections
+            for section in doc.sections:
+                for header_footer in (
+                    section.header,
+                    section.footer,
+                    getattr(section, "first_page_header", None),
+                    getattr(section, "first_page_footer", None),
+                    getattr(section, "even_page_header", None),
+                    getattr(section, "even_page_footer", None),
+                ):
+                    if header_footer is None:
+                        continue
+                    try:
+                        for para in header_footer.paragraphs:
+                            text = para.text.strip()
+                            if text:
+                                text_parts.append(text)
+                    except Exception:
+                        pass
+
+            # 4. Text boxes (w:txbxContent) — walk the XML directly
+            try:
+                from lxml import etree
+
+                nsmap = {
+                    "w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+                    "mc": "http://schemas.openxmlformats.org/markup-compatibility/2006",
+                    "wps": "http://schemas.microsoft.com/office/word/2010/wordprocessingShape",
+                }
+                body_xml = doc.element
+                # Find all w:txbxContent elements (text boxes)
+                for txbx in body_xml.iter(
+                    "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}txbxContent"
+                ):
+                    for p_elem in txbx.iter(
+                        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+                    ):
+                        if p_elem.text and p_elem.text.strip():
+                            text_parts.append(p_elem.text.strip())
+            except ImportError:
+                # lxml not available — skip text box extraction
+                logger.debug("lxml not available, skipping text box extraction")
+            except Exception as e:
+                logger.debug(f"Text box extraction failed: {e}")
+
             return "\n".join(text_parts)
         except Exception as e:
             logger.error(f"DOCX extraction failed: {e}")

@@ -1,37 +1,44 @@
 """
 Embedding service - generates vector embeddings for documents.
 
-Supports:
-- Gemini embeddings (production)
-- Fake/deterministic embeddings (tests/dev)
-
-Provider is configured via EMBEDDING_PROVIDER env var.
+Matches Phase 1 SynQ behavior:
+- Gemini ``gemini-embedding-001`` with explicit ``output_dimensionality``
+- ``task_type=retrieval_document`` when indexing passages
+- ``task_type=retrieval_query`` when embedding the user question
 """
 
-from typing import List, Protocol
-from abc import ABC, abstractmethod
+from __future__ import annotations
+
 import hashlib
+import logging
+from typing import List, Optional, Protocol
 
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
+
+TASK_RETRIEVAL_DOCUMENT = "retrieval_document"
+TASK_RETRIEVAL_QUERY = "retrieval_query"
+
+
+def _normalize_gemini_model_name(model: str | None) -> str:
+    """google-generativeai requires models/ or tunedModels/ prefix."""
+    name = (model or "").strip() or "gemini-embedding-001"
+    if name.startswith("models/") or name.startswith("tunedModels/"):
+        return name
+    return f"models/{name}"
+
 
 class EmbeddingProvider(Protocol):
-    """Protocol for embedding providers."""
-    
-    async def embed_texts(self, texts: List[str]) -> List[List[float]]:
-        """
-        Generate embeddings for a list of texts.
-        
-        Args:
-            texts: List of text strings
-            
-        Returns:
-            List of embedding vectors (each is a list of floats)
-        """
+    async def embed_texts(
+        self,
+        texts: List[str],
+        *,
+        task_type: Optional[str] = None,
+    ) -> List[List[float]]:
         ...
-    
+
     def get_dimension(self) -> int:
-        """Get embedding dimension."""
         ...
 
 
@@ -52,20 +59,21 @@ class GeminiEmbeddingProvider:
             dimension: Embedding dimension
         """
         self.api_key = api_key
-        self.model = model
-        self.dimension = dimension
-        
-        # Import here to avoid requiring google-generativeai in tests
+        self.model = _normalize_gemini_model_name(model)
+        self.dimension = int(dimension)
+
         import google.generativeai as genai
+
         genai.configure(api_key=api_key)
         self.genai = genai
     
-    async def embed_texts(self, texts: List[str]) -> List[List[float]]:
+    async def embed_texts(self, texts: List[str], *, task_type: Optional[str] = None) -> List[List[float]]:
         """
         Generate embeddings using Gemini.
         
         Args:
             texts: List of text strings
+            task_type: Optional task type for Phase 1 compatibility (retrieval_document/retrieval_query)
             
         Returns:
             List of embedding vectors
@@ -76,18 +84,20 @@ class GeminiEmbeddingProvider:
             # Truncate if too long (Gemini has token limits)
             truncated_text = text[:10000]
             
-            result = self.genai.embed_content(
-                model=self.model,
-                content=truncated_text,
-                output_dimensionality=self.dimension,
-            )
+            kwargs = {
+                "model": self.model,
+                "content": truncated_text,
+                "output_dimensionality": self.dimension,
+            }
+            if task_type:
+                kwargs["task_type"] = task_type
             
+            result = self.genai.embed_content(**kwargs)
             embeddings.append(result["embedding"])
         
         return embeddings
-    
+
     def get_dimension(self) -> int:
-        """Get embedding dimension."""
         return self.dimension
 
 
@@ -107,7 +117,7 @@ class FakeEmbeddingProvider:
         """
         self.dimension = dimension
     
-    async def embed_texts(self, texts: List[str]) -> List[List[float]]:
+    async def embed_texts(self, texts: List[str], *, task_type: Optional[str] = None) -> List[List[float]]:
         """
         Generate deterministic fake embeddings.
         
@@ -115,49 +125,46 @@ class FakeEmbeddingProvider:
         
         Args:
             texts: List of text strings
+            task_type: Optional task type for Phase 1 compatibility
             
         Returns:
             List of embedding vectors
         """
+        prefix = f"{task_type or 'none'}::"
         embeddings = []
-        
         for text in texts:
-            # Generate deterministic vector from text hash
-            text_hash = hashlib.sha256(text.encode()).hexdigest()
-            
-            # Convert hash to floats in [-1, 1] range
-            vector = []
+            text_hash = hashlib.sha256((prefix + text).encode()).hexdigest()
+            vector: List[float] = []
             for i in range(self.dimension):
-                # Use different parts of the hash
                 byte_idx = (i * 2) % len(text_hash)
-                hex_val = int(text_hash[byte_idx:byte_idx+2], 16)
-                # Normalize to [-1, 1]
-                normalized = (hex_val / 128.0) - 1.0
-                vector.append(normalized)
-            
+                hex_val = int(text_hash[byte_idx : byte_idx + 2], 16)
+                vector.append((hex_val / 128.0) - 1.0)
             embeddings.append(vector)
-        
         return embeddings
-    
+
     def get_dimension(self) -> int:
-        """Get embedding dimension."""
         return self.dimension
 
 
 class EmbeddingService:
-    """
-    Embedding service - facade for different providers.
-    
-    Selects provider based on configuration.
-    """
-    
-    def __init__(self):
-        """Initialize embedding service with configured provider."""
+    """Facade selecting Gemini or fake from settings."""
+
+    def __init__(self) -> None:
         provider_name = (
             getattr(settings, "embedding_provider", None)
             or getattr(settings, "EMBEDDING_PROVIDER", "fake")
+            or "fake"
         )
-        
+        provider_name = str(provider_name).strip().lower()
+
+        dimension = int(
+            getattr(settings, "embedding_dimension", None)
+            or getattr(settings, "embedding_dimensions", None)
+            or getattr(settings, "EMBEDDING_DIMENSION", None)
+            or getattr(settings, "EMBEDDING_DIMENSIONS", None)
+            or 3072
+        )
+
         if provider_name == "gemini":
             api_key = (
                 getattr(settings, "gemini_api_key", None)
@@ -165,7 +172,10 @@ class EmbeddingService:
             )
             model = (
                 getattr(settings, "embedding_model", None)
-                or getattr(settings, "EMBEDDING_MODEL", "gemini-embedding-001")
+                or getattr(settings, "model_version", None)
+                or getattr(settings, "EMBEDDING_MODEL", None)
+                or getattr(settings, "MODEL_VERSION", None)
+                or "gemini-embedding-001"
             )
             # Prefer EMBEDDING_DIMENSIONS (plural, QdrantVectorStore) so a leftover
             # EMBEDDING_DIMENSION=768 cannot silently undersize vectors vs the
@@ -177,51 +187,45 @@ class EmbeddingService:
             
             if not api_key:
                 raise ValueError("GEMINI_API_KEY not configured")
-            
             self.provider = GeminiEmbeddingProvider(api_key, model, dimension)
-        
         elif provider_name == "fake":
             dimension = (
                 getattr(settings, "embedding_dimensions", None)
                 or 3072
             )
             self.provider = FakeEmbeddingProvider(dimension)
-        
         else:
-            raise ValueError(f"Unknown embedding provider: {provider_name}")
-    
-    async def embed_texts(self, texts: List[str]) -> List[List[float]]:
-        """
-        Generate embeddings for texts.
-        
-        Args:
-            texts: List of text strings
-            
-        Returns:
-            List of embedding vectors
-        """
+            raise ValueError(f"Unknown embedding provider: {provider_name!r}")
+
+    async def embed_texts(
+        self,
+        texts: List[str],
+        *,
+        task_type: Optional[str] = None,
+    ) -> List[List[float]]:
         if not texts:
             return []
-        
-        return await self.provider.embed_texts(texts)
-    
-    async def embed_text(self, text: str) -> List[float]:
-        """
-        Generate embedding for a single text.
-        
-        Args:
-            text: Text string
-            
-        Returns:
-            Embedding vector
-        """
-        embeddings = await self.embed_texts([text])
-        return embeddings[0] if embeddings else []
-    
+        return await self.provider.embed_texts(texts, task_type=task_type)
+
+    async def embed_text(
+        self,
+        text: str,
+        *,
+        task_type: Optional[str] = None,
+    ) -> List[float]:
+        vectors = await self.embed_texts([text], task_type=task_type)
+        return vectors[0] if vectors else []
+
+    async def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        """Index-time passage embeddings (Phase 1 retrieval_document)."""
+        return await self.embed_texts(texts, task_type=TASK_RETRIEVAL_DOCUMENT)
+
+    async def embed_query(self, text: str) -> List[float]:
+        """Query-time embedding (Phase 1 retrieval_query)."""
+        return await self.embed_text(text, task_type=TASK_RETRIEVAL_QUERY)
+
     def get_dimension(self) -> int:
-        """Get embedding dimension."""
         return self.provider.get_dimension()
 
 
-# Global embedding service instance
 embedding_service = EmbeddingService()

@@ -69,7 +69,10 @@ async def lifespan(app: FastAPI):
         logger.critical("Startup configuration invalid: %s", exc)
         raise
     await redis_client.connect()
-    logger.info("Connected to Redis")
+    if redis_client._client is None:
+        logger.warning("Redis unavailable — running in in-memory fallback")
+    else:
+        logger.info("Connected to Redis")
     await mcp_revocation_listener.start()
 
     yield
@@ -106,16 +109,12 @@ app.add_middleware(TenantMiddleware)
 app.add_middleware(HttpMetricsMiddleware)
 app.add_middleware(RateLimitMiddleware)
 
-_cors_origins = settings.cors_origins_list
 # Browsers reject allow_origins=["*"] together with allow_credentials=True.
-# In development, allow localhost and Vercel preview/prod hosts by regex.
-_cors_regex = None
-if _is_relaxed_env and not _cors_origins:
-    _cors_origins = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ]
-    _cors_regex = r"https://([a-z0-9-]+\.)*vercel\.app"
+# Always allow *.vercel.app via regex so prod + preview deployments work even when
+# CORS_ALLOWED_ORIGINS lists only one Vercel URL (setting origins disables regex
+# unless we set both — this was breaking UI login while Postman still worked).
+_cors_origins = settings.effective_cors_origins
+_cors_regex = r"https://([a-z0-9-]+\.)*vercel\.app"
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
@@ -123,6 +122,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Block O – instrument FastAPI (needs the app object)

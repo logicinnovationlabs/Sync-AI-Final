@@ -50,10 +50,8 @@ class MockLexicalStore(LexicalStore):
         if is_fail_closed(acl_terms):
             return {"results": [], "facets": {}, "total": 0}
         
-        if tenant_id not in self.documents:
-            return {"results": [], "facets": {}, "total": 0}
-        
-        # Filter visible matching docs
+        docs = self.documents.get(tenant_id, {})
+        results = []
         visible_docs = []
         results = []
         for doc_id, doc_data in self.documents[tenant_id].items():

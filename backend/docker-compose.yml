@@ -70,6 +70,9 @@ services:
       QDRANT_COLLECTION_NAME: documents
       EMBEDDING_PROVIDER: fake
       EMBEDDING_DIMENSION: 3072
+      EMBEDDING_DIMENSIONS: 3072
+      CHUNK_SIZE: 1000
+      CHUNK_OVERLAP: 200
       # Block B: Celery
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/1
@@ -107,6 +110,9 @@ services:
       QDRANT_COLLECTION_NAME: documents
       EMBEDDING_PROVIDER: fake
       EMBEDDING_DIMENSION: 3072
+      EMBEDDING_DIMENSIONS: 3072
+      CHUNK_SIZE: 1000
+      CHUNK_OVERLAP: 200
       # Block B: Celery
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/1

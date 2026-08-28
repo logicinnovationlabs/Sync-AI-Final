@@ -24,6 +24,18 @@ logger = logging.getLogger(__name__)
 AclCaptureHook = Callable[[str, bytes, Dict[str, Any]], None]
 
 
+def is_loopback_url(url: str) -> bool:
+    lowered = (url or "").lower()
+    return (
+        not lowered
+        or "localhost" in lowered
+        or "127.0.0.1" in lowered
+        or "0.0.0.0" in lowered
+        or "[::1]" in lowered
+        or "://::1" in lowered
+    )
+
+
 def encode_acl_terms(acl_terms: List[str]) -> bytes:
     """Wrap Identity/JWT acl_terms as opaque bytes (JSON array, UTF-8)."""
     return json.dumps(list(acl_terms), separators=(",", ":"), ensure_ascii=False).encode(
@@ -165,6 +177,9 @@ class SearchToolbox:
             call, mode="vector", authorization=authorization, tenant_id=tenant_id
         )
 
+    def _federator_is_loopback(self) -> bool:
+        return is_loopback_url(self.federator_url)
+
     async def _federated_search(
         self,
         call: ToolCall,
@@ -173,22 +188,43 @@ class SearchToolbox:
         authorization: Optional[str],
         tenant_id: Optional[str],
     ) -> ToolResult:
-        """Call Block J Query Federator POST /search/federated."""
+        """Block J search — prefer in-process (Render chat must not call localhost)."""
         acl = acl_bytes_for_transport(call.acl_compiled_filter)
         params = dict(call.query_params)
         terms = acl_terms_for_json_body(acl)
+        query = str(params.get("query", "") or "")
+        size = int(params.get("size", 20))
+
+        # Production: QUERY_FEDERATOR_URL defaults to localhost and fails on Render.
+        # Documents tab hits this API in-process via the browser; chat must do the same.
+        if tenant_id and self._federator_is_loopback():
+            return await self._federated_search_inprocess(
+                call,
+                query=query,
+                size=size,
+                tenant_id=tenant_id,
+                acl_terms=[] if is_fail_closed(terms) else terms,
+                mode=mode,
+            )
+
         body: Dict[str, Any] = {
-            "query": params.get("query", ""),
-            "size": int(params.get("size", 20)),
+            "query": query,
+            "size": size,
             "from": int(params.get("from", 0)),
             "acl_terms": [] if is_fail_closed(terms) else terms,
             "debug": bool(params.get("debug", False)),
             "orchestrator_mode": mode,
+            "enable_lexical": True,
+            "enable_vector": True,
         }
         if tenant_id:
             body["tenant_id"] = tenant_id
         headers = self._acl_headers(acl, authorization)
-        self._record(call.tool_name, acl, {"url": f"{self.federator_url}/search/federated", "body": body, "headers": headers})
+        self._record(
+            call.tool_name,
+            acl,
+            {"url": f"{self.federator_url}/search/federated", "body": body, "headers": headers},
+        )
 
         started = time.perf_counter()
         try:
@@ -211,6 +247,92 @@ class SearchToolbox:
         except Exception as exc:  # noqa: BLE001
             latency = (time.perf_counter() - started) * 1000.0
             logger.exception("federated search failed")
+            # Last resort: same-process search when the HTTP hop dies.
+            if tenant_id:
+                logger.warning(
+                    "federated HTTP failed; falling back to in-process search: %s", exc
+                )
+                return await self._federated_search_inprocess(
+                    call,
+                    query=query,
+                    size=size,
+                    tenant_id=tenant_id,
+                    acl_terms=[] if is_fail_closed(terms) else terms,
+                    mode=mode,
+                )
+            return ToolResult(
+                tool_name=call.tool_name,
+                ok=False,
+                payload={},
+                error=str(exc),
+                acl_bytes_sent=acl,
+                latency_ms=latency,
+            )
+
+    async def _federated_search_inprocess(
+        self,
+        call: ToolCall,
+        *,
+        query: str,
+        size: int,
+        tenant_id: str,
+        acl_terms: List[str],
+        mode: str,
+    ) -> ToolResult:
+        from app.services.query_federator import federated_search_inprocess
+
+        acl = acl_bytes_for_transport(call.acl_compiled_filter)
+        principal = ""
+        for term in acl_terms:
+            raw = str(term)
+            if raw.startswith("user:"):
+                principal = raw.split(":", 1)[-1]
+                break
+            if raw and not principal:
+                principal = raw
+
+        self._record(
+            call.tool_name,
+            acl,
+            {
+                "url": "inprocess://search/federated",
+                "body": {
+                    "query": query,
+                    "size": size,
+                    "tenant_id": tenant_id,
+                    "mode": mode,
+                    "acl_terms": acl_terms,
+                },
+            },
+        )
+        started = time.perf_counter()
+        try:
+            payload = await federated_search_inprocess(
+                query=query,
+                tenant_id=tenant_id,
+                principal_id=principal,
+                size=size,
+                acl_terms=acl_terms,
+            )
+            latency = (time.perf_counter() - started) * 1000.0
+            hit_count = len(payload.get("results") or [])
+            logger.info(
+                "[assistant.pipeline] inprocess federated mode=%s hits=%s ms=%.1f",
+                mode,
+                hit_count,
+                latency,
+            )
+            return ToolResult(
+                tool_name=call.tool_name,
+                ok=True,
+                payload=payload,
+                error=None,
+                acl_bytes_sent=acl,
+                latency_ms=latency,
+            )
+        except Exception as exc:  # noqa: BLE001
+            latency = (time.perf_counter() - started) * 1000.0
+            logger.exception("inprocess federated search failed")
             return ToolResult(
                 tool_name=call.tool_name,
                 ok=False,
@@ -322,6 +444,14 @@ class SearchToolbox:
         self._record(call.tool_name, acl, {"url": url, "headers": headers, "tenant_id": tenant_id})
 
         started = time.perf_counter()
+        if is_loopback_url(self.signals_url):
+            return ToolResult(
+                tool_name=call.tool_name,
+                ok=True,
+                payload={"skipped": True, "reason": "loopback"},
+                acl_bytes_sent=acl,
+                latency_ms=(time.perf_counter() - started) * 1000.0,
+            )
         try:
             resp = await self._request("GET", url, headers=headers)
             latency = (time.perf_counter() - started) * 1000.0

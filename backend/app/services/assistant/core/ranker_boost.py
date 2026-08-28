@@ -42,6 +42,15 @@ def extract_base_hits(federator_payload: Mapping[str, Any]) -> List[RankedHit]:
         if not doc_id:
             continue
         base = _as_float(item.get("score"), 0.0)
+        item_meta = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+        from_email = str(item.get("from_email") or item_meta.get("from_email") or "")
+        meta = dict(item)
+        if from_email:
+            meta["from_email"] = from_email
+            if isinstance(meta.get("metadata"), dict):
+                meta["metadata"] = {**meta["metadata"], "from_email": from_email}
+            else:
+                meta["metadata"] = {"from_email": from_email}
         hits.append(
             RankedHit(
                 document_id=doc_id,
@@ -50,7 +59,7 @@ def extract_base_hits(federator_payload: Mapping[str, Any]) -> List[RankedHit]:
                 title=str(item.get("title") or ""),
                 snippet=str(item.get("snippet") or item.get("body") or ""),
                 sources=list(item.get("sources") or []),
-                meta=dict(item),
+                meta=meta,
             )
         )
     return hits

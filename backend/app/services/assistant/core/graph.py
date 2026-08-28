@@ -10,6 +10,8 @@ from typing import Any, Dict, List, Optional, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
+from app.services.rag_debug_trace import get_tracer as _get_rag_tracer
+
 from app.services.assistant.core.intent_router import Intent, classify_intent
 from app.services.assistant.core.ranker_boost import (
     RankedHit,
@@ -24,14 +26,21 @@ from app.services.assistant.domain.models import (
     ToolResult,
 )
 from app.services.assistant.infrastructure.memory_store import EpisodicMemoryStore
-from app.services.assistant.infrastructure.tools import SearchToolbox, encode_acl_terms
+from app.services.assistant.infrastructure.tools import (
+    SearchToolbox,
+    encode_acl_terms,
+    is_loopback_url,
+)
 from app.services.assistant.infrastructure.chat_provider import (
     GREETING_TEXT,
     ChatService,
     assemble_chat_messages,
     debug_source_chunks,
+    enrich_hits_with_full_bodies,
     filter_relevant_hits,
+    plain_source_text,
     record_prompt,
+    source_text_is_usable,
 )
 
 logger = logging.getLogger(__name__)
@@ -286,29 +295,31 @@ class OrchestratorGraph:
                     "tool_call_rounds": rounds + 1,
                 }
 
-        # Parallel lexical + vector via Federator fan-out wrappers + signal lookup.
-        calls = [
-            ToolCall(
-                tool_name="lexical_search",
-                query_params={"query": prompt, "size": 10},
-                acl_compiled_filter=acl,
-            ),
-            ToolCall(
-                tool_name="vector_search",
-                query_params={"query": prompt, "size": 10},
-                acl_compiled_filter=acl,
-            ),
-            ToolCall(
-                tool_name="signal_lookup",
-                query_params={"user_id": req["user_id"]},
-                acl_compiled_filter=acl,
-            ),
-        ]
-        gathered = await asyncio.gather(
-            *[self.toolbox.execute(c, authorization=auth, tenant_id=tenant_id) for c in calls]
+        # One federated search (indexed + lexical + vector). The old dual
+        # lexical_search + vector_search wrappers each ran the full federator.
+        search_call = ToolCall(
+            tool_name="vector_search",
+            query_params={"query": prompt, "size": 10},
+            acl_compiled_filter=acl,
         )
-        results.extend(gathered)
+        tasks = [
+            self.toolbox.execute(search_call, authorization=auth, tenant_id=tenant_id)
+        ]
         signals: Dict[str, Any] = {}
+        if not is_loopback_url(getattr(self.toolbox, "signals_url", "")):
+            tasks.append(
+                self.toolbox.execute(
+                    ToolCall(
+                        tool_name="signal_lookup",
+                        query_params={"user_id": req["user_id"]},
+                        acl_compiled_filter=acl,
+                    ),
+                    authorization=auth,
+                    tenant_id=tenant_id,
+                )
+            )
+        gathered = await asyncio.gather(*tasks)
+        results.extend(gathered)
         for r in gathered:
             if r.tool_name == "signal_lookup" and r.ok:
                 signals = r.payload
@@ -335,8 +346,18 @@ class OrchestratorGraph:
                         base_score=1.0,
                         boosted_score=1.0,
                         title=str(payload.get("title") or ""),
-                        snippet=str(payload.get("body") or "")[:500],
+                        snippet=str(payload.get("body") or "")[:2000],
                         sources=["document_reader"],
+                        meta={
+                            "metadata": payload.get("structured_metadata")
+                            or payload.get("metadata")
+                            or {},
+                            "from_email": (
+                                (payload.get("structured_metadata") or {}).get("from_email")
+                                if isinstance(payload.get("structured_metadata"), dict)
+                                else ""
+                            ),
+                        },
                     )
                     timings = dict(state.get("timings_ms") or {})
                     timings["context_retrieval_completed_ms"] = self._elapsed_ms(state)
@@ -376,6 +397,10 @@ class OrchestratorGraph:
             retrieval_confidence(boosted) < self.confidence_threshold
             and boosted
             and rounds < self.max_tool_call_rounds
+            and not any(
+                source_text_is_usable(str(h.snippet or h.title or ""))
+                for h in boosted[:3]
+            )
         ):
             top = boosted[0]
             acl = state["acl_compiled_filter"]
@@ -400,7 +425,7 @@ class OrchestratorGraph:
                     base_score=top.base_score,
                     boosted_score=max(top.boosted_score, self.confidence_threshold),
                     title=top.title or str((reader.payload or {}).get("title") or ""),
-                    snippet=body[:800] or top.snippet,
+                    snippet=body[:2000] or top.snippet,
                     sources=list(top.sources) + ["document_reader_fallback"],
                     boost_reason="search_vs_read_fallback",
                     meta=dict(top.meta),
@@ -431,6 +456,21 @@ class OrchestratorGraph:
             len(boosted),
             used_reader,
         )
+
+        # --- Rule #2, Stage 7: reranking (signal boost) ---
+        tracer = _get_rag_tracer()
+        if state.get("signals"):
+            tracer.log_reranking(
+                before=[h.__dict__ for h in base_hits[:20]],
+                after=[h.__dict__ for h in boosted[:20]],
+                dropped=[
+                    h.__dict__ for h in base_hits
+                    if h.document_id not in {b.document_id for b in boosted}
+                ],
+            )
+        else:
+            tracer.log_reranking()  # logs "reranking: disabled"
+
         timings = dict(state.get("timings_ms") or {})
         timings["context_retrieval_completed_ms"] = self._elapsed_ms(state)
         return {
@@ -447,9 +487,17 @@ class OrchestratorGraph:
         from app.core.config import settings as _settings
 
         intent = state.get("intent")
-        hits = filter_relevant_hits(list(state.get("ranked_hits") or []))
+        raw_hits = list(state.get("ranked_hits") or [])
+        hits = filter_relevant_hits(raw_hits)
         req = state.get("request") or {}
+        tenant_id = str(req.get("tenant_id") or "")
+        hits = await enrich_hits_with_full_bodies(hits, tenant_id)
         user_prompt = str(req.get("prompt") or "")
+        logger.info(
+            "[assistant.pipeline] grounding hits raw=%s kept=%s",
+            len(raw_hits),
+            len(hits),
+        )
         session = state.get("session") or {}
         history = list(session.get("history") or [])
 
@@ -471,7 +519,7 @@ class OrchestratorGraph:
 
         citations: List[Dict[str, Any]] = []
         for i, h in enumerate(hits[:3], start=1):
-            snippet = (h.get("snippet") or "").strip().replace("\n", " ")
+            snippet = plain_source_text(str(h.get("snippet") or ""), limit=200)
             meta = h.get("meta") if isinstance(h.get("meta"), dict) else {}
             citations.append(
                 {
@@ -490,6 +538,7 @@ class OrchestratorGraph:
             user_prompt,
             hits,
             conversation_history=history,
+            account_email=str(req.get("account_email") or "") or None,
         )
         record_prompt(
             {
@@ -508,13 +557,13 @@ class OrchestratorGraph:
             getattr(self.chat_service.provider, "name", ""),
             len(hits),
         )
-        max_tokens_raw = getattr(_settings, "llm_chat_max_tokens", 512)
+        max_tokens_raw = getattr(_settings, "llm_chat_max_tokens", 1024)
         temperature_raw = getattr(_settings, "llm_chat_temperature", 0.1)
         generation = await self.chat_service.generate(
             messages,
             ranked_hits=hits,
             used_document_reader=bool(state.get("used_document_reader")),
-            max_tokens=int(max_tokens_raw if max_tokens_raw is not None else 512),
+            max_tokens=int(max_tokens_raw if max_tokens_raw is not None else 1024),
             temperature=float(temperature_raw if temperature_raw is not None else 0.1),
         )
         gen_timings = generation.timings_ms or {}

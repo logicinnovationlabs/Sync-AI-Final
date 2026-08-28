@@ -172,7 +172,7 @@ class Settings(BaseSettings):
         ),
     )
     embedding_dimensions: int = Field(
-        default=384,
+        default=3072,
         validation_alias=AliasChoices(
             "EMBEDDING_DIMENSIONS",
             "embedding_dimensions",
@@ -327,7 +327,7 @@ class Settings(BaseSettings):
     qdrant_api_key: Optional[str] = Field(default=None)
     gemini_api_key: Optional[str] = Field(default=None)
     embedding_dimension: int = Field(
-        default=384,
+        default=3072,
         validation_alias=AliasChoices("EMBEDDING_DIMENSION", "embedding_dimension"),
     )
 
@@ -360,18 +360,22 @@ class Settings(BaseSettings):
         ),
     )
     llm_chat_temperature: float = Field(
-        default=0.1,
+        default=0.3,
         validation_alias=AliasChoices(
             "LLM_CHAT_TEMPERATURE", "llm_chat_temperature"
         ),
     )
     llm_chat_max_tokens: int = Field(
-        default=1024,
+        default=1500,
         validation_alias=AliasChoices("LLM_CHAT_MAX_TOKENS", "llm_chat_max_tokens"),
     )
     assistant_debug: bool = Field(
         default=False,
         validation_alias=AliasChoices("ASSISTANT_DEBUG", "assistant_debug"),
+    )
+    rag_debug_trace: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("RAG_DEBUG_TRACE", "rag_debug_trace"),
     )
 
     environment: str = Field(default="development")
@@ -414,11 +418,11 @@ class Settings(BaseSettings):
     # Block E: Chunking & Embeddings
     # ------------------------------------------------------------------
     chunk_size: int = Field(
-        default=512,
+        default=1000,
         validation_alias=AliasChoices("CHUNK_SIZE", "chunk_size"),
     )
     chunk_overlap: int = Field(
-        default=50,
+        default=200,
         validation_alias=AliasChoices("CHUNK_OVERLAP", "chunk_overlap"),
     )
     embedding_model_version: str = Field(
@@ -430,7 +434,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("EMBEDDING_BATCH_SIZE", "embedding_batch_size"),
     )
     embedding_dimensions: int = Field(
-        default=384,
+        default=3072,
         validation_alias=AliasChoices("EMBEDDING_DIMENSIONS", "embedding_dimensions"),
     )
     
@@ -581,12 +585,46 @@ class Settings(BaseSettings):
     def oidc_issuer(self) -> Optional[str]:
         return self.oauth_issuer_url
 
+    @staticmethod
+    def normalize_origin(origin: str) -> str:
+        """Strip whitespace and trailing slash so browser Origin headers match."""
+        return (origin or "").strip().rstrip("/")
+
     @property
     def cors_origins_list(self) -> list[str]:
         raw = (self.cors_allowed_origins or "").strip()
         if not raw:
             return []
-        return [origin.strip() for origin in raw.split(",") if origin.strip()]
+        return [
+            self.normalize_origin(origin)
+            for origin in raw.split(",")
+            if origin.strip()
+        ]
+
+    @property
+    def effective_cors_origins(self) -> list[str]:
+        """
+        Browser-allowed origins: explicit CORS list + FRONTEND_URL + local dev hosts.
+
+        FRONTEND_URL is merged so Render/Vercel only need one of CORS_ALLOWED_ORIGINS
+        or FRONTEND_URL set correctly (both is fine).
+        """
+        seen: set[str] = set()
+        merged: list[str] = []
+        for origin in self.cors_origins_list:
+            if origin and origin not in seen:
+                seen.add(origin)
+                merged.append(origin)
+        frontend = self.normalize_origin(self.frontend_url or "")
+        if frontend and frontend not in seen:
+            seen.add(frontend)
+            merged.append(frontend)
+        if self.environment.lower() in ("development", "dev", "test", "staging"):
+            for origin in ("http://localhost:3000", "http://127.0.0.1:3000"):
+                if origin not in seen:
+                    seen.add(origin)
+                    merged.append(origin)
+        return merged
 
     @property
     def scim_endpoint(self) -> Optional[str]:

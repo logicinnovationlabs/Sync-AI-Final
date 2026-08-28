@@ -7,6 +7,8 @@ import logging
 import uuid
 from typing import Any, Dict, List, Optional
 
+from app.services.rag_debug_trace import get_tracer as _get_rag_tracer
+
 from opentelemetry import trace
 
 from app.core.config import settings
@@ -59,7 +61,7 @@ class QdrantVectorStore(VectorStore):
         self.dimensions = int(
             getattr(settings, "embedding_dimensions", None)
             or getattr(settings, "embedding_dimension", None)
-            or 384
+            or 3072
         )
         self._upsert_batch_size = 50
         self._ensured_collections: set[str] = set()
@@ -207,6 +209,20 @@ class QdrantVectorStore(VectorStore):
                 logger.error(f"Qdrant search failed: {e}")
                 return []
 
+            # --- Rule #2, Stage 5: vector retrieval BEFORE ACL post-filter ---
+            tracer = _get_rag_tracer()
+            pre_acl_results = [
+                {
+                    "chunk_id": (hit.payload or {}).get("chunk_id", ""),
+                    "document_id": (hit.payload or {}).get("document_id", ""),
+                    "score": hit.score,
+                    "title": ((hit.payload or {}).get("metadata") or {}).get("title", ""),
+                }
+                for hit in results
+            ]
+            tracer.log_vector_retrieval(pre_acl_results, pre_acl=True)
+            pre_filter_count = len(results)
+
             output = []
             for hit in results:
                 payload = hit.payload or {}
@@ -222,6 +238,15 @@ class QdrantVectorStore(VectorStore):
                 })
                 if len(output) >= top_k:
                     break
+
+            # --- Rule #2, Stage 6: ACL/tenant filter counts ---
+            must_clause_repr = {
+                "tenant_id": tenant_id,
+                "acl_terms": list(acl_terms)[:10],
+                "is_bypass": is_bypass(acl_terms),
+            }
+            tracer.log_acl_filter(must_clause_repr, pre_filter_count, len(output))
+
             return output
 
     async def upsert_chunk(

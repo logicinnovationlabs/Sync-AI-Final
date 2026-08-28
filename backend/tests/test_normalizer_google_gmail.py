@@ -107,3 +107,27 @@ def test_extract_identity_hints_owner_and_creator(normalizer):
     assert "creator" in hints
     assert hints["creator"].email == "sender@example.com"
     assert hints["creator"].name == "Sender Name"
+
+
+@pytest.mark.asyncio
+async def test_extract_text_falls_back_to_html_multipart(normalizer):
+    """HTML-only newsletters should still yield readable plain text."""
+    import base64
+
+    html = "<p>The world claims to love authenticity.</p>"
+    encoded = base64.urlsafe_b64encode(html.encode("utf-8")).decode("ascii")
+    raw = {
+        "snippet": "short",
+        "payload": {
+            "mimeType": "multipart/alternative",
+            "parts": [
+                {
+                    "mimeType": "text/html",
+                    "body": {"data": encoded},
+                }
+            ],
+        },
+    }
+    text = await normalizer.extract_text(raw)
+    assert "authenticity" in text
+    assert "<p>" not in text

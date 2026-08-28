@@ -81,21 +81,41 @@ class GoogleGmailNormalizer(NormalizerStrategy):
             except Exception:
                 pass
         
-        # Check multipart
-        parts = payload.get("parts", [])
-        for part in parts:
-            mime_type = part.get("mimeType", "")
-            if mime_type == "text/plain":
-                part_body = part.get("body", {}).get("data", "")
+        # Multipart: prefer text/plain, then text/html (many newsletters are HTML-only).
+        plain = self._first_part_text(payload, "text/plain")
+        if plain:
+            return plain
+        html_body = self._first_part_text(payload, "text/html")
+        if html_body:
+            return html_body
+        return ""
+
+    def _first_part_text(self, payload: Dict[str, Any], mime_type: str) -> str:
+        """Walk MIME parts (including nested multipart/*) for the first matching body."""
+        target = (mime_type or "").lower()
+
+        def walk(node: Dict[str, Any]) -> str:
+            if not isinstance(node, dict):
+                return ""
+            node_mime = str(node.get("mimeType") or "").lower()
+            if node_mime == target:
+                part_body = (node.get("body") or {}).get("data") or ""
                 if part_body:
                     try:
                         import base64
-                        decoded = base64.urlsafe_b64decode(part_body).decode("utf-8", errors="ignore")
-                        return decoded
+
+                        return base64.urlsafe_b64decode(part_body).decode(
+                            "utf-8", errors="ignore"
+                        )
                     except Exception:
-                        pass
-        
-        return ""
+                        return ""
+            for child in node.get("parts") or []:
+                found = walk(child)
+                if found:
+                    return found
+            return ""
+
+        return walk(payload)
     
     def _strip_html(self, text: str) -> str:
         """Strip HTML tags from text."""

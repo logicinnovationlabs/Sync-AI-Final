@@ -79,6 +79,53 @@ class NativeLoginResponse(BaseModel):
     must_change_password: bool = False
 
 
+class RefreshRequest(BaseModel):
+    """SPA refresh body (frontend calls POST /auth/refresh)."""
+
+    refresh_token: str
+
+
+@router.post("/refresh", response_model=NativeLoginResponse)
+async def refresh_session(request: RefreshRequest):
+    """Mint a new access + refresh token pair from a valid refresh JWT.
+
+    The UI uses JSON ``{ refresh_token }`` here. The OAuth form endpoint
+    ``POST /oauth/token`` remains for protocol clients.
+    """
+    from app.core.exceptions import UnauthorizedError, TenantNotFoundError
+
+    try:
+        payload = await token_service.validate_token(request.refresh_token)
+        if payload.get("token_type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+        tenant_id = str(payload.get("tenant_id") or "")
+        if not tenant_id:
+            raise HTTPException(status_code=401, detail="Refresh token missing tenant_id")
+        routing = await tenant_resolver.resolve(tenant_id)
+        async for db_session in tenant_db_manager.get_session(
+            routing.db_host,
+            routing.db_name,
+            routing.db_user,
+            routing.db_password,
+            tenant_id,
+        ):
+            tokens = await oauth_service.refresh_access_token(
+                request.refresh_token, db_session
+            )
+            return NativeLoginResponse(
+                access_token=tokens["access_token"],
+                refresh_token=tokens["refresh_token"],
+                token_type=tokens.get("token_type", "Bearer"),
+                expires_in=int(tokens.get("expires_in") or settings.token_ttl_access),
+            )
+    except HTTPException:
+        raise
+    except UnauthorizedError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except TenantNotFoundError as exc:
+        raise HTTPException(status_code=401, detail="Unknown tenant") from exc
+
+
 @router.post("/login", response_model=NativeLoginResponse)
 async def native_login(request: NativeLoginRequest):
     """

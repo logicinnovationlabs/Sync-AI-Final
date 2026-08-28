@@ -39,7 +39,8 @@ class CanonicalDocument(BaseModel):
     id: str                              # f"{source_type}_{source_id}", stable across re-processing
     source_type: str
     source_id: str
-    tenant_id: UUID4
+    # Any UUID version — seeded tenants often use uuid5, not uuid4.
+    tenant_id: UUID
 
     title: str
     content: str                          # extracted plain text, bounded length (MAX_EXTRACTED_CHARS)
@@ -86,14 +87,14 @@ class Group(BaseModel):
     Groups can contain both individual principals and other groups.
     Cycle-safe expansion is required.
     """
-    id: UUID4
-    tenant_id: UUID4
+    id: UUID
+    tenant_id: UUID
     name: str
     email: Optional[str] = None
     source_type: str
     source_id: str
-    member_principal_ids: List[UUID4] = Field(default_factory=list)
-    member_group_ids: List[UUID4] = Field(default_factory=list)          # nested groups — cycle-checked
+    member_principal_ids: List[UUID] = Field(default_factory=list)
+    member_group_ids: List[UUID] = Field(default_factory=list)          # nested groups — cycle-checked
     created_at: datetime
     updated_at: datetime
 
@@ -113,7 +114,7 @@ class ACLEntry(BaseModel):
     source_container_id: Optional[str] = None   # which container the inheritance came from
     is_deny: bool = False                  # explicit deny override
     source_type: str
-    tenant_id: UUID4
+    tenant_id: UUID
     created_at: datetime
     updated_at: datetime
 
@@ -126,12 +127,12 @@ class ContainerACLEntry(BaseModel):
     permissions without having to re-parse documents.
     """
     container_id: str                      # folder/mailbox ID
-    principal_id: Optional[UUID4] = None
-    group_id: Optional[UUID4] = None
+    principal_id: Optional[UUID] = None
+    group_id: Optional[UUID] = None
     permission: PermissionLevel
     is_deny: bool = False
     source_type: str
-    tenant_id: UUID4
+    tenant_id: UUID
     created_at: datetime
     updated_at: datetime
 
@@ -145,7 +146,7 @@ class ContainerEdge(BaseModel):
     """
     parent_container_id: str
     child_container_id: str
-    tenant_id: UUID4
+    tenant_id: UUID
     source_type: str
     created_at: datetime
 
