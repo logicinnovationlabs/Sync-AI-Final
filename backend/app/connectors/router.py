@@ -333,6 +333,46 @@ async def toggle_organization_connector(
         raise HTTPException(status_code=500, detail=f"Toggle failed: {str(e)}")
 
 
+@router.post(
+    "/admin/google/organization/{source_type}/backfill",
+    summary="Trigger organization connector backfill",
+    dependencies=[Depends(require_scope("connectors.write")), Depends(require_admin)],
+)
+async def trigger_organization_backfill(
+    source_type: str,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    tenant: TenantRouting = Depends(get_tenant),
+):
+    """
+    Initiate asynchronous backfill for organization connector.
+
+    Admin-only endpoint. Triggers backfill with explicit organization scope,
+    not inferred from the calling user's personal identity.
+    """
+    tenant_id = current_user.get("tenant_id")
+    if not tenant_id or str(tenant.tenant_id) != tenant_id:
+        raise HTTPException(status_code=403, detail="Cross-tenant execution rejected")
+
+    if source_type not in GOOGLE_SOURCES:
+        raise HTTPException(status_code=400, detail=f"Invalid source_type: {source_type}")
+
+    status_store.set_status(
+        tenant_id, source_type, user_id="organization", connection_status="syncing", last_error=""
+    )
+    task_result = backfill_tenant_source.delay(
+        tenant_id=tenant_id,
+        source_type=source_type,
+        user_id="organization",
+    )
+
+    return {
+        "status": "queued",
+        "task_id": task_result.id,
+        "tenant_id": tenant_id,
+        "source_type": source_type,
+    }
+
+
 @router.get(
     "/google/organization/status",
     summary="Get organization Google Workspace connector status",
@@ -371,14 +411,16 @@ async def get_organization_connector_status(
             str(routing.tenant_id),
         )
 
-        async with factory() as session:
-            # Check tenant-level enabled flag
-            tenant_result = await session.execute(
+        # Check tenant-level enabled flag from control_plane database
+        from app.storage.control_plane_db import ControlPlaneSessionLocal
+        async with ControlPlaneSessionLocal() as cp_session:
+            tenant_result = await cp_session.execute(
                 select(Tenant).where(Tenant.tenant_id == tenant_uuid)
             )
             tenant_row = tenant_result.scalar_one_or_none()
             org_enabled = tenant_row.google_org_workspace_enabled if tenant_row else False
 
+        async with factory() as session:
             # Get organization connector row
             result = await session.execute(
                 select(TenantConnector).where(
@@ -401,7 +443,11 @@ async def get_organization_connector_status(
             # Get runtime status
             runtime = status_store.get_status(tenant_id, source_type, user_id="organization")
             connection_status = runtime.get("connection_status") or "not_connected"
-            if connection_status == "not_connected" and (cursor or row):
+            # If no organization connector row exists, force not_connected regardless of stale Redis status
+            if row is None:
+                connection_status = "not_connected"
+            # Only show active/syncing if the organization connector is actually enabled
+            elif connection_status == "not_connected" and org_enabled and cursor:
                 connection_status = "active" if cursor else "syncing"
 
             details: Dict[str, Any] = {
@@ -459,9 +505,9 @@ async def get_connector_status(
     runtime_user_id = user_id if connection_scope == "personal" else "organization"
     runtime = status_store.get_status(tenant_id, source_type, user_id=runtime_user_id)
     token_store = PersistentGoogleTokenStore(tenant_id)
-    has_token = token_store.get_token(google_oauth_token_key(tenant_id, user_id)) is not None
+    has_token = token_store.get_token(google_oauth_token_key(tenant_id, user_id, connection_scope)) is not None
     if not has_token:
-        has_token = token_store.get_token(google_oauth_token_key(tenant_id)) is not None
+        has_token = token_store.get_token(google_oauth_token_key(tenant_id, "", connection_scope)) is not None
     connection_status = runtime.get("connection_status") or "not_connected"
     if connection_status == "not_connected" and (cursor or has_token):
         connection_status = "active" if cursor else "syncing"
@@ -530,7 +576,7 @@ async def get_google_authorize_url(
     """
     Generate Google OAuth authorization link for the authenticated tenant.
 
-    State carries tenant_id + user_id (base64 JSON) plus a CSRF nonce.
+    State carries tenant_id + user_id + connection_scope (base64 JSON) plus a CSRF nonce.
     """
     tenant_id = current_user.get("tenant_id")
     if not tenant_id or str(tenant.tenant_id) != str(tenant_id):
@@ -542,14 +588,51 @@ async def get_google_authorize_url(
 
     redirect_uri = _google_redirect_uri()
     user_id = _user_id(current_user)
-    state = encode_oauth_state(str(tenant_id), user_id)
+    state = encode_oauth_state(str(tenant_id), user_id, "personal")
     token_store = PersistentGoogleTokenStore(str(tenant_id))
-    oauth = google_oauth_from_settings(token_store, principal_id=user_id)
+    oauth = google_oauth_from_settings(token_store, principal_id=user_id, connection_scope="personal")
     auth_url = oauth.build_authorization_url(str(tenant_id), redirect_uri, state=state)
 
     return {
         "authorization_url": auth_url,
         "tenant_id": tenant_id,
+        "connection_scope": "personal",
+    }
+
+
+@router.get(
+    "/google/authorize/organization",
+    summary="Generate Google OAuth authorization URL for organization scope",
+    dependencies=[Depends(require_scope("connectors.write")), Depends(require_admin)],
+)
+async def get_google_authorize_url_organization(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    tenant: TenantRouting = Depends(get_tenant),
+):
+    """
+    Generate Google OAuth authorization link for organization scope (admin-only).
+
+    State carries tenant_id + user_id + connection_scope (base64 JSON) plus a CSRF nonce.
+    """
+    tenant_id = current_user.get("tenant_id")
+    if not tenant_id or str(tenant.tenant_id) != str(tenant_id):
+        raise HTTPException(status_code=403, detail="Cross-tenant execution rejected")
+
+    client_id = settings.google_client_id or ""
+    if not client_id:
+        raise HTTPException(status_code=503, detail="GOOGLE_CLIENT_ID is not configured")
+
+    redirect_uri = _google_redirect_uri()
+    user_id = _user_id(current_user)
+    state = encode_oauth_state(str(tenant_id), user_id, "organization")
+    token_store = PersistentGoogleTokenStore(str(tenant_id))
+    oauth = google_oauth_from_settings(token_store, principal_id=user_id, connection_scope="organization")
+    auth_url = oauth.build_authorization_url(str(tenant_id), redirect_uri, state=state)
+
+    return {
+        "authorization_url": auth_url,
+        "tenant_id": tenant_id,
+        "connection_scope": "organization",
     }
 
 
@@ -567,10 +650,14 @@ async def google_oauth_callback(
     Unauthenticated by design: Google redirects the browser here without our JWT.
     Binding is the CSRF state nonce issued by /google/authorize.
     On success: encrypt+store tokens, enqueue Drive + Gmail full backfill, redirect UI.
+    Handles both personal and organization connection scopes.
     """
+    logger.info(f"OAuth callback invoked: error={error}, code={bool(code)}, state={bool(state)}")
     if error:
+        logger.error(f"OAuth callback error: {error}")
         return RedirectResponse(frontend_connectors_redirect("error", error), status_code=302)
     if not code or not state:
+        logger.error(f"OAuth callback missing code or state: code={bool(code)}, state={bool(state)}")
         return RedirectResponse(
             frontend_connectors_redirect("error", "missing_code_or_state"),
             status_code=302,
@@ -578,6 +665,7 @@ async def google_oauth_callback(
 
     payload = decode_oauth_state(state)
     if not payload:
+        logger.error(f"OAuth callback invalid state: state={state}")
         return RedirectResponse(
             frontend_connectors_redirect("error", "invalid_state"),
             status_code=302,
@@ -585,10 +673,12 @@ async def google_oauth_callback(
 
     tenant_id = str(payload["tenant_id"])
     user_id = str(payload["user_id"])
+    connection_scope = str(payload.get("connection_scope") or "personal")
+    logger.info(f"OAuth callback: tenant_id={tenant_id}, user_id={user_id}, connection_scope={connection_scope}")
     redirect_uri = _google_redirect_uri()
 
     token_store = PersistentGoogleTokenStore(tenant_id)
-    oauth = google_oauth_from_settings(token_store, principal_id=user_id)
+    oauth = google_oauth_from_settings(token_store, principal_id=user_id, connection_scope=connection_scope)
     try:
         token_data = await oauth.exchange_code_for_tokens(tenant_id, code, redirect_uri)
     except Exception:
@@ -603,14 +693,22 @@ async def google_oauth_callback(
         if mailbox_email:
             merged["mailbox_email"] = mailbox_email
         merged["connected_by"] = user_id
-        token_store.set_token(google_oauth_token_key(tenant_id, user_id), merged)
-    await _record_connector_rows(tenant_id, user_id, mailbox_email)
+        token_store.set_token(google_oauth_token_key(tenant_id, user_id, connection_scope), merged)
+
+    if connection_scope == "organization":
+        logger.info(f"Calling _record_organization_connector_rows for tenant_id={tenant_id}, user_id={user_id}, mailbox_email={mailbox_email}")
+        await _record_organization_connector_rows(tenant_id, user_id, mailbox_email)
+        runtime_user_id = "organization"
+    else:
+        logger.info(f"Calling _record_connector_rows for tenant_id={tenant_id}, user_id={user_id}, mailbox_email={mailbox_email}")
+        await _record_connector_rows(tenant_id, user_id, mailbox_email)
+        runtime_user_id = user_id
 
     for source_type in GOOGLE_SOURCES:
         status_store.set_status(
             tenant_id,
             source_type,
-            user_id=user_id,
+            user_id=runtime_user_id,
             connection_status="syncing",
             last_error="",
         )
@@ -618,19 +716,19 @@ async def google_oauth_callback(
             backfill_source.delay(
                 tenant_id=tenant_id,
                 source_type=source_type,
-                user_id=user_id,
-                connector_id=google_credential_ref(tenant_id, user_id),
+                user_id=runtime_user_id,
+                connector_id=google_credential_ref(tenant_id, user_id, connection_scope),
             )
         except Exception:
             status_store.set_status(
                 tenant_id,
                 source_type,
-                user_id=user_id,
+                user_id=runtime_user_id,
                 connection_status="error",
                 last_error="celery_enqueue_failed",
             )
             logger.exception(
-                "Failed to enqueue backfill tenant=%s source=%s", tenant_id, source_type
+                "Failed to enqueue backfill tenant=%s source=%s scope=%s", tenant_id, source_type, connection_scope
             )
 
     return RedirectResponse(frontend_connectors_redirect("connected"), status_code=302)
@@ -653,6 +751,11 @@ async def _record_connector_rows(tenant_id: str, user_id: str, mailbox_email: st
         tenant_uuid = UUID(tenant_id)
         actor_uuid = UUID(user_id) if user_id else tenant_uuid
     except (TypeError, ValueError):
+        logger.warning(
+            "Failed to parse tenant/user UUID for connector row creation: tenant_id=%s user_id=%s",
+            tenant_id,
+            user_id,
+        )
         return
 
     try:
@@ -668,37 +771,139 @@ async def _record_connector_rows(tenant_id: str, user_id: str, mailbox_email: st
             routing.db_password,
             str(routing.tenant_id),
         )
-        cred_ref = google_credential_ref(tenant_id, user_id)
+        cred_ref = google_credential_ref(tenant_id, user_id, "personal")
         async with factory() as session:
             for source_type in GOOGLE_SOURCES:
-                result = await session.execute(
-                    select(TenantConnector).where(
-                        TenantConnector.tenant_id == tenant_uuid,
-                        TenantConnector.source_type == source_type,
-                        TenantConnector.connection_scope == "personal",
-                    )
-                )
-                row = result.scalar_one_or_none()
-                config = {"mailbox_email": mailbox_email, "connected_by": user_id}
-                if row is None:
-                    session.add(
-                        TenantConnector(
-                            tenant_id=tenant_uuid,
-                            source_type=source_type,
-                            connection_scope="personal",
-                            enabled=True,
-                            config=config,
-                            setup_by=actor_uuid,
-                            credential_ref=cred_ref,
+                try:
+                    result = await session.execute(
+                        select(TenantConnector).where(
+                            TenantConnector.tenant_id == tenant_uuid,
+                            TenantConnector.source_type == source_type,
+                            TenantConnector.connection_scope == "personal",
                         )
                     )
-                else:
-                    row.enabled = True
-                    merged = dict(row.config or {})
-                    merged.update(config)
-                    row.config = merged
-                    row.credential_ref = cred_ref
-                    row.setup_by = actor_uuid
+                    row = result.scalar_one_or_none()
+                    config = {"mailbox_email": mailbox_email, "connected_by": user_id}
+                    if row is None:
+                        session.add(
+                            TenantConnector(
+                                tenant_id=tenant_uuid,
+                                source_type=source_type,
+                                connection_scope="personal",
+                                enabled=True,
+                                config=config,
+                                setup_by=actor_uuid,
+                                credential_ref=cred_ref,
+                            )
+                        )
+                    else:
+                        row.enabled = True
+                        merged = dict(row.config or {})
+                        merged.update(config)
+                        row.config = merged
+                        row.credential_ref = cred_ref
+                        row.setup_by = actor_uuid
+                    logger.info(
+                        "Connector row upserted: tenant_id=%s source_type=%s enabled=True",
+                        tenant_id,
+                        source_type,
+                    )
+                except Exception as exc:
+                    logger.exception(
+                        "Failed to upsert connector row: tenant_id=%s source_type=%s error=%s",
+                        tenant_id,
+                        source_type,
+                        str(exc),
+                    )
+                    # Continue processing other source_types - independent per source
+                    # This allows Gmail to work even if Drive fails, with clear error logging
             await session.commit()
-    except Exception:
+    except Exception as exc:
+        logger.exception(
+            "Failed to initialize connector row creation: tenant_id=%s user_id=%s error=%s",
+            tenant_id,
+            user_id,
+            str(exc),
+        )
+
+
+async def _record_organization_connector_rows(tenant_id: str, user_id: str, mailbox_email: str) -> None:
+    """Create organization-scoped TenantConnector rows with oauth_admin credential mode."""
+    try:
+        tenant_uuid = UUID(tenant_id)
+        actor_uuid = UUID(user_id) if user_id else tenant_uuid
+    except (TypeError, ValueError):
+        logger.warning(
+            "Failed to parse tenant/user UUID for org connector row creation: tenant_id=%s user_id=%s",
+            tenant_id,
+            user_id,
+        )
         return
+
+    try:
+        from app.services.tenant_resolver import tenant_resolver
+        from app.storage.tenant_db import tenant_db_manager
+        from app.models.tenant_connector import TenantConnector
+
+        routing = await tenant_resolver.resolve(tenant_id)
+        factory = tenant_db_manager.get_session_factory(
+            routing.db_host,
+            routing.db_name,
+            routing.db_user,
+            routing.db_password,
+            str(routing.tenant_id),
+        )
+        cred_ref = google_credential_ref(tenant_id, user_id, "organization")
+        async with factory() as session:
+            for source_type in GOOGLE_SOURCES:
+                try:
+                    result = await session.execute(
+                        select(TenantConnector).where(
+                            TenantConnector.tenant_id == tenant_uuid,
+                            TenantConnector.source_type == source_type,
+                            TenantConnector.connection_scope == "organization",
+                        )
+                    )
+                    row = result.scalar_one_or_none()
+                    config = {
+                        "credential_mode": "oauth_admin",
+                        "mailbox_email": mailbox_email,
+                        "connected_by": user_id,
+                    }
+                    if row is None:
+                        session.add(
+                            TenantConnector(
+                                tenant_id=tenant_uuid,
+                                source_type=source_type,
+                                connection_scope="organization",
+                                enabled=True,
+                                config=config,
+                                setup_by=actor_uuid,
+                                credential_ref=cred_ref,
+                            )
+                        )
+                    else:
+                        row.enabled = True
+                        row.config = config
+                        row.credential_ref = cred_ref
+                        row.setup_by = actor_uuid
+                    logger.info(
+                        "Organization connector row upserted: tenant_id=%s source_type=%s credential_mode=oauth_admin",
+                        tenant_id,
+                        source_type,
+                    )
+                except Exception as exc:
+                    logger.exception(
+                        "Failed to upsert org connector row: tenant_id=%s source_type=%s error=%s",
+                        tenant_id,
+                        source_type,
+                        str(exc),
+                    )
+            await session.commit()
+    except Exception as exc:
+        logger.exception(
+            "Failed to initialize org connector row creation: tenant_id=%s user_id=%s error=%s",
+            tenant_id,
+            user_id,
+            str(exc),
+        )

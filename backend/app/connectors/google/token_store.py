@@ -22,6 +22,7 @@ from app.core.config import settings
 from app.storage.vault_client import vault_client
 from app.connectors.google.keys import (
     principal_from_token_key,
+    scope_from_token_key,
     tenant_from_token_key,
     vault_google_oauth_key,
 )
@@ -160,7 +161,7 @@ class PersistentGoogleTokenStore(TokenStore):
                 ciphertext = None
 
         if not ciphertext and tenant_id:
-            vault_name = vault_google_oauth_key(tenant_id, principal_from_token_key(key))
+            vault_name = vault_google_oauth_key(tenant_id, principal_from_token_key(key), scope_from_token_key(key))
             try:
                 if hasattr(vault_client, "get"):
                     ciphertext = vault_client.get(vault_name)
@@ -198,7 +199,7 @@ class PersistentGoogleTokenStore(TokenStore):
                 logger.warning("Redis token persist failed: %s", type(exc).__name__)
 
         if tenant_id:
-            vault_name = vault_google_oauth_key(tenant_id, principal_from_token_key(key))
+            vault_name = vault_google_oauth_key(tenant_id, principal_from_token_key(key), scope_from_token_key(key))
             try:
                 if hasattr(vault_client, "set"):
                     vault_client.set(vault_name, ciphertext)
@@ -206,6 +207,6 @@ class PersistentGoogleTokenStore(TokenStore):
                 logger.warning("Vault token persist failed: %s", type(exc).__name__)
 
 
-def google_credential_ref(tenant_id: str, user_id: str = "") -> str:
-    """Vault key *name* stored on TenantConnector.credential_ref — never a secret."""
-    return vault_google_oauth_key(tenant_id, user_id)
+def google_credential_ref(tenant_id: str, user_id: str = "", connection_scope: str = "personal") -> str:
+    """Vault key *name* stored on TenantConnector.credential_ref — never a secret. Includes connection_scope to separate personal/organization tokens."""
+    return vault_google_oauth_key(tenant_id, user_id, connection_scope)
