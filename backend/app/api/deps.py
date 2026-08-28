@@ -87,14 +87,18 @@ async def get_tenant_session(
     tenant: TenantRouting = Depends(get_tenant),
 ) -> AsyncGenerator[AsyncSession, None]:
     """Yield a tenant-DB session bound to the JWT tenant_id."""
-    async for session in tenant_db_manager.get_session(
+    factory = tenant_db_manager.get_session_factory(
         tenant.db_host,
         tenant.db_name,
         tenant.db_user,
         tenant.db_password,
         str(tenant.tenant_id),
-    ):
+    )
+    session = factory()
+    try:
         yield session
+    finally:
+        await session.close()
 
 
 async def require_admin(

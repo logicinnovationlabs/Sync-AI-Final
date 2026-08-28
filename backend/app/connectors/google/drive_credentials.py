@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+from contextlib import asynccontextmanager
 from typing import Any
 from uuid import UUID
 
@@ -27,29 +28,34 @@ DRIVE_READONLY_SCOPES = (
 
 MODE_OAUTH = "oauth"
 MODE_DWD = "service_account_dwd"
+MODE_OAUTH_ADMIN = "oauth_admin"
 
 
+@asynccontextmanager
 async def _tenant_session(tenant_id: str):
     from app.services.tenant_resolver import tenant_resolver
     from app.storage.tenant_db import tenant_db_manager
 
     routing = await tenant_resolver.resolve(str(tenant_id))
-    async for session in tenant_db_manager.get_session(
+    factory = tenant_db_manager.get_session_factory(
         routing.db_host,
         routing.db_name,
         routing.db_user,
         routing.db_password,
         str(routing.tenant_id),
-    ):
+    )
+    session = factory()
+    try:
         yield session, routing.tenant_id
-        return
+    finally:
+        await session.close()
 
 
 async def load_drive_connector_row(tenant_id: str, connection_scope: str = "personal"):
     from app.models.tenant_connector import TenantConnector
 
     try:
-        async for session, tid in _tenant_session(tenant_id):
+        async with _tenant_session(tenant_id) as (session, tid):
             result = await session.execute(
                 select(TenantConnector).where(
                     TenantConnector.tenant_id == tid,
@@ -79,7 +85,7 @@ async def set_drive_ingest_paused(tenant_id: str, paused: bool, reason: str = ""
     from app.models.tenant_connector import TenantConnector
 
     try:
-        async for session, tid in _tenant_session(tenant_id):
+        async with _tenant_session(tenant_id) as (session, tid):
             result = await session.execute(
                 select(TenantConnector).where(
                     TenantConnector.tenant_id == tid,
@@ -163,8 +169,24 @@ async def get_drive_access_token(tenant_id: str, oauth_manager, connection_scope
 
     row = await load_drive_connector_row(tenant_id, connection_scope) if uuid_tenant else None
     mode = _credential_mode(row)
+    
     if uuid_tenant and mode == MODE_DWD:
         return await mint_dwd_access_token(tenant_id, row)
+    
+    if uuid_tenant and mode == MODE_OAUTH_ADMIN:
+        # Use OAuth with the admin's user_id from connector config
+        admin_user_id = (row.config or {}).get("connected_by") if row else None
+        if not admin_user_id:
+            raise RuntimeError("oauth_admin mode requires connected_by in connector config")
+        if not oauth_manager:
+            raise RuntimeError("OAuth manager not configured")
+        # Create a new oauth_manager instance with the admin's principal_id
+        from app.connectors.google.token_store import PersistentGoogleTokenStore
+        from app.connectors.google.oauth import google_oauth_from_settings
+        token_store = PersistentGoogleTokenStore(tenant_id)
+        admin_oauth = google_oauth_from_settings(token_store, principal_id=admin_user_id, connection_scope="organization")
+        return await admin_oauth.get_valid_token(tenant_id)
+    
     if not oauth_manager:
         raise RuntimeError("OAuth manager not configured")
     return await oauth_manager.get_valid_token(tenant_id)

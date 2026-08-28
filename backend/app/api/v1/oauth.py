@@ -26,14 +26,18 @@ async def _tenant_session(tenant_id: str):
         routing = await tenant_resolver.resolve(str(tenant_id))
     except TenantNotFoundError as exc:
         raise HTTPException(status_code=401, detail="Unknown tenant") from exc
-    async for db_session in tenant_db_manager.get_session(
+    factory = tenant_db_manager.get_session_factory(
         routing.db_host,
         routing.db_name,
         routing.db_user,
         routing.db_password,
         str(tenant_id),
-    ):
+    )
+    db_session = factory()
+    try:
         yield db_session
+    finally:
+        await db_session.close()
 
 
 @router.post("/token")

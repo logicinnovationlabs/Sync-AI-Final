@@ -109,29 +109,32 @@ async def create_tenant(
 
     temp_password = generate_temporary_password()
     admin_user = None
-    async for db_session in tenant_db_manager.get_session(
+    factory = tenant_db_manager.get_session_factory(
         routing.db_host,
         routing.db_name,
         routing.db_user,
         routing.db_password,
         str(tenant.tenant_id),
-    ):
-        try:
-            admin_user = await native_auth_service.create_native_user(
-                email=str(request.admin_email),
-                password=temp_password,
-                display_name=request.admin_display_name,
-                tenant_id=tenant.tenant_id,
-                db_session=db_session,
-                role="admin",
-                invited_by=None,
-                must_change_password=True,
-                is_active=True,
-            )
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"First admin creation failed: {e}")
+    )
+    db_session = factory()
+    try:
+        admin_user = await native_auth_service.create_native_user(
+            email=str(request.admin_email),
+            password=temp_password,
+            display_name=request.admin_display_name,
+            tenant_id=tenant.tenant_id,
+            db_session=db_session,
+            role="admin",
+            invited_by=None,
+            must_change_password=True,
+            is_active=True,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"First admin creation failed: {e}")
+    finally:
+        await db_session.close()
 
     if admin_user is None:
         raise HTTPException(status_code=500, detail="First admin creation failed")

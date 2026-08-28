@@ -125,13 +125,15 @@ async def _audit_document_acl(
         tenant = UUID(str(tenant_id))
         actor = UUID(str(principal_id))
         routing = await tenant_resolver.resolve(str(tenant_id))
-        async for session in tenant_db_manager.get_session(
+        factory = tenant_db_manager.get_session_factory(
             routing.db_host,
             routing.db_name,
             routing.db_user,
             routing.db_password,
             str(routing.tenant_id),
-        ):
+        )
+        session = factory()
+        try:
             await write_audit_log(
                 session,
                 tenant_id=tenant,
@@ -140,7 +142,8 @@ async def _audit_document_acl(
                 target={"document_id": doc_id, "allowed": allowed},
             )
             await session.commit()
-            return
+        finally:
+            await session.close()
     except (TenantNotFoundError, TypeError, ValueError):
         return
     except Exception:

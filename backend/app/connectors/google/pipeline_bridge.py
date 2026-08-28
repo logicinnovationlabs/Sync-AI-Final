@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -123,8 +124,15 @@ async def process_raw_batch(
         )
         return []
 
+    # Extract base tenant_id from composite format (tenant_id:user_id)
+    base_tenant_id = tenant_id
+    if ":" in tenant_id:
+        parts = tenant_id.split(":")
+        if len(parts) == 2:
+            base_tenant_id = parts[0]
+    
     try:
-        tenant_uuid = UUID(str(tenant_id))
+        tenant_uuid = UUID(str(base_tenant_id))
     except (TypeError, ValueError) as extra:
         if require_postgres:
             raise
@@ -144,7 +152,7 @@ async def process_raw_batch(
 
     routing = None
     try:
-        routing = await tenant_resolver.resolve(str(tenant_id))
+        routing = await tenant_resolver.resolve(str(base_tenant_id))
     except TenantNotFoundError:
         if require_postgres:
             raise
@@ -161,34 +169,33 @@ async def process_raw_batch(
         routing = None
 
     if routing is not None:
-        async for session in tenant_db_manager.get_session(
+        factory = tenant_db_manager.get_session_factory(
             routing.db_host,
             routing.db_name,
             routing.db_user,
             routing.db_password,
             str(routing.tenant_id),
-        ):
-            try:
-                pipeline = get_pipeline(session=session)
-            except Exception as extra:
-                if require_postgres:
-                    raise
-                logger.warning(
-                    "pipeline=fallback_transform source=%s tenant=%s reason=pipeline_init_failed "
-                    "exc_type=%s exc=%s",
-                    source_type,
-                    tenant_id,
-                    type(extra).__name__,
-                    extra,
-                )
-                return None
-            return await _run_pipeline(
-                pipeline, raw_documents, source_type, tenant_uuid, tenant_id
+        )
+        session = factory()
+        try:
+            pipeline = get_pipeline(session=session)
+        except Exception as extra:
+            if require_postgres:
+                raise
+            logger.warning(
+                "pipeline=fallback_transform source=%s tenant=%s reason=pipeline_init_failed "
+                "exc_type=%s exc=%s",
+                source_type,
+                tenant_id,
+                type(extra).__name__,
+                extra,
             )
-        if require_postgres:
-            raise RuntimeError(
-                f"webhook ACL compile aborted: tenant session was not opened tenant={tenant_id}"
-            )
+            return None
+        result = await _run_pipeline(
+            pipeline, raw_documents, source_type, tenant_uuid, tenant_id
+        )
+        await session.close()
+        return result
 
     if require_postgres:
         raise RuntimeError(
