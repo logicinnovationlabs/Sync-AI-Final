@@ -33,8 +33,10 @@ def _bind_indexer_mocks(indexer, *, allowed_keys=None, embed_side_effect=None):
     mock_embed.get_dimension = MagicMock(return_value=768)
     if embed_side_effect is not None:
         mock_embed.embed_texts = AsyncMock(side_effect=embed_side_effect)
+        mock_embed.embed_documents = AsyncMock(side_effect=embed_side_effect)
     else:
         mock_embed.embed_texts = AsyncMock(return_value=[[0.1] * 768])
+        mock_embed.embed_documents = AsyncMock(return_value=[[0.1] * 768])
     mock_qdrant = MagicMock()
     mock_qdrant.upsert_documents = AsyncMock()
     mock_registry = MagicMock()
@@ -369,7 +371,7 @@ async def test_indexer_large_content_handling():
         )
         with pytest.raises(ValueError, match="Content too large"):
             await indexer.bulk_index([doc], "tenant")
-        mock_embed.embed_texts.assert_called_once()
+        mock_embed.embed_documents.assert_called_once()
 
 
 # ============================================================
