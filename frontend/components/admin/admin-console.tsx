@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { listAdminUsers, listAuditLogs } from "@/lib/api/admin"
+import { listAdminUsers, listAuditLogs, listPendingIdentities } from "@/lib/api/admin"
 import {
   connectOrganizationConnector,
   disconnectOrganizationConnector,
@@ -30,6 +30,13 @@ export function AdminConsole() {
   const audit = useQuery({
     queryKey: ["admin-audit"],
     queryFn: () => listAuditLogs(token!),
+    enabled: Boolean(token),
+    retry: false,
+  })
+
+  const pendingIdentities = useQuery({
+    queryKey: ["admin-pending-identities"],
+    queryFn: () => listPendingIdentities(token!),
     enabled: Boolean(token),
     retry: false,
   })
@@ -204,6 +211,46 @@ export function AdminConsole() {
                   <span className="ml-2 text-muted-foreground">
                     {new Date(row.created_at).toLocaleString()}
                   </span>
+                </li>
+              ))
+            )}
+          </ul>
+        )}
+      </section>
+
+      <section>
+        <h2 className="text-sm font-medium">Pending identities</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          GET /admin/pending-identities — ACL resolution queue
+        </p>
+        {pendingIdentities.isFetching && (
+          <p className="mt-3 text-sm text-muted-foreground">Loading pending identities…</p>
+        )}
+        {pendingIdentities.error && (
+          <p role="alert" className="mt-3 text-sm text-destructive">
+            {pendingIdentities.error instanceof ApiError
+              ? pendingIdentities.error.message
+              : "Failed to load pending identities"}
+          </p>
+        )}
+        {pendingIdentities.data && (
+          <ul className="mt-3 divide-y divide-border-subtle rounded-2xl border border-border-subtle">
+            {pendingIdentities.data.length === 0 ? (
+              <li className="px-4 py-3 text-sm text-muted-foreground">
+                No pending identities for this tenant.
+              </li>
+            ) : (
+              pendingIdentities.data.map((item, index) => (
+                <li key={`${item.document_id}-${item.shared_email}-${index}`} className="px-4 py-3 text-sm">
+                  <span className="font-medium">{item.shared_email}</span>
+                  <span className="ml-2 text-muted-foreground">
+                    Document: {item.document_id}
+                  </span>
+                  {item.first_seen_at && (
+                    <span className="ml-2 text-muted-foreground">
+                      First seen: {new Date(item.first_seen_at).toLocaleString()}
+                    </span>
+                  )}
                 </li>
               ))
             )}

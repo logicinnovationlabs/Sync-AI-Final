@@ -44,6 +44,13 @@ export function triggerBackfill(token: string, source: BackendSourceType) {
   })
 }
 
+export function triggerOrganizationBackfill(token: string, source: BackendSourceType) {
+  return apiFetch<BackfillResponse>(`/api/v1/connectors/admin/google/organization/${source}/backfill`, {
+    method: "POST",
+    token,
+  })
+}
+
 export function disconnectConnector(token: string, source: BackendSourceType) {
   return apiFetch<{ status: string; tenant_id: string; source_type: string }>(
     `/api/v1/connectors/${source}/disconnect`,
@@ -54,10 +61,14 @@ export function disconnectConnector(token: string, source: BackendSourceType) {
 export interface GoogleAuthorizeResponse {
   authorization_url: string
   tenant_id: string
+  connection_scope: string
 }
 
-export function getGoogleAuthorizeUrl(token: string) {
-  return apiFetch<GoogleAuthorizeResponse>("/api/v1/connectors/google/authorize", {
+export function getGoogleAuthorizeUrl(token: string, connectionScope = "personal") {
+  const endpoint = connectionScope === "organization"
+    ? "/api/v1/connectors/google/authorize/organization"
+    : "/api/v1/connectors/google/authorize"
+  return apiFetch<GoogleAuthorizeResponse>(endpoint, {
     token,
   })
 }

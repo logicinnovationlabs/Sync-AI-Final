@@ -9,9 +9,11 @@ import { ConnectorLogo } from "@/components/connector-logo"
 import { Button } from "@/components/ui/button"
 import {
   disconnectConnector,
+  disconnectOrganizationConnector,
   getConnectorStatus,
   getGoogleAuthorizeUrl,
   getOrganizationConnectorStatus,
+  triggerOrganizationBackfill,
   triggerBackfill,
   type BackendSourceType,
   type ConnectorStatus,
@@ -209,6 +211,7 @@ function GoogleOrganizationSource({ id, label }: { id: BackendSourceType; label:
   const canWrite = useAuthStore((s) =>
     hasScope(s.effectiveScopes(), SCOPES.CONNECTORS_WRITE)
   )
+  const isAdmin = useAuthStore((s) => s.isAdmin())
   const queryClient = useQueryClient()
 
   const status = useQuery({
@@ -220,6 +223,22 @@ function GoogleOrganizationSource({ id, label }: { id: BackendSourceType; label:
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["connector-status", "organization", id] })
+
+  const authorize = useMutation({
+    mutationFn: () => getGoogleAuthorizeUrl(token!, "organization"),
+    onSuccess: (data) => {
+      if (data.authorization_url) window.location.href = data.authorization_url
+    },
+  })
+
+  const backfill = useMutation({
+    mutationFn: () => triggerOrganizationBackfill(token!, id),
+    onSuccess: invalidate,
+  })
+  const disconnect = useMutation({
+    mutationFn: () => disconnectOrganizationConnector(token!),
+    onSuccess: invalidate,
+  })
 
   const started = Boolean(status.data?.details?.connected)
   const orgEnabled = Boolean(status.data?.details?.org_enabled)
@@ -280,24 +299,26 @@ function GoogleOrganizationSource({ id, label }: { id: BackendSourceType; label:
         />
       </div>
 
-      {hydrated && canWrite && !status.error && (
+      {hydrated && canWrite && isAdmin && !status.error && (
         <div className="flex justify-end gap-1.5">
           <Button
             size="sm"
             variant="outline"
-            disabled={!orgEnabled}
+            disabled={!orgEnabled || backfill.isPending}
+            onClick={() => backfill.mutate()}
           >
-            <RefreshCw className="size-3.5" />
-            Resync
+            <RefreshCw className={cn("size-3.5", backfill.isPending && "animate-spin")} />
+            {backfill.isPending ? "Syncing…" : "Resync"}
           </Button>
           {started && (
             <Button
               size="sm"
               variant="ghost"
-              disabled={!orgEnabled}
+              disabled={!orgEnabled || disconnect.isPending}
+              onClick={() => disconnect.mutate()}
             >
               <Unplug className="size-3.5" />
-              Disconnect
+              {disconnect.isPending ? "Disconnecting…" : "Disconnect"}
             </Button>
           )}
         </div>
@@ -321,6 +342,7 @@ export function ConnectorCard({
   const canWrite = useAuthStore((s) =>
     hasScope(s.effectiveScopes(), SCOPES.CONNECTORS_WRITE)
   )
+  const isAdmin = useAuthStore((s) => s.isAdmin())
 
   const searchParams = useSearchParams()
   const queryClient = useQueryClient()
@@ -361,19 +383,31 @@ export function ConnectorCard({
     googleLive &&
     (sourceIsLinked(driveStatus.data) || sourceIsLinked(gmailStatus.data))
 
+  const googleOrgLinked =
+    isGoogleOrganization &&
+    googleLive &&
+    (orgDriveStatus.data?.details?.connected || orgGmailStatus.data?.details?.connected)
+
   const authorize = useMutation({
-    mutationFn: () => getGoogleAuthorizeUrl(token!),
+    mutationFn: () => getGoogleAuthorizeUrl(token!, "personal"),
+    onSuccess: (data) => {
+      if (data.authorization_url) window.location.href = data.authorization_url
+    },
+  })
+
+  const authorizeOrg = useMutation({
+    mutationFn: () => getGoogleAuthorizeUrl(token!, "organization"),
     onSuccess: (data) => {
       if (data.authorization_url) window.location.href = data.authorization_url
     },
   })
 
   useEffect(() => {
-    if (!isGooglePersonal) return
+    if (!isGooglePersonal && !isGoogleOrganization) return
     const google = searchParams.get("google")
     if (!google) return
     queryClient.invalidateQueries({ queryKey: ["connector-status"] })
-  }, [connector.source, queryClient, searchParams, isGooglePersonal])
+  }, [connector.source, queryClient, searchParams, isGooglePersonal, isGoogleOrganization])
 
   const live = connector.available
 
@@ -429,7 +463,9 @@ export function ConnectorCard({
 
       <div className="flex items-center justify-between gap-3 border-t border-border-subtle pt-3.5">
         <p className="font-mono text-[0.6875rem] text-muted-foreground">
-          {connector.handshake} · {connector.cadence}
+          {isGoogleOrganization && googleOrgLinked
+            ? "OAuth (admin) · Polled every ~3 min"
+            : connector.handshake} · {connector.cadence}
         </p>
         {live && isGooglePersonal ? (
           hydrated && canWrite && (
@@ -448,10 +484,26 @@ export function ConnectorCard({
             </Button>
           )
         ) : live && isGoogleOrganization ? (
-          <Button size="sm" variant="outline" disabled>
-            <Plug className="size-3.5" />
-            Admin-managed
-          </Button>
+          hydrated && canWrite && isAdmin ? (
+            <Button
+              size="sm"
+              variant={googleOrgLinked ? "outline" : "default"}
+              disabled={authorizeOrg.isPending}
+              onClick={() => authorizeOrg.mutate()}
+            >
+              <Plug className="size-3.5" />
+              {authorizeOrg.isPending
+                ? "Opening…"
+                : googleOrgLinked
+                  ? "Reconnect"
+                  : "Connect"}
+            </Button>
+          ) : (
+            <Button size="sm" variant="outline" disabled>
+              <Plug className="size-3.5" />
+              Admin-managed
+            </Button>
+          )
         ) : (
           <Button size="sm" variant="outline" disabled>
             <Plug className="size-3.5" />
