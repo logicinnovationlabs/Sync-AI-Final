@@ -273,9 +273,16 @@ services:
       - "8000:8000"
     env_file:
       - .env.docker
+    environment:
+      GOOGLE_PUBSUB_PROJECT_ID: sync-ai-505006
+      GOOGLE_PUBSUB_TOPIC: gmail-push-notifications
+      GOOGLE_PUBSUB_SUBSCRIPTION: gmail-push-notifications-sub
+      WEBHOOK_BASE_URL: https://sycq-ai-final-2.onrender.com
+      GOOGLE_APPLICATION_CREDENTIALS: /app/keys/sync-ai-505006-service-account.json
     volumes:
       - ./backend/app:/app/app
       - ./backend/migrations:/app/migrations
+      - ./backend/keys:/app/keys
     depends_on:
       postgres:
         condition: service_healthy
@@ -309,8 +316,15 @@ services:
     container_name: snyq_celery_worker
     env_file:
       - .env.docker
+    environment:
+      GOOGLE_PUBSUB_PROJECT_ID: sync-ai-505006
+      GOOGLE_PUBSUB_TOPIC: gmail-push-notifications
+      GOOGLE_PUBSUB_SUBSCRIPTION: gmail-push-notifications-sub
+      WEBHOOK_BASE_URL: https://sycq-ai-final-2.onrender.com
+      GOOGLE_APPLICATION_CREDENTIALS: /app/keys/sync-ai-505006-service-account.json
     volumes:
       - ./backend/app:/app/app
+      - ./backend/keys:/app/keys
     healthcheck:
       disable: true
     restart: unless-stopped
