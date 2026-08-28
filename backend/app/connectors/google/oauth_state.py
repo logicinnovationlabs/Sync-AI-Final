@@ -42,18 +42,24 @@ def _sync_redis():
         return None
 
 
-def encode_oauth_state(tenant_id: str, user_id: str) -> str:
+def encode_oauth_state(tenant_id: str, user_id: str, connection_scope: str = "personal") -> str:
     """
     Build a CSRF-protected state string carrying tenant_id and user_id.
 
     A random nonce is stored in Redis and embedded in the payload so the
     callback can reject replays / forged states.
+
+    Args:
+        tenant_id: Tenant UUID
+        user_id: User principal UUID
+        connection_scope: "personal" or "organization"
     """
     nonce = secrets.token_urlsafe(24)
     payload = {
         "tenant_id": str(tenant_id),
         "user_id": str(user_id),
         "nonce": nonce,
+        "connection_scope": connection_scope,
     }
     client = _sync_redis()
     if client is not None:

@@ -207,6 +207,14 @@ class Settings(BaseSettings):
     # Azure Key Vault client URL (optional). Distinct from KMS_KEY_VAULT_URL
     # (HashiCorp/local KMS). Leave empty to use MockVaultClient in local/dev.
     vault_url: Optional[str] = Field(default=None)
+    vault_provider: Optional[str] = Field(
+        default="azure",
+        validation_alias=AliasChoices("VAULT_PROVIDER", "vault_provider"),
+    )
+    vault_token: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("VAULT_TOKEN", "vault_token"),
+    )
     vault_tenant_id: Optional[str] = Field(default=None)
     vault_client_id: Optional[str] = Field(default=None)
     vault_client_secret: Optional[str] = Field(default=None)
@@ -292,6 +300,28 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices(
             "GOOGLE_PUBSUB_VERIFICATION_TOKEN", "google_pubsub_verification_token"
         ),
+    )
+    google_pubsub_project_id: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "GOOGLE_PUBSUB_PROJECT_ID", "google_pubsub_project_id"
+        ),
+    )
+    google_pubsub_topic: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "GOOGLE_PUBSUB_TOPIC", "google_pubsub_topic"
+        ),
+    )
+    google_pubsub_subscription: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "GOOGLE_PUBSUB_SUBSCRIPTION", "google_pubsub_subscription"
+        ),
+    )
+    webhook_base_url: str = Field(
+        default="http://localhost:8000",
+        validation_alias=AliasChoices("WEBHOOK_BASE_URL", "webhook_base_url"),
     )
 
     qdrant_api_key: Optional[str] = Field(default=None)

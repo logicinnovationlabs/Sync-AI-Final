@@ -35,6 +35,9 @@ azure-keyvault-secrets==4.9.0
 azure-identity==1.19.0
 email-validator==2.2.0
 
+# HashiCorp Vault (Optional - for production)
+hvac==2.3.0
+
 # Block B - Celery & Task Queue
 celery[redis]==5.4.0
 kombu==5.4.0
@@ -44,6 +47,7 @@ google-api-python-client==2.149.0
 google-auth-oauthlib==1.2.1
 google-auth-httplib2==0.2.0
 google-generativeai==0.8.3
+google-cloud-pubsub==2.19.0
 
 # Block B - Vector Database
 qdrant-client==1.12.0
