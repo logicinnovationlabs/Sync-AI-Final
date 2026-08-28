@@ -254,6 +254,7 @@ export function AnimatedSidebarProvider({
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
       if (
+        event.key &&
         event.key.toLowerCase() === SIDEBAR_KEYBOARD_SHORTCUT &&
         (event.metaKey || event.ctrlKey)
       ) {

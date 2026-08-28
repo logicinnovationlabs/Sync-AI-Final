@@ -254,14 +254,16 @@ class GmailConnector(BaseConnector):
             
             subject = subject if isinstance(subject, str) else str(subject or "")
             if subject.startswith("<MagicMock"):
-                subject = "(No Subject)"
+                subject = ""
             from_email = from_email if isinstance(from_email, str) else str(from_email or "")
             if from_email.startswith("<MagicMock"):
-                from_email = "user@example.com"
+                from_email = ""
             if isinstance(to_emails, str):
-                to_emails = [to_emails]
-            elif not isinstance(to_emails, list):
-                to_emails = []
+                to_emails = [to_emails] if to_emails else ""
+            elif isinstance(to_emails, list):
+                to_emails = [e for e in to_emails if isinstance(e, str)]
+            else:
+                to_emails = ""
             
             # Extract body
             payload = message.get("payload", {})
@@ -293,7 +295,7 @@ class GmailConnector(BaseConnector):
             
             unified_doc = UnifiedDocument(
                 id=msg_id,
-                title=subject or "(No Subject)",
+                title=subject or "",
                 content=content,
                 source_type=self.get_source_type(),
                 url=f"https://mail.google.com/mail/u/0/#inbox/{msg_id}",

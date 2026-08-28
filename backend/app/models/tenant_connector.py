@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, String, UniqueConstraint
+from sqlalchemy import Boolean, String, UniqueConstraint, Index
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -23,7 +23,8 @@ class TenantConnector(Base, TimestampMixin):
 
     __tablename__ = "tenant_connectors"
     __table_args__ = (
-        UniqueConstraint("tenant_id", "source_type", name="uq_tenant_connectors_source"),
+        UniqueConstraint("tenant_id", "source_type", "connection_scope", name="uq_tenant_connectors_source_scope"),
+        Index("ix_tenant_connectors_scope", "connection_scope"),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -38,6 +39,12 @@ class TenantConnector(Base, TimestampMixin):
         index=True,
     )
     source_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    connection_scope: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="personal",
+        comment="'personal' for per-user OAuth, 'organization' for admin service account",
+    )
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     config: Mapped[Dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     setup_by: Mapped[UUID] = mapped_column(

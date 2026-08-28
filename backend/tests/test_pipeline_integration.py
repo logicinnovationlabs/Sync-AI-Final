@@ -41,6 +41,8 @@ def pipeline():
 async def test_process_raw_drive_document(pipeline):
     """Test processing a raw Drive document through the pipeline."""
     tenant_id = uuid4()
+    pipeline.canonical_repo.register_login_user(tenant_id, "owner@example.com", uuid4())
+    pipeline.canonical_repo.register_login_user(tenant_id, "alice@example.com", uuid4())
     
     raw = {
         "id": "file_123",
@@ -94,6 +96,7 @@ async def test_process_raw_drive_document(pipeline):
 async def test_process_raw_gmail_message(pipeline):
     """Test processing a raw Gmail message through the pipeline."""
     tenant_id = uuid4()
+    pipeline.canonical_repo.register_login_user(tenant_id, "mailbox@example.com", uuid4())
     
     raw = {
         "id": "msg_456",
@@ -166,6 +169,8 @@ async def test_process_raw_with_mime_mismatch(pipeline):
 async def test_process_raw_creates_resolved_identities(pipeline):
     """Test that processing creates and reuses Principal entries."""
     tenant_id = uuid4()
+    alice_id = uuid4()
+    pipeline.canonical_repo.register_login_user(tenant_id, "alice@example.com", alice_id)
     
     # Process first document
     raw1 = {

@@ -4,6 +4,7 @@ Celery Beat schedule - periodic tasks.
 Schedules:
 - renew_watch_channels: Run every N hours to renew expiring watches
 - run_scheduled_tenant_backups: Daily tenant schema backups
+- poll_gmail_pubsub: Pull Gmail push notifications from Pub/Sub subscription
 """
 
 from celery.schedules import crontab
@@ -27,6 +28,20 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(hour=2, minute=0),
         "options": {
             "expires": 7200,
+        },
+    },
+    "poll-drive-acl-delta": {
+        "task": "app.workers.tasks.poll_drive_acl_delta",
+        "schedule": float(getattr(settings, "drive_acl_poll_seconds", 180) or 180),
+        "options": {
+            "expires": 120,
+        },
+    },
+    "poll-gmail-pubsub": {
+        "task": "app.workers.tasks.poll_gmail_pubsub",
+        "schedule": 60.0,  # Every 60 seconds
+        "options": {
+            "expires": 120,
         },
     },
 }

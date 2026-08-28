@@ -191,3 +191,182 @@ async def get_google_authorize_url(
         "authorization_url": auth_url,
         "tenant_id": tenant_id,
     }
+
+
+@router.get(
+    "/google/callback",
+    summary="Google OAuth callback — exchange code, store tokens, auto-sync",
+)
+async def google_oauth_callback(
+    request: Request,
+    code: Optional[str] = Query(None),
+    state: Optional[str] = Query(None),
+    error: Optional[str] = Query(None),
+):
+    """
+    Unauthenticated by design: Google redirects the browser here without our JWT.
+    On success: encrypt+store tokens, enqueue Drive + Gmail full backfill, redirect UI.
+    """
+    if error:
+        return RedirectResponse(f"/connectors?status=error&message={error}", status_code=302)
+    if not code or not state:
+        return RedirectResponse("/connectors?status=error&message=missing_code_or_state", status_code=302)
+
+    # Simple state validation - just tenant_id for now
+    try:
+        import json
+        import base64
+        payload = json.loads(base64.b64decode(state))
+        tenant_id = str(payload.get("tenant_id", ""))
+        user_id = str(payload.get("user_id", ""))
+    except Exception:
+        return RedirectResponse("/connectors?status=error&message=invalid_state", status_code=302)
+
+    if not tenant_id:
+        return RedirectResponse("/connectors?status=error&message=missing_tenant_id", status_code=302)
+
+    try:
+        from app.connectors.google.token_store import PersistentGoogleTokenStore, google_oauth_token_key
+        from app.connectors.google.oauth import google_oauth_from_settings
+        from app.connectors.google.keys import google_credential_ref
+        from app.connectors.google import status_store
+        from app.workers.tasks import backfill_source
+        from app.services.tenant_resolver import tenant_resolver
+        from app.storage.tenant_db import tenant_db_manager
+        from app.models.tenant_connector import TenantConnector
+        from sqlalchemy import select
+        from uuid import UUID
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        redirect_uri = getattr(settings, "GOOGLE_REDIRECT_URI", "http://localhost:8000/api/v1/connectors/google/callback")
+        token_store = PersistentGoogleTokenStore(tenant_id)
+        oauth = google_oauth_from_settings(token_store, principal_id=user_id)
+        
+        token_data = await oauth.exchange_code_for_tokens(tenant_id, code, redirect_uri)
+        
+        # Resolve mailbox email
+        mailbox_email = ""
+        try:
+            token = await oauth.get_valid_token(tenant_id)
+            from app.connectors.google.clients.gmail_client import GmailClient
+            profile = await GmailClient().get_profile(token)
+            mailbox_email = str(profile.get("emailAddress") or "")
+        except Exception:
+            pass
+
+        if mailbox_email or user_id:
+            merged = dict(token_data or {})
+            if mailbox_email:
+                merged["mailbox_email"] = mailbox_email
+            merged["connected_by"] = user_id
+            token_store.set_token(google_oauth_token_key(tenant_id, user_id), merged)
+
+        # Record connector rows
+        try:
+            tenant_uuid = UUID(tenant_id)
+            actor_uuid = UUID(user_id) if user_id else tenant_uuid
+        except (TypeError, ValueError):
+            logger.warning("Failed to parse tenant/user UUID for connector row creation")
+        else:
+            try:
+                routing = await tenant_resolver.resolve(tenant_id)
+                factory = tenant_db_manager.get_session_factory(
+                    routing.db_host,
+                    routing.db_name,
+                    routing.db_user,
+                    routing.db_password,
+                    str(routing.tenant_id),
+                )
+                cred_ref = google_credential_ref(tenant_id, user_id)
+                GOOGLE_SOURCES = ("google_drive", "google_gmail")
+                
+                async with factory() as session:
+                    for source_type in GOOGLE_SOURCES:
+                        try:
+                            result = await session.execute(
+                                select(TenantConnector).where(
+                                    TenantConnector.tenant_id == tenant_uuid,
+                                    TenantConnector.source_type == source_type,
+                                    TenantConnector.connection_scope == "personal",
+                                )
+                            )
+                            row = result.scalar_one_or_none()
+                            config = {"mailbox_email": mailbox_email, "connected_by": user_id}
+                            if row is None:
+                                session.add(
+                                    TenantConnector(
+                                        tenant_id=tenant_uuid,
+                                        source_type=source_type,
+                                        connection_scope="personal",
+                                        enabled=True,
+                                        config=config,
+                                        setup_by=actor_uuid,
+                                        credential_ref=cred_ref,
+                                    )
+                                )
+                            else:
+                                row.enabled = True
+                                merged = dict(row.config or {})
+                                merged.update(config)
+                                row.config = merged
+                                row.credential_ref = cred_ref
+                                row.setup_by = actor_uuid
+                            logger.info(
+                                "Connector row upserted: tenant_id=%s source_type=%s enabled=True",
+                                tenant_id,
+                                source_type,
+                            )
+                        except Exception as exc:
+                            logger.exception(
+                                "Failed to upsert connector row: tenant_id=%s source_type=%s error=%s",
+                                tenant_id,
+                                source_type,
+                                str(exc),
+                            )
+                    await session.commit()
+            except Exception as exc:
+                logger.exception(
+                    "Failed to initialize connector row creation: tenant_id=%s user_id=%s error=%s",
+                    tenant_id,
+                    user_id,
+                    str(exc),
+                )
+
+        # Enqueue backfills
+        GOOGLE_SOURCES = ("google_drive", "google_gmail")
+        for source_type in GOOGLE_SOURCES:
+            status_store.set_status(
+                tenant_id,
+                source_type,
+                user_id=user_id,
+                connection_status="syncing",
+                last_error="",
+            )
+            try:
+                backfill_source.delay(
+                    tenant_id=tenant_id,
+                    source_type=source_type,
+                    user_id=user_id,
+                    connector_id=google_credential_ref(tenant_id, user_id, "personal"),
+                )
+            except Exception:
+                status_store.set_status(
+                    tenant_id,
+                    source_type,
+                    user_id=user_id,
+                    connection_status="error",
+                    last_error="celery_enqueue_failed",
+                )
+                logger.exception(
+                    "Failed to enqueue backfill tenant=%s source=%s", tenant_id, source_type
+                )
+
+    except Exception as exc:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception("OAuth callback failed: %s", str(exc))
+        return RedirectResponse(f"/connectors?status=error&message=oauth_failed", status_code=302)
+
+    return RedirectResponse("/connectors?status=connected", status_code=302)

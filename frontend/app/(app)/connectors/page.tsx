@@ -11,7 +11,7 @@ export default function ConnectorsPage() {
     <div className="flex h-full flex-col">
       <PageHeader
         title="Connectors"
-        description="Connect your own Google account. Drive and Gmail stay private to you — other members and admins cannot search them."
+        description="Connect your personal Google account for private search, or access organization-wide content if enabled by your admin."
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto">

@@ -13,10 +13,6 @@ from urllib.parse import urlparse
 from opentelemetry import metrics, trace
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.instrumentation.celery import CeleryInstrumentor
-from opentelemetry.instrumentation.redis import RedisInstrumentor
-from opentelemetry.instrumentation.requests import RequestsInstrumentor
-from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from opentelemetry.metrics import CallbackOptions, Observation
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
@@ -142,6 +138,44 @@ def setup_telemetry(service_name: str = "snyq-backend") -> None:
     setup_otel_logging()
     _BOOTSTRAPPED = True
     _instrument_libraries()
+
+
+try:
+    from opentelemetry.instrumentation.celery import CeleryInstrumentor
+except ImportError:  # optional extra; 3.14 host venv may not ship it
+    class CeleryInstrumentor:  # type: ignore[no-redef]
+        _is_instrumented_by_opentelemetry = True
+
+        def instrument(self, **kwargs) -> None:
+            return None
+
+
+try:
+    from opentelemetry.instrumentation.redis import RedisInstrumentor
+except ImportError:
+    class RedisInstrumentor:  # type: ignore[no-redef]
+        _is_instrumented_by_opentelemetry = True
+
+        def instrument(self, **kwargs) -> None:
+            return None
+
+
+try:
+    from opentelemetry.instrumentation.requests import RequestsInstrumentor
+except ImportError:
+    class RequestsInstrumentor:  # type: ignore[no-redef]
+        _is_instrumented_by_opentelemetry = True
+
+        def instrument(self, **kwargs) -> None:
+            return None
+
+
+try:
+    from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+except ImportError:
+    class SQLAlchemyInstrumentor:  # type: ignore[no-redef]
+        def instrument(self, **kwargs) -> None:
+            return None
 
 
 def _instrument_libraries() -> None:

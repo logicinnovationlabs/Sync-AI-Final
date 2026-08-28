@@ -102,9 +102,7 @@ def test_extract_permission_hints_group_permissions(normalizer):
     
     hints = normalizer.extract_permission_hints(raw)
     
-    assert len(hints) == 1
-    assert hints[0][0].email == "eng@example.com"
-    assert hints[0][1] == PermissionLevel.READ
+    assert len(hints) == 0
 
 
 def test_extract_containers(normalizer):
@@ -113,7 +111,7 @@ def test_extract_containers(normalizer):
     
     containers = normalizer.extract_containers(raw)
     
-    assert containers == ["folder_1", "folder_2"]
+    assert containers == []
 
 
 def test_extract_identity_hints_owner(normalizer):

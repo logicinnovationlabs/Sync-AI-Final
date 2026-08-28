@@ -19,6 +19,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _ENV_FILE = None if os.getenv("SNYQ_IGNORE_ENV_FILE") == "1" else ".env"
 
 
+def _default_acl_backend() -> str:
+    env = (os.getenv("ENVIRONMENT") or "development").strip().lower()
+    if env in {"test"}:
+        return "mock"
+    return "postgres"
+
+
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
@@ -200,6 +207,14 @@ class Settings(BaseSettings):
     # Azure Key Vault client URL (optional). Distinct from KMS_KEY_VAULT_URL
     # (HashiCorp/local KMS). Leave empty to use MockVaultClient in local/dev.
     vault_url: Optional[str] = Field(default=None)
+    vault_provider: Optional[str] = Field(
+        default="azure",
+        validation_alias=AliasChoices("VAULT_PROVIDER", "vault_provider"),
+    )
+    vault_token: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("VAULT_TOKEN", "vault_token"),
+    )
     vault_tenant_id: Optional[str] = Field(default=None)
     vault_client_id: Optional[str] = Field(default=None)
     vault_client_secret: Optional[str] = Field(default=None)
@@ -258,11 +273,55 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("GOOGLE_REFRESH_TOKEN", "google_refresh_token"),
     )
+    google_drive_credential_mode: str = Field(
+        default="oauth",
+        validation_alias=AliasChoices(
+            "GOOGLE_DRIVE_CREDENTIAL_MODE", "google_drive_credential_mode"
+        ),
+    )
+    google_dwd_impersonate_email: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "GOOGLE_DWD_IMPERSONATE_EMAIL", "google_dwd_impersonate_email"
+        ),
+    )
+    google_service_account_vault_key: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "GOOGLE_SERVICE_ACCOUNT_VAULT_KEY", "google_service_account_vault_key"
+        ),
+    )
+    drive_acl_poll_seconds: int = Field(
+        default=180,
+        validation_alias=AliasChoices("DRIVE_ACL_POLL_SECONDS", "drive_acl_poll_seconds"),
+    )
     google_pubsub_verification_token: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices(
             "GOOGLE_PUBSUB_VERIFICATION_TOKEN", "google_pubsub_verification_token"
         ),
+    )
+    google_pubsub_project_id: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "GOOGLE_PUBSUB_PROJECT_ID", "google_pubsub_project_id"
+        ),
+    )
+    google_pubsub_topic: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "GOOGLE_PUBSUB_TOPIC", "google_pubsub_topic"
+        ),
+    )
+    google_pubsub_subscription: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "GOOGLE_PUBSUB_SUBSCRIPTION", "google_pubsub_subscription"
+        ),
+    )
+    webhook_base_url: str = Field(
+        default="http://localhost:8000",
+        validation_alias=AliasChoices("WEBHOOK_BASE_URL", "webhook_base_url"),
     )
 
     qdrant_api_key: Optional[str] = Field(default=None)
@@ -582,7 +641,7 @@ class Settings(BaseSettings):
     storage_secure: bool = Field(default=False)
     stream_threshold_bytes: int = Field(default=10 * 1024 * 1024)  # 10MB
     stream_chunk_bytes: int = Field(default=8192)
-    acl_backend: str = Field(default="mock")  # "mock" | "http"
+    acl_backend: str = Field(default_factory=_default_acl_backend)  # "mock" | "http" | "postgres"
     acl_service_url: str = Field(default="http://localhost:8000/acl")
 
     @model_validator(mode="after")

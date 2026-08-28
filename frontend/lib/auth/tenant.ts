@@ -11,9 +11,10 @@
  * routing in production (wildcard DNS and certificate).
  *
  * Locally there is no subdomain to read — `localhost` and `127.0.0.1` have none
- * — so it falls back to `NEXT_PUBLIC_DEFAULT_TENANT`. Without that set, login
- * comes back 404 "Tenant not found", which is the honest failure: we genuinely
- * don't know which workspace you meant.
+ * — so it falls back to `NEXT_PUBLIC_DEFAULT_TENANT`. Vercel/Render hostnames
+ * (`*.vercel.app`, `*.onrender.com`) also use that fallback, because the first
+ * label is the app name, not a tenant. Without the fallback, login comes back
+ * 404 "Tenant not found".
  *
  * Registration still asks for the workspace outright, because you pick which one
  * you're joining before you're inside it and there's no hostname to infer from.
@@ -25,8 +26,15 @@ const BARE_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "[::1]"])
 /** Subdomains that are ours, not a tenant's. */
 const RESERVED = new Set(["www", "app", "api", "admin", "staging", "preview"])
 
-/** Hosted preview/prod URLs — first label is the project name, not a tenant. */
-const PLATFORM_SUFFIXES = [".vercel.app", ".onrender.com"]
+/** Platform hosts whose first label is the app name, not a tenant (e.g. foo.vercel.app). */
+const PLATFORM_SUFFIXES = [
+  ".vercel.app",
+  ".netlify.app",
+  ".onrender.com",
+  ".render.com",
+  ".railway.app",
+  ".fly.dev",
+]
 
 export function tenantFromHost(hostname?: string): string {
   const host = (hostname ?? (typeof window !== "undefined" ? window.location.hostname : ""))
@@ -36,7 +44,6 @@ export function tenantFromHost(hostname?: string): string {
   const fallback = (process.env.NEXT_PUBLIC_DEFAULT_TENANT || "alpha").trim()
 
   if (!host || BARE_HOSTS.has(host)) return fallback
-
   if (PLATFORM_SUFFIXES.some((suffix) => host.endsWith(suffix))) return fallback
 
   const labels = host.split(".")

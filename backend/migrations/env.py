@@ -29,6 +29,7 @@ from app.models.canonical import (  # noqa: F401 — Block C metadata
     ACLEntryRow,
     ContainerACLEntryRow,
     ContainerEdgeRow,
+    PendingIdentityQueueRow,
 )
 
 # this is the Alembic Config object
@@ -71,7 +72,7 @@ async def run_async_migrations() -> None:
         configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
-        connect_args=connect_args_for_url(settings.control_plane_database_url),
+        connect_args=connect_args_for_url(settings.control_plane_database_url or ""),
     )
 
     async with connectable.connect() as connection:

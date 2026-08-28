@@ -12,7 +12,7 @@ must never be able to reconstruct a working credential.
 
 from typing import Dict, Any
 from uuid import UUID, uuid4
-from sqlalchemy import String, Text
+from sqlalchemy import Boolean, String, Text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -64,6 +64,12 @@ class Tenant(Base, TimestampMixin):
             "The actual secret lives only in Vault. This prevents credential theft via metadata access "
             "(Vishwas §28.2/§28.6)."
         ),
+    )
+    google_org_workspace_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        comment="Admin toggle for organization Google Workspace connector availability",
     )
 
     def __repr__(self) -> str:

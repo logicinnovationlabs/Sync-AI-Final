@@ -21,9 +21,13 @@ const detail: Record<
   string,
   { reads: string[]; note: string }
 > = {
-  google: {
+  google_personal: {
     reads: ["Drive documents", "Gmail threads", "Shared drives"],
-    note: "OAuth consent from your Google Workspace account. Polling picks up new and changed files continuously.",
+    note: "OAuth consent from your personal Google Workspace account. Polling picks up new and changed files continuously.",
+  },
+  google_organization: {
+    reads: ["Organization Drive", "Shared Gmail", "Team drives"],
+    note: "Service account integration with your organization's Google Workspace. Real-time webhooks for instant sync.",
   },
   outlook: {
     reads: ["Outlook mail", "OneDrive files", "SharePoint documents"],

@@ -77,6 +77,10 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       CELERY_TASK_ALWAYS_EAGER: false
+      # Block B: Google PubSub for Gmail watch
+      GOOGLE_PUBSUB_VERIFICATION_TOKEN: ""
+      GOOGLE_PUBSUB_PROJECT_ID: sync-ai-505006
+      GOOGLE_PUBSUB_TOPIC: projects/sync-ai-505006/topics/gmail-push-notifications
     volumes:
       - ./app:/app/app
       - ./keys:/app/keys
@@ -116,8 +120,10 @@ services:
       # Block B: Google OAuth (add your credentials in .env)
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      GOOGLE_PUBSUB_PROJECT_ID: ${GOOGLE_PUBSUB_PROJECT_ID:-}
-      GOOGLE_PUBSUB_TOPIC: ${GOOGLE_PUBSUB_TOPIC:-gmail-watch-notifications}
+      # Block B: Google PubSub for Gmail watch
+      GOOGLE_PUBSUB_VERIFICATION_TOKEN: ""
+      GOOGLE_PUBSUB_PROJECT_ID: sync-ai-505006
+      GOOGLE_PUBSUB_TOPIC: projects/sync-ai-505006/topics/gmail-push-notifications
     volumes:
       - ./app:/app/app
     command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 -Q celery,google

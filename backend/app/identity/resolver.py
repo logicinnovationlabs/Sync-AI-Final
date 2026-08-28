@@ -15,6 +15,11 @@ from app.core.models import IdentityHint, ResolvedIdentity, Principal
 
 logger = logging.getLogger(__name__)
 
+# Drive shares and Gmail mailbox owners bind to users.principal_id.
+# They never mint a second identity_principals row when the compiler
+# passes document_id (the ACL write path).
+MIRROR_BIND_SOURCES = frozenset({"google_drive", "google_gmail"})
+
 
 class IdentityResolver:
     """
@@ -37,7 +42,13 @@ class IdentityResolver:
         self.matchers = matchers
         self.repo = canonical_repo
     
-    async def resolve(self, hint: IdentityHint, tenant_id: UUID) -> ResolvedIdentity:
+    async def resolve(
+        self,
+        hint: IdentityHint,
+        tenant_id: UUID,
+        document_id: Optional[str] = None,
+        source_account_id: Optional[UUID] = None,
+    ) -> ResolvedIdentity:
         """
         Resolve an identity hint to a principal.
         
@@ -57,6 +68,19 @@ class IdentityResolver:
         """
         # Normalize email if present
         normalized_email = self._normalize_email(hint.email) if hint.email else None
+
+        # Mirror bind: users table is canonical. For Drive/Gmail sources, always
+        # use the mirror bind path (queue unmatched emails) regardless of whether
+        # document_id was passed. This prevents auto-provisioning of external users
+        # if a caller forgets to pass document_id (defense-in-depth).
+        if hint.source_type in MIRROR_BIND_SOURCES and normalized_email:
+            return await self._resolve_drive_share(
+                hint,
+                tenant_id,
+                normalized_email,
+                document_id or "unknown",  # Use placeholder if not provided
+                source_account_id,
+            )
         
         # Try email matcher first (highest confidence)
         if normalized_email:
@@ -103,6 +127,65 @@ class IdentityResolver:
             f"source={hint.source_type}, external_id={hint.external_id}"
         )
         raise ValueError(f"Cannot resolve identity hint with no email: {hint}")
+
+    async def _resolve_drive_share(
+        self,
+        hint: IdentityHint,
+        tenant_id: UUID,
+        normalized_email: str,
+        document_id: str,
+        source_account_id: Optional[UUID],
+    ) -> ResolvedIdentity:
+        """Bind a Drive share or Gmail mailbox email to users.principal_id or queue it."""
+        login_user = None
+        if hasattr(self.repo, "get_login_user_by_email"):
+            login_user = await self.repo.get_login_user_by_email(normalized_email, tenant_id)
+
+        if login_user:
+            principal_id, email = login_user
+            now = datetime.now(timezone.utc)
+            principal = Principal(
+                id=principal_id,
+                tenant_id=tenant_id,
+                email=email,
+                name=hint.name,
+                source_identities={hint.source_type: hint.external_id},
+                created_at=now,
+                updated_at=now,
+            )
+            logger.info(
+                "mirror identity bound source=%s email=%s principal_id=%s document_id=%s",
+                hint.source_type,
+                normalized_email,
+                principal_id,
+                document_id,
+            )
+            return ResolvedIdentity(
+                principal_id=principal_id,
+                principal=principal,
+                confidence=1.0,
+                matched_on="email",
+            )
+
+        if hasattr(self.repo, "upsert_pending_identity"):
+            await self.repo.upsert_pending_identity(
+                tenant_id,
+                document_id,
+                normalized_email,
+                source_account_id=source_account_id,
+            )
+        logger.info(
+            "pending identity match queued email=%s document_id=%s",
+            normalized_email,
+            document_id,
+        )
+        return ResolvedIdentity(
+            principal_id=None,
+            principal=None,
+            confidence=0.0,
+            matched_on="pending",
+            is_pending=True,
+        )
     
     async def _match_by_email(
         self, normalized_email: str, tenant_id: UUID, hint: IdentityHint

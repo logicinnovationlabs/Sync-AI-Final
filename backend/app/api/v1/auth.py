@@ -20,6 +20,7 @@ import base64
 from datetime import datetime, timezone
 from urllib.parse import urlencode
 import jwt as pyjwt
+import logging
 
 from app.core.config import settings
 from app.services.token_service import token_service
@@ -29,6 +30,8 @@ from app.services.admin.scopes import scopes_for_role
 from app.services.oauth_service import oauth_service
 from app.storage.tenant_db import tenant_db_manager
 from app.storage.redis_client import redis_client
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -169,54 +172,70 @@ async def native_login(request: NativeLoginRequest):
         raise HTTPException(status_code=500, detail=f"Tenant resolution failed: {e}")
     
     # Get tenant database session
-    async for db_session in tenant_db_manager.get_session(
+    factory = tenant_db_manager.get_session_factory(
         routing.db_host,
         routing.db_name,
         routing.db_user,
         routing.db_password,
         str(tenant_id),
-    ):
+    )
+    db_session = factory()
+    try:
         # Authenticate user
-        try:
-            user = await native_auth_service.authenticate_user(
-                email=request.email,
-                password=request.password,
-                tenant_id=tenant_id,
-                db_session=db_session,
-            )
-        except Exception as e:
-            raise HTTPException(status_code=401, detail=str(e))
-        
-        # Issue JWT tokens — scopes follow persisted org role (Block N)
-        role = getattr(user, "role", None) or "member"
-        scopes = scopes_for_role(role)
-        access_token = await token_service.issue_access_token(
-            tenant_id=str(tenant_id),
-            principal_id=str(user.principal_id),
-            scopes=scopes,
-            role=role,
-            token_version=getattr(user, "token_version", 0) or 0,
-            must_change_password=bool(getattr(user, "must_change_password", False)),
+        user = await native_auth_service.authenticate_user(
+            email=request.email,
+            password=request.password,
+            tenant_id=tenant_id,
+            db_session=db_session,
         )
-        
-        refresh_token = await token_service.issue_refresh_token(
-            tenant_id=str(tenant_id),
-            principal_id=str(user.principal_id),
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    
+    # Issue JWT tokens — scopes follow persisted org role (Block N)
+    role = getattr(user, "role", None) or "member"
+    scopes = scopes_for_role(role)
+    access_token = await token_service.issue_access_token(
+        tenant_id=str(tenant_id),
+        principal_id=str(user.principal_id),
+        scopes=scopes,
+        role=role,
+        token_version=getattr(user, "token_version", 0) or 0,
+        must_change_password=bool(getattr(user, "must_change_password", False)),
+    )
+    
+    refresh_token = await token_service.issue_refresh_token(
+        tenant_id=str(tenant_id),
+        principal_id=str(user.principal_id),
+    )
+    await oauth_service.persist_refresh_token(
+        refresh_token,
+        str(tenant_id),
+        str(user.principal_id),
+        db_session,
+    )
+
+    try:
+        from app.storage.canonical_repo import bind_pending_drive_shares
+
+        await bind_pending_drive_shares(
+            db_session, tenant_id, user.email, user.principal_id
         )
-        await oauth_service.persist_refresh_token(
-            refresh_token,
-            str(tenant_id),
-            str(user.principal_id),
-            db_session,
+    except Exception:
+        logger.exception(
+            "pending identity drain failed at login email=%s tenant_id=%s",
+            user.email,
+            tenant_id,
         )
 
-        return NativeLoginResponse(
-            access_token=access_token,
-            refresh_token=refresh_token,
-            expires_in=settings.token_ttl_access,
-            role=role,
-            must_change_password=bool(getattr(user, "must_change_password", False)),
-        )
+    result = NativeLoginResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=settings.token_ttl_access,
+        role=role,
+        must_change_password=bool(getattr(user, "must_change_password", False)),
+    )
+    await db_session.close()
+    return result
 
 
 def _pkce_challenge(verifier: str) -> str:
@@ -377,13 +396,15 @@ async def sso_callback(
     from sqlalchemy import select
     from app.models.user import User
 
-    async for db_session in tenant_db_manager.get_session(
+    factory = tenant_db_manager.get_session_factory(
         routing.db_host,
         routing.db_name,
         routing.db_user,
         routing.db_password,
         str(tenant_id),
-    ):
+    )
+    db_session = factory()
+    try:
         result = await db_session.execute(
             select(User).where(
                 User.email == email,
@@ -408,17 +429,12 @@ async def sso_callback(
             tenant_id=str(tenant_id),
             principal_id=str(user.principal_id),
         )
-        await oauth_service.persist_refresh_token(
-            refresh_token,
-            str(tenant_id),
-            str(user.principal_id),
-            db_session,
+        result = SsoLoginResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_in=settings.token_ttl_access,
+            role=role,
         )
-        return {
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "token_type": "Bearer",
-            "expires_in": settings.token_ttl_access,
-        }
-
-    raise HTTPException(status_code=401, detail="SSO login failed")
+    finally:
+        await db_session.close()
+    return result

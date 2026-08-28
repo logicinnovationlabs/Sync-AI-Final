@@ -251,7 +251,95 @@ class Indexer:
             source_type,
             tenant_id,
         )
+        
         await self.qdrant.delete_by_ids(document_ids, tenant_id=tenant_id)
+        await self._delete_canonical_acls(document_ids, tenant_id)
+
+    async def _delete_canonical_acls(
+        self,
+        document_ids: List[str],
+        tenant_id: str,
+    ) -> None:
+        """Drop matching canonical_documents and acl_entries (fail closed on routing)."""
+        from uuid import UUID
+
+        from app.core.exceptions import TenantNotFoundError
+        from app.services.tenant_resolver import tenant_resolver
+        from app.storage.canonical_repo import CanonicalRepo
+        from app.storage.tenant_db import tenant_db_manager
+
+        try:
+            tenant_uuid = UUID(str(tenant_id))
+        except (TypeError, ValueError):
+            logger.error("delete ACL skipped: invalid tenant_id")
+            return
+
+        try:
+            routing = await tenant_resolver.resolve(str(tenant_id))
+        except TenantNotFoundError:
+            logger.error("delete ACL tenant not found tenant_id=%s", tenant_id)
+            return
+        except Exception:
+            logger.exception("delete ACL routing failed tenant_id=%s", tenant_id)
+            raise
+
+        factory = tenant_db_manager.get_session_factory(
+            routing.db_host,
+            routing.db_name,
+            routing.db_user,
+            routing.db_password,
+            str(routing.tenant_id),
+        )
+        session = factory()
+        try:
+            repo = CanonicalRepo(use_memory=False, session=session)
+            await repo.delete_documents_and_acls(document_ids, tenant_uuid)
+        finally:
+            await session.close()
+        
+    async def reindex_by_ids(
+        self,
+        tenant_id: str,
+        document_ids: List[str],
+        repo,
+    ) -> None:
+        """Rebuild UnifiedDocuments for ``document_ids`` and call ``bulk_index``.
+
+        ``bulk_index`` cannot accept an id list; this is the minimal scoped wrapper.
+        """
+        if not document_ids:
+            return
+        from app.core.base_connector import UnifiedDocument
+
+        documents = []
+        for document_id in document_ids:
+            doc = await repo.get_document(document_id)
+            if doc is None:
+                logger.warning("reindex skipped missing document_id=%s", document_id)
+                continue
+            entries = await repo.get_acl_entries(document_id)
+            permissions = []
+            for entry in entries:
+                if entry.principal_id:
+                    permissions.append(f"user:{entry.principal_id}")
+                elif entry.group_id:
+                    permissions.append(f"group:{entry.group_id}")
+            documents.append(
+                UnifiedDocument(
+                    id=doc.source_id,
+                    title=doc.title,
+                    content=doc.content,
+                    source_type=doc.source_type,
+                    url=doc.url,
+                    permissions=list(set(permissions)),
+                    created_at=doc.created_at,
+                    updated_at=doc.updated_at,
+                    source_updated_at=doc.source_updated_at,
+                    structured_metadata=doc.structured_metadata or {},
+                )
+            )
+        if documents:
+            await self.bulk_index(documents, tenant_id)
 
 
 indexer = Indexer()

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from typing import Protocol, Set, Tuple
+from uuid import UUID
 
 import httpx
 from fastapi import HTTPException
@@ -18,7 +19,7 @@ class ACLChecker(Protocol):
 
 
 class MockACLChecker:
-    """Phase 1 / in-process ACL. No caching ΓÇö each call reads current state."""
+    """Phase 1 / in-process ACL. No caching — each call reads current state."""
 
     def __init__(self) -> None:
         self._allowed: Set[Tuple[str, str, str]] = set()
@@ -46,7 +47,7 @@ class MockACLChecker:
 
 
 class HttpACLChecker:
-    """Phase 2 ΓÇö call Block C /acl/compile with no local cache."""
+    """Phase 2 — call Block C /acl/compile with no local cache."""
 
     def __init__(self, acl_service_url: str, timeout: float = 5.0) -> None:
         self.acl_service_url = acl_service_url.rstrip("/")
@@ -84,18 +85,69 @@ class HttpACLChecker:
         return False
 
 
+class PostgresACLChecker:
+    """Live ``acl_entries`` check. Deny wins; missing row is deny. No cache."""
+
+    def __init__(self, repo=None) -> None:
+        self._repo = repo
+
+    async def is_allowed(
+        self, tenant_id: str, principal_id: str, doc_id: str
+    ) -> bool:
+        try:
+            tenant = UUID(str(tenant_id))
+            principal = UUID(str(principal_id))
+        except (TypeError, ValueError):
+            return False
+
+        repo = self._repo
+        if repo is not None:
+            return await repo.principal_can_read_document(tenant, principal, doc_id)
+
+        from app.core.exceptions import TenantNotFoundError
+        from app.services.tenant_resolver import tenant_resolver
+        from app.storage.canonical_repo import CanonicalRepo
+        from app.storage.tenant_db import tenant_db_manager
+
+        try:
+            routing = await tenant_resolver.resolve(str(tenant_id))
+        except TenantNotFoundError:
+            logger.error("ACL tenant not found tenant_id=%s", tenant_id)
+            return False
+        except Exception as exc:
+            logger.error("ACL tenant routing failed: %s", exc)
+            return False
+
+        factory = tenant_db_manager.get_session_factory(
+            routing.db_host,
+            routing.db_name,
+            routing.db_user,
+            routing.db_password,
+            str(routing.tenant_id),
+        )
+        session = factory()
+        try:
+            live_repo = CanonicalRepo(use_memory=False, session=session)
+            result = await live_repo.principal_can_read_document(tenant, principal, doc_id)
+            return result
+        finally:
+            await session.close()
+
+
 async def check_acl(
     checker: ACLChecker,
     tenant_id: str,
     principal_id: str,
     doc_id: str,
 ) -> bool:
-    """Re-evaluate access on every call ΓÇö never cache (K1)."""
+    """Re-evaluate access on every call — never cache (K1)."""
     return await checker.is_allowed(tenant_id, principal_id, doc_id)
 
 
-def create_acl_checker(settings) -> MockACLChecker | HttpACLChecker:
-    if settings.acl_backend == "http":
+def create_acl_checker(settings) -> MockACLChecker | HttpACLChecker | PostgresACLChecker:
+    backend = (getattr(settings, "acl_backend", None) or "mock").strip().lower()
+    if backend == "http":
         return HttpACLChecker(settings.acl_service_url)
+    if backend == "postgres":
+        return PostgresACLChecker()
     return MockACLChecker()
-

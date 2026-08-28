@@ -86,6 +86,7 @@ async def test_end_to_end_drive_document():
     
     # Test document
     tenant_id = uuid4()
+    canonical_repo.register_login_user(tenant_id, "test@example.com", uuid4())
     raw = {
         "id": "smoke_test_file",
         "name": "Smoke Test Document",
@@ -144,6 +145,7 @@ async def test_end_to_end_gmail_message():
     
     # Test message
     tenant_id = uuid4()
+    canonical_repo.register_login_user(tenant_id, "mailbox@example.com", uuid4())
     raw = {
         "id": "smoke_test_msg",
         "threadId": "thread_smoke",

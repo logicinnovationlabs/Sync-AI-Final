@@ -47,10 +47,8 @@ async def list_audit_logs(
     page_size: int = Query(50, ge=1, le=100),
 ):
     """List this tenant's audit events. Filters never accept a tenant_id body field."""
-    try:
-        tenant_id = UUID(str(tenant.tenant_id))
-    except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail="Invalid tenant_id")
+    # audit_logs.tenant_id is VARCHAR(255); coerce at this boundary so asyncpg binds a str
+    tenant_id = str(tenant.tenant_id)
 
     filters = [AuditLog.tenant_id == tenant_id]
     if date_from is not None:

@@ -15,6 +15,7 @@ from typing import Optional
 import logging
 from datetime import datetime, timedelta
 from uuid import UUID
+from sqlalchemy import select
 
 from app.workers.celery_app import celery_app
 from app.services.sync import sync_orchestrator
@@ -31,7 +32,13 @@ from app.connectors.google import status_store
 from app.core.config import settings
 from app.storage.redis_client import redis_client
 from app.storage.vault_client import PlatformSecretKeys, vault_client
-from app.core.exceptions import TenantNotFoundError
+from app.core.exceptions import (
+    InvalidTokenError,
+    RevokedTokenError,
+    TenantNotFoundError,
+    UnauthorizedError,
+    VaultError,
+)
 from app.services.tenant_resolver import tenant_resolver
 import asyncio
 import inspect
@@ -73,6 +80,29 @@ except (ImportError, ValueError):
     pass
 
 logger = logging.getLogger(__name__)
+
+_AUTH_FAILURE_TYPES = (UnauthorizedError, InvalidTokenError, RevokedTokenError)
+
+
+def _is_google_auth_failure(exc: BaseException) -> bool:
+    """True only for typed credential/token failures, never VaultError."""
+    if isinstance(exc, VaultError):
+        return False
+    if isinstance(exc, _AUTH_FAILURE_TYPES):
+        return True
+    cause = getattr(exc, "__cause__", None)
+    if cause is not None and cause is not exc:
+        return _is_google_auth_failure(cause)
+    return False
+
+
+def _backfill_failure_status(exc: BaseException) -> str:
+    """Map a backfill exception to status_store vocabulary. Vault != re-auth."""
+    if isinstance(exc, VaultError) or isinstance(getattr(exc, "__cause__", None), VaultError):
+        return "error"
+    if _is_google_auth_failure(exc):
+        return "needs_reauth"
+    return "error"
 
 
 def _run_async(coro):
@@ -173,12 +203,20 @@ def _validate_tenant_auth(tenant_id: str):
             tenant_id,
         )
         raise ValueError(f"AUTH_FAILED: Tenant auth invalid or revoked for tenant_id: {tenant_id}")
+    
+    # Extract base tenant_id from composite format (tenant_id:user_id)
+    base_tenant_id = tenant_id
+    if ":" in tenant_id:
+        parts = tenant_id.split(":")
+        if len(parts) == 2:
+            base_tenant_id = parts[0]
+    
     try:
-        UUID(tenant_id)
+        UUID(base_tenant_id)
     except (ValueError, TypeError):
         return
     try:
-        _safe_resolve_tenant(tenant_id)
+        _safe_resolve_tenant(base_tenant_id)
     except TenantNotFoundError as exc:
         if not _dev_or_test():
             raise ValueError(
@@ -207,7 +245,15 @@ def _safe_resolve_tenant(tenant_id: str):
     """Resolve tenant routing; skip nested-loop resolve in local tests."""
     if _loop_busy() and _dev_or_test():
         return None
-    return _run_async(tenant_resolver.resolve(tenant_id))
+    
+    # Extract base tenant_id from composite format (tenant_id:user_id)
+    base_tenant_id = tenant_id
+    if ":" in tenant_id:
+        parts = tenant_id.split(":")
+        if len(parts) == 2:
+            base_tenant_id = parts[0]
+    
+    return _run_async(tenant_resolver.resolve(base_tenant_id))
 
 
 def _mailbox_for_tenant(tenant_id: str, source_type: str) -> str:
@@ -225,6 +271,49 @@ def _mailbox_for_tenant(tenant_id: str, source_type: str) -> str:
         return str(cfg.get("mailbox_email") or cfg.get("google_mailbox_email") or "")
     except Exception as exc:
         logger.debug("Mailbox lookup failed for tenant %s: %s", tenant_id, exc)
+        return ""
+
+
+def _resolve_org_admin_user_id(tenant_id: str, source_type: str) -> str:
+    """Resolve admin user_id from organization connector config for oauth_admin mode."""
+    from app.services.tenant_resolver import tenant_resolver
+    from app.storage.tenant_db import tenant_db_manager
+    from app.models.tenant_connector import TenantConnector
+    
+    try:
+        routing = _safe_resolve_tenant(tenant_id)
+        if routing is None:
+            return ""
+        
+        tenant_uuid = UUID(tenant_id)
+        
+        async def _resolve(uuid_val):
+            factory = tenant_db_manager.get_session_factory(
+                routing.db_host,
+                routing.db_name,
+                routing.db_user,
+                routing.db_password,
+                str(routing.tenant_id),
+            )
+            async with factory() as session:
+                result = await session.execute(
+                    select(TenantConnector).where(
+                        TenantConnector.tenant_id == uuid_val,
+                        TenantConnector.source_type == source_type,
+                        TenantConnector.connection_scope == "organization",
+                    )
+                )
+                row = result.scalar_one_or_none()
+                if row:
+                    config = dict(row.config or {})
+                    admin_user_id = config.get("connected_by") or ""
+                    logger.debug("Resolved org admin user_id %s for tenant %s source %s", admin_user_id, tenant_id, source_type)
+                    return str(admin_user_id)
+                return ""
+        
+        return _run_async(_resolve(tenant_uuid))
+    except Exception as exc:
+        logger.warning("Failed to resolve org admin user_id for tenant %s source %s: %s", tenant_id, source_type, exc)
         return ""
 
 
@@ -256,6 +345,7 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
     Args:
         tenant_id: Tenant identifier
         source_type: Source type (e.g., 'google_drive', 'google_gmail')
+        user_id: User principal ID (or "organization" for org scope)
         
     Returns:
         Summary dict with counts and final cursor
@@ -271,6 +361,14 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
 
         token_store = PersistentGoogleTokenStore(tenant_id)
         principal_id = str(user_id or "").strip()
+        
+        # For organization scope, resolve the actual admin user_id from connector config
+        if principal_id == "organization":
+            admin_user_id = _resolve_org_admin_user_id(tenant_id, source_type)
+            if admin_user_id:
+                principal_id = admin_user_id
+                logger.info("Organization scope: using admin user_id %s", principal_id)
+        
         scope_id = cursor_scope_id(tenant_id, principal_id)
 
         oauth_manager = None
@@ -294,7 +392,7 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
             status_store.set_status(
                 tenant_id,
                 source_type,
-                user_id=principal_id,
+                user_id=str(user_id or principal_id),  # Use original user_id for status tracking
                 connection_status="syncing",
                 last_error="",
             )
@@ -313,7 +411,7 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
             # OAuth stores connected_by so manual/beat re-syncs still ACL to the owner
             try:
                 blob = (
-                    token_store.get_token(google_oauth_token_key(tenant_id))
+                    token_store.get_token(google_oauth_token_key(tenant_id, "", "personal"))
                     or {}
                 )
                 principal_id = str(
@@ -326,7 +424,7 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
                 pass
         config = {
             "tenant_id": tenant_id,
-            "mailbox_email": mailbox_email or "user@example.com",
+            "mailbox_email": mailbox_email or "",
             "connected_by": user_id or principal_id or "",
         }
         
@@ -377,10 +475,33 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
         final_cursor = result.get("final_cursor")
         if final_cursor:
             _run_async(cursor_store.update_cursor(scope_id, source_type, final_cursor))
+        elif source_type == "google_drive":
+            # For Drive, if no pagination occurred (single page), fetch and store startPageToken
+            # This enables ACL delta polling to work even when backfill had no nextPageToken
+            try:
+                from app.connectors.google.clients.drive_client import DriveClient
+                drive_client = DriveClient()
+                token = _run_async(connector.get_valid_token())
+                start_page_token = _run_async(drive_client.get_start_page_token(token))
+                if start_page_token:
+                    _run_async(cursor_store.update_cursor(scope_id, source_type, start_page_token))
+                    logger.info(
+                        f"Stored Drive startPageToken for ACL delta polling tenant={tenant_id} token={start_page_token}"
+                    )
+            except Exception as exc:
+                logger.warning(
+                    f"Failed to fetch Drive startPageToken for ACL delta polling tenant={tenant_id}: {exc}"
+                )
 
         _register_watches_best_effort(
-            oauth_manager, tenant_id, source_type, final_cursor
+            oauth_manager, scope_id, source_type, final_cursor
         )
+        
+        # For Gmail, override cursor with historyId from watch_data (not page token from backfill)
+        if source_type == "google_gmail":
+            watch_info = _run_async(cursor_store.get_watch_info(scope_id, source_type))
+            if watch_info and "history_id" in watch_info:
+                _run_async(cursor_store.update_cursor(scope_id, source_type, watch_info["history_id"]))
 
         logger.info(
             f"Backfill completed for tenant {tenant_id}, source {source_type}: "
@@ -390,7 +511,7 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
         status_store.set_status(
             tenant_id,
             source_type,
-            user_id=principal_id,
+            user_id=str(user_id or principal_id),  # Use original user_id for correct Redis key (organization vs personal)
             connection_status="active",
             files_indexed=int(result.get("indexed_count") or 0),
             last_error="",
@@ -450,15 +571,19 @@ def process_drive_notification(self, tenant_id: str) -> dict:
     """
     try:
         logger.info(f"Processing Drive notification for tenant {tenant_id}")
-        _validate_tenant_auth(tenant_id)
+        
+        # Extract base tenant_id and principal_id from scoped tenant_id (e.g., "tenant_id:user_id" -> "tenant_id", "user_id")
+        base_tenant_id = tenant_id.split(":")[0] if ":" in tenant_id else tenant_id
+        principal_id = tenant_id.split(":")[1] if ":" in tenant_id else ""
+        _validate_tenant_auth(base_tenant_id)
 
-        # Get stored cursor
+        # Get stored cursor using the scoped tenant_id
         page_token = _run_async(cursor_store.get_cursor(tenant_id, "google_drive"))
         if not page_token:
             logger.warning(f"No cursor found for tenant {tenant_id}, skipping")
             return {"status": "no_cursor", "indexed_count": 0, "deleted_count": 0}
-        config = {"tenant_id": tenant_id}
-        token_store = PersistentGoogleTokenStore(tenant_id)
+        config = {"tenant_id": base_tenant_id}
+        token_store = PersistentGoogleTokenStore(base_tenant_id)
 
         oauth_manager = GoogleOAuthManager(
             token_store,
@@ -468,39 +593,56 @@ def process_drive_notification(self, tenant_id: str) -> dict:
                 "https://www.googleapis.com/auth/drive.readonly",
                 "https://www.googleapis.com/auth/gmail.readonly",
             ],
+            principal_id=principal_id,
         )
         client_id = settings.google_client_id or ""
         client_secret = settings.google_client_secret or ""
         seed_token_store_from_env(
             token_store,
-            tenant_id,
+            base_tenant_id,
             client_id=client_id,
             client_secret=client_secret,
             refresh_token=getattr(settings, "google_refresh_token", None),
         )
         
         # Create Drive connector
-        connector = DriveConnector(config, token_store, oauth_manager)
+        connector = DriveConnector(config, token_store, oauth_manager, connection_scope="organization")
         
         # Fetch changes since page token
         delta_result = _run_async(connector.fetch_since_page_token(page_token))
         
-        # Transform
+        logger.info(f"Drive delta result: documents={len(delta_result.documents) if hasattr(delta_result, 'documents') else 0}, next_cursor={delta_result.next_cursor}")
+        
+        unified_docs = []
         if hasattr(delta_result, "documents") and delta_result.documents:
-            unified_docs = _run_async(connector.transform(delta_result.documents))
+            _attach_extracted_text_for_pipeline(delta_result.documents)
+            from app.connectors.google.pipeline_bridge import process_raw_batch
+
+            unified_docs = _run_async(
+                process_raw_batch(
+                    delta_result.documents,
+                    "google_drive",
+                    base_tenant_id,
+                    require_postgres=True,
+                )
+            )
+            if unified_docs is None:
+                raise RuntimeError(
+                    f"webhook ACL compile failed: process_raw_batch returned None tenant={base_tenant_id}"
+                )
             if unified_docs:
-                _run_async(indexer.bulk_index(unified_docs, tenant_id))
+                _run_async(indexer.bulk_index(unified_docs, base_tenant_id))
         
         # Handle deletions
         deleted_ids = getattr(delta_result, "deleted_ids", [])
         if deleted_ids:
-            _run_async(indexer.delete_by_ids(deleted_ids, tenant_id, "google_drive"))
+            _run_async(indexer.delete_by_ids(deleted_ids, base_tenant_id, "google_drive"))
         
-        # Update cursor
+        # Update cursor (always advance if Drive API returned a new cursor)
         if hasattr(delta_result, "next_cursor") and delta_result.next_cursor:
             _run_async(cursor_store.update_cursor(tenant_id, "google_drive", delta_result.next_cursor))
         
-        doc_count = len(getattr(delta_result, "documents", []))
+        doc_count = len(unified_docs)
         logger.info(
             f"Drive notification processed for tenant {tenant_id}: "
             f"{doc_count} indexed, {len(deleted_ids)} deleted"
@@ -514,12 +656,172 @@ def process_drive_notification(self, tenant_id: str) -> dict:
     
     except Exception as e:
         logger.error(f"Drive notification processing failed for tenant {tenant_id}: {e}")
+        if isinstance(e, (InvalidTokenError, UnauthorizedError, RevokedTokenError)):
+            from app.connectors.google.drive_credentials import set_drive_ingest_paused
+
+            try:
+                _run_async(
+                    set_drive_ingest_paused(tenant_id, True, type(e).__name__)
+                )
+            except Exception:
+                logger.exception("failed to pause Drive ingest tenant=%s", tenant_id)
         
         # Retry on transient errors
         if "429" in str(e) or "quota" in str(e).lower():
             raise self.retry(exc=e, countdown=min(2 ** self.request.retries * 60, 3600))
         
         raise
+
+
+@celery_app.task
+def poll_drive_acl_delta() -> dict:
+    """Beat fallback: same incremental path as the Drive webhook, every ~3 minutes."""
+    from app.workers.drive_acl_poll import enqueue_drive_acl_poll
+
+    tenant_ids = _run_async(cursor_store.list_tenants_with_cursor("google_drive"))
+    result = enqueue_drive_acl_poll(tenant_ids, process_drive_notification.delay)
+    logger.info("poll_drive_acl_delta enqueued=%s", result["enqueued"])
+    return result
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=30)
+def poll_gmail_pubsub(self) -> dict:
+    """
+    Pull Gmail push notifications from Pub/Sub subscription and process them.
+
+    This task runs every 60 seconds via Celery Beat to pull messages from
+    the Gmail Pub/Sub subscription (gmail-push-notifications-sub).
+
+    Pipeline:
+    1. Pull messages from Pub/Sub subscription
+    2. Decode Gmail historyId/emailAddress from message payload
+    3. Call process_gmail_notification for each tenant with changes
+    4. Ack messages only after successful processing
+
+    Returns:
+        Summary dict with processed count and errors
+    """
+    try:
+        project_id = getattr(settings, "google_pubsub_project_id", None)
+        subscription_name = getattr(settings, "google_pubsub_subscription", None)
+
+        if not project_id:
+            logger.debug("Gmail Pub/Sub pull skipped: GOOGLE_PUBSUB_PROJECT_ID not set")
+            return {"status": "skipped", "reason": "no_project_id", "processed": 0}
+
+        if not subscription_name:
+            logger.debug("Gmail Pub/Sub pull skipped: GOOGLE_PUBSUB_SUBSCRIPTION not set")
+            return {"status": "skipped", "reason": "no_subscription", "processed": 0}
+
+        from google.cloud import pubsub_v1
+
+        subscriber = pubsub_v1.SubscriberClient()
+        subscription_path = subscriber.subscription_path(project_id, subscription_name)
+
+        # Pull up to 10 messages per poll
+        response = subscriber.pull(
+            request={"subscription": subscription_path, "max_messages": 10},
+            timeout=30.0,
+        )
+
+        if not response.received_messages:
+            return {"status": "success", "processed": 0, "errors": []}
+
+        processed_count = 0
+        errors = []
+        ack_ids = []
+
+        for msg in response.received_messages:
+            try:
+                import base64
+                import json
+
+                # Decode Pub/Sub message data
+                payload = json.loads(msg.message.data.decode("utf-8"))
+
+                # Gmail push notification format
+                email_address = payload.get("emailAddress")
+                history_id = payload.get("historyId")
+
+                if not email_address or not history_id:
+                    logger.warning(f"Invalid Gmail push notification: missing emailAddress or historyId")
+                    ack_ids.append(msg.ack_id)
+                    continue
+
+                # Map email address to tenant_id by querying tenant_connectors
+                from app.storage.control_plane_db import ControlPlaneSessionLocal
+                from sqlalchemy import select
+                from app.models.tenant_connector import TenantConnector
+                
+                tenant_id = None
+                try:
+                    async def _map_email():
+                        async with ControlPlaneSessionLocal() as session:
+                            result = await session.execute(
+                                select(TenantConnector.tenant_id, TenantConnector.config)
+                                .where(TenantConnector.source_type == "google_gmail")
+                                .where(TenantConnector.connection_scope == "personal")
+                                .where(TenantConnector.config["mailbox_email"].astext == email_address)
+                            )
+                            row = result.first()
+                            if row:
+                                tid = str(row[0])
+                                config = row[1]
+                                user_id_for_cursor = config.get("connected_by") if config else None
+                                # Build composite tenant_id for cursor lookup
+                                if user_id_for_cursor:
+                                    return f"{tid}:{user_id_for_cursor}"
+                                return tid
+                            return None
+                    
+                    tenant_id = _run_async(_map_email())
+                except Exception as e:
+                    logger.error(f"Failed to map email address {email_address} to tenant_id: {e}")
+                
+                if not tenant_id:
+                    logger.warning(f"No tenant found for email address {email_address}, skipping notification")
+                    ack_ids.append(msg.ack_id)
+                    continue
+
+                # Process the notification
+                result = process_gmail_notification(tenant_id)
+
+                if result.get("status") == "success":
+                    processed_count += 1
+                    ack_ids.append(msg.ack_id)
+                    logger.info(
+                        f"Gmail PubSub message processed: tenant={tenant_id}, "
+                        f"historyId={history_id}, indexed={result.get('indexed_count', 0)}"
+                    )
+                else:
+                    logger.error(f"Gmail notification processing failed: {result}")
+                    errors.append(f"tenant={tenant_id}, error={result.get('status')}")
+
+            except Exception as e:
+                logger.error(f"Failed to process Gmail PubSub message: {e}")
+                errors.append(str(e))
+                # Don't ack failed messages - they'll be redelivered
+
+        # Ack successfully processed messages
+        if ack_ids:
+            subscriber.acknowledge(
+                request={"subscription": subscription_path, "ack_ids": ack_ids}
+            )
+
+        logger.info(f"Gmail PubSub poll completed: processed={processed_count}, errors={len(errors)}")
+
+        return {
+            "status": "success",
+            "processed": processed_count,
+            "errors": errors,
+        }
+
+    except Exception as e:
+        logger.error(f"Gmail PubSub poll failed: {e}")
+        # Retry on transient errors
+        if "deadline" in str(e).lower() or "timeout" in str(e).lower():
+            raise self.retry(exc=e, countdown=30)
+        return {"status": "error", "processed": 0, "errors": [str(e)]}
 
 
 @celery_app.task(bind=True, max_retries=5, default_retry_delay=30)
@@ -529,9 +831,10 @@ def process_gmail_notification(self, tenant_id: str) -> dict:
     
     Pipeline:
     1. Get stored history ID from cursor_store
-    2. Fetch history since that ID
-    3. Transform and index
-    4. Update stored cursor
+    2. Fetch history since that ID (messages.get payloads already full MIME)
+    3. process_raw_batch (Postgres CanonicalRepo) → ACLCompiler → replace_acl_entries
+    4. bulk_index (re-embed; same chain as Drive webhook / backfill)
+    5. Update stored cursor (only here — not on the HTTP webhook path)
     
     Args:
         tenant_id: Tenant identifier
@@ -547,7 +850,17 @@ def process_gmail_notification(self, tenant_id: str) -> dict:
         if not history_id:
             logger.warning(f"No cursor found for tenant {tenant_id}, skipping")
             return {"status": "no_cursor", "indexed_count": 0, "deleted_count": 0}
-        token_store = PersistentGoogleTokenStore(tenant_id)
+        
+        # Extract base tenant_id and user_id from composite tenant_id if present
+        base_tenant_id = tenant_id
+        principal_id = None
+        if ":" in tenant_id:
+            parts = tenant_id.split(":")
+            if len(parts) == 2:
+                base_tenant_id = parts[0]
+                principal_id = parts[1]
+        
+        token_store = PersistentGoogleTokenStore(base_tenant_id)
         oauth_manager = GoogleOAuthManager(
             token_store,
             settings.google_client_id or "",
@@ -556,6 +869,7 @@ def process_gmail_notification(self, tenant_id: str) -> dict:
                 "https://www.googleapis.com/auth/drive.readonly",
                 "https://www.googleapis.com/auth/gmail.readonly",
             ],
+            principal_id=principal_id,
         )
         client_id = settings.google_client_id or ""
         client_secret = settings.google_client_secret or ""
@@ -578,9 +892,22 @@ def process_gmail_notification(self, tenant_id: str) -> dict:
         # Fetch changes since history ID
         delta_result = _run_async(connector.fetch_since_history_id(history_id))
         
-        # Transform
+        unified_docs = []
         if hasattr(delta_result, "documents") and delta_result.documents:
-            unified_docs = _run_async(connector.transform(delta_result.documents))
+            from app.connectors.google.pipeline_bridge import process_raw_batch
+
+            unified_docs = _run_async(
+                process_raw_batch(
+                    delta_result.documents,
+                    "google_gmail",
+                    tenant_id,
+                    require_postgres=True,
+                )
+            )
+            if unified_docs is None:
+                raise RuntimeError(
+                    f"webhook ACL compile failed: process_raw_batch returned None tenant={tenant_id}"
+                )
             if unified_docs:
                 _run_async(indexer.bulk_index(unified_docs, tenant_id))
         
@@ -589,11 +916,11 @@ def process_gmail_notification(self, tenant_id: str) -> dict:
         if deleted_ids:
             _run_async(indexer.delete_by_ids(deleted_ids, tenant_id, "google_gmail"))
         
-        # Update cursor
+        # Update cursor only after compile/index (or empty delta / deletes)
         if hasattr(delta_result, "next_cursor") and delta_result.next_cursor:
             _run_async(cursor_store.update_cursor(tenant_id, "google_gmail", delta_result.next_cursor))
         
-        doc_count = len(getattr(delta_result, "documents", []))
+        doc_count = len(unified_docs)
         logger.info(
             f"Gmail notification processed for tenant {tenant_id}: "
             f"{doc_count} indexed, {len(deleted_ids)} deleted"
@@ -711,6 +1038,23 @@ def _register_watches_best_effort(
         )
 
 
+def _attach_extracted_text_for_pipeline(documents: list) -> None:
+    """Copy hydrate's ``_extracted_text`` onto ``extractedText`` for process_raw.
+
+    GoogleDriveNormalizer.extract_text does not read ``_extracted_text``. Glue
+    lives here so the webhook path does not change shared extractor field order.
+    """
+    for file in documents or []:
+        extracted = file.get("_extracted_text")
+        if isinstance(extracted, str) and extracted:
+            file["extractedText"] = extracted
+        logger.info(
+            "drive webhook change file_id=%s modifiedTime=%s",
+            file.get("id"),
+            file.get("modifiedTime"),
+        )
+
+
 def _acl_terms_for_user(user_id: Optional[str]) -> list:
     principal = str(user_id or "")
     if not principal:
@@ -728,9 +1072,19 @@ def _lookup_mailbox_email(
     if token_store is None:
         return ""
     try:
-        data = token_store.get_token(google_oauth_token_key(tenant_id, user_id)) or {}
+        # Extract base tenant_id from composite format (tenant_id:user_id)
+        base_tenant_id = tenant_id
+        if ":" in tenant_id:
+            parts = tenant_id.split(":")
+            if len(parts) == 2:
+                base_tenant_id = parts[0]
+                # If user_id not provided, extract from composite
+                if not user_id:
+                    user_id = parts[1]
+        
+        data = token_store.get_token(google_oauth_token_key(base_tenant_id, user_id, "personal")) or {}
         if not data.get("mailbox_email"):
-            data = token_store.get_token(google_oauth_token_key(tenant_id)) or {}
+            data = token_store.get_token(google_oauth_token_key(base_tenant_id, "", "personal")) or {}
         return str(data.get("mailbox_email") or "")
     except Exception:
         return ""

@@ -43,14 +43,21 @@ class EmbeddingProvider(Protocol):
 
 
 class GeminiEmbeddingProvider:
-    """Gemini embeddings via google-generativeai (Phase 1 compatible)."""
-
-    def __init__(
-        self,
-        api_key: str,
-        model: str = "gemini-embedding-001",
-        dimension: int = 3072,
-    ):
+    """
+    Gemini-based embedding provider.
+    
+    Uses Google's Gemini embedding model via the genai SDK.
+    """
+    
+    def __init__(self, api_key: str, model: str = "gemini-embedding-001", dimension: int = 3072):
+        """
+        Initialize Gemini provider.
+        
+        Args:
+            api_key: Gemini API key
+            model: Model name
+            dimension: Embedding dimension
+        """
         self.api_key = api_key
         self.model = _normalize_gemini_model_name(model)
         self.dimension = int(dimension)
@@ -59,72 +66,72 @@ class GeminiEmbeddingProvider:
 
         genai.configure(api_key=api_key)
         self.genai = genai
-
-    def _fit_dimension(self, vector: List[float]) -> List[float]:
-        if len(vector) == self.dimension:
-            return vector
-        if len(vector) > self.dimension:
-            logger.warning(
-                "Fitting Gemini vector %s → %s (prefer EMBEDDING_DIMENSION=3072 like Phase 1)",
-                len(vector),
-                self.dimension,
-            )
-            return vector[: self.dimension]
-        return vector + [0.0] * (self.dimension - len(vector))
-
-    def _embed_one(self, text: str, task_type: Optional[str]) -> List[float]:
-        model = _normalize_gemini_model_name(self.model)
-        truncated = (text or "")[:10000]
-        kwargs = {
-            "model": model,
-            "content": truncated,
-            "output_dimensionality": int(self.dimension),
-        }
-        if task_type:
-            kwargs["task_type"] = task_type
-
-        try:
-            result = self.genai.embed_content(**kwargs)
-        except TypeError:
-            fallback = {"model": model, "content": truncated}
+    
+    async def embed_texts(self, texts: List[str], *, task_type: Optional[str] = None) -> List[List[float]]:
+        """
+        Generate embeddings using Gemini.
+        
+        Args:
+            texts: List of text strings
+            task_type: Optional task type for Phase 1 compatibility (retrieval_document/retrieval_query)
+            
+        Returns:
+            List of embedding vectors
+        """
+        embeddings = []
+        
+        for text in texts:
+            # Truncate if too long (Gemini has token limits)
+            truncated_text = text[:10000]
+            
+            kwargs = {
+                "model": self.model,
+                "content": truncated_text,
+                "output_dimensionality": self.dimension,
+            }
             if task_type:
-                fallback["task_type"] = task_type
-            try:
-                result = self.genai.embed_content(**fallback)
-            except TypeError:
-                result = self.genai.embed_content(model=model, content=truncated)
-
-        raw = result.get("embedding") if isinstance(result, dict) else None
-        if raw is None:
-            raw = getattr(result, "embedding", None) or []
-        return self._fit_dimension(list(raw))
-
-    async def embed_texts(
-        self,
-        texts: List[str],
-        *,
-        task_type: Optional[str] = None,
-    ) -> List[List[float]]:
-        return [self._embed_one(text, task_type) for text in texts]
+                kwargs["task_type"] = task_type
+            
+            result = self.genai.embed_content(**kwargs)
+            embeddings.append(result["embedding"])
+        
+        return embeddings
 
     def get_dimension(self) -> int:
         return self.dimension
 
 
 class FakeEmbeddingProvider:
-    """Deterministic hash embeddings for offline tests."""
-
+    """
+    Fake/deterministic embedding provider for tests and development.
+    
+    Generates consistent embeddings based on text hash.
+    """
+    
     def __init__(self, dimension: int = 3072):
-        self.dimension = int(dimension)
-
-    async def embed_texts(
-        self,
-        texts: List[str],
-        *,
-        task_type: Optional[str] = None,
-    ) -> List[List[float]]:
+        """
+        Initialize fake provider.
+        
+        Args:
+            dimension: Embedding dimension
+        """
+        self.dimension = dimension
+    
+    async def embed_texts(self, texts: List[str], *, task_type: Optional[str] = None) -> List[List[float]]:
+        """
+        Generate deterministic fake embeddings.
+        
+        Uses text hash to generate consistent vectors.
+        
+        Args:
+            texts: List of text strings
+            task_type: Optional task type for Phase 1 compatibility
+            
+        Returns:
+            List of embedding vectors
+        """
         prefix = f"{task_type or 'none'}::"
-        out: List[List[float]] = []
+        embeddings = []
         for text in texts:
             text_hash = hashlib.sha256((prefix + text).encode()).hexdigest()
             vector: List[float] = []
@@ -132,8 +139,8 @@ class FakeEmbeddingProvider:
                 byte_idx = (i * 2) % len(text_hash)
                 hex_val = int(text_hash[byte_idx : byte_idx + 2], 16)
                 vector.append((hex_val / 128.0) - 1.0)
-            out.append(vector)
-        return out
+            embeddings.append(vector)
+        return embeddings
 
     def get_dimension(self) -> int:
         return self.dimension
@@ -170,10 +177,22 @@ class EmbeddingService:
                 or getattr(settings, "MODEL_VERSION", None)
                 or "gemini-embedding-001"
             )
+            # Prefer EMBEDDING_DIMENSIONS (plural, QdrantVectorStore) so a leftover
+            # EMBEDDING_DIMENSION=768 cannot silently undersize vectors vs the
+            # live 3072-d `documents` collection.
+            dimension = (
+                getattr(settings, "embedding_dimensions", None)
+                or 3072
+            )
+            
             if not api_key:
                 raise ValueError("GEMINI_API_KEY not configured")
             self.provider = GeminiEmbeddingProvider(api_key, model, dimension)
         elif provider_name == "fake":
+            dimension = (
+                getattr(settings, "embedding_dimensions", None)
+                or 3072
+            )
             self.provider = FakeEmbeddingProvider(dimension)
         else:
             raise ValueError(f"Unknown embedding provider: {provider_name!r}")

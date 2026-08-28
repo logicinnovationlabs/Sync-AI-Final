@@ -7,6 +7,7 @@ and the actual secret lives only in Vault, fetched at runtime.
 Provides:
 - VaultClient interface (abstract)
 - AzureKeyVaultClient (real Azure Key Vault)
+- HashiCorpVaultClient (real HashiCorp Vault)
 - MockVaultClient (env-var backed for dev/test, no real Vault needed)
 
 The system auto-selects MockVaultClient if VAULT_URL is blank.
@@ -14,11 +15,14 @@ The system auto-selects MockVaultClient if VAULT_URL is blank.
 
 from abc import ABC, abstractmethod
 from typing import Optional
+import logging
 import os
 
 from app.core.backends import mock_backends_allowed
 from app.core.config import settings
 from app.core.exceptions import VaultError
+
+logger = logging.getLogger(__name__)
 
 
 class PlatformSecretKeys:
@@ -94,10 +98,42 @@ class VaultClient(ABC):
         ...
 
 
+def azure_secret_name(key_name: str) -> str:
+    """Map app key names (kv/tenant-id/db_password) to Azure secret names.
+
+    Azure allows only ``[0-9a-zA-Z-]``, 1–127 chars. Slashes and underscores
+    become hyphens. Callers still pass the original key name.
+    """
+    raw = (key_name or "").strip()
+    chars = [ch if ch.isalnum() or ch == "-" else "-" for ch in raw]
+    name = "".join(chars)
+    while "--" in name:
+        name = name.replace("--", "-")
+    name = name.strip("-")[:127].rstrip("-")
+    if not name:
+        raise VaultError("Azure secret name is empty after sanitizing key_name")
+    return name
+
+
+def _tenant_db_password_fallback(key_name: str) -> Optional[str]:
+    """When Azure has no tenant DB secret, reuse the control-plane DB_PASSWORD.
+
+    Hosted Supabase uses one database for control-plane and tenant rows, so the
+    Postgres password is already in settings.
+    """
+    if "db_password" not in (key_name or ""):
+        return None
+    password = (settings.db_password or "").strip()
+    if not password:
+        return None
+    logger.warning("Azure Key Vault miss for tenant DB password; using DB_PASSWORD")
+    return password
+
+
 class AzureKeyVaultClient(VaultClient):
     """
     Real Azure Key Vault client.
-    
+
     Requires VAULT_URL, VAULT_TENANT_ID, VAULT_CLIENT_ID, VAULT_CLIENT_SECRET.
     """
 
@@ -122,13 +158,13 @@ class AzureKeyVaultClient(VaultClient):
     async def get_secret(self, key_name: str) -> str:
         """
         Retrieve a secret from Azure Key Vault.
-        
+
         Args:
             key_name: Secret name in Key Vault (e.g., 'tenant-a-db-password')
-            
+
         Returns:
             Secret value.
-            
+
         Raises:
             VaultError if retrieval fails.
         """
@@ -136,38 +172,170 @@ class AzureKeyVaultClient(VaultClient):
             # Azure Key Vault requires synchronous calls; wrap in executor for async
             import asyncio
             loop = asyncio.get_event_loop()
-            secret = await loop.run_in_executor(None, self.client.get_secret, key_name)
+            secret = await loop.run_in_executor(
+                None, self.client.get_secret, azure_secret_name(key_name)
+            )
             return secret.value
         except Exception as e:
+            fallback = _tenant_db_password_fallback(key_name)
+            if fallback is not None:
+                return fallback
             raise VaultError(f"Failed to get secret '{key_name}': {e}")
 
     async def set_secret(self, key_name: str, secret_value: str) -> None:
         """
         Store a secret in Azure Key Vault.
-        
+
         Args:
             key_name: Secret name
             secret_value: Secret to store
-            
+
         Raises:
             VaultError if storage fails.
         """
         try:
             import asyncio
             loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, self.client.set_secret, key_name, secret_value)
+            await loop.run_in_executor(
+                None, self.client.set_secret, azure_secret_name(key_name), secret_value
+            )
         except Exception as e:
             raise VaultError(f"Failed to set secret '{key_name}': {e}")
 
     def get(self, key_name: str) -> str:
         try:
-            return self.client.get_secret(key_name).value
+            return self.client.get_secret(azure_secret_name(key_name)).value
         except Exception as e:
+            fallback = _tenant_db_password_fallback(key_name)
+            if fallback is not None:
+                return fallback
+            if mock_backends_allowed() and key_name in _OPTIONAL_DEV_SECRETS:
+                return ""
             raise VaultError(f"Failed to get secret '{key_name}': {e}")
 
     def set(self, key_name: str, value: str) -> None:
         try:
-            self.client.set_secret(key_name, value)
+            self.client.set_secret(azure_secret_name(key_name), value)
+        except Exception as e:
+            raise VaultError(f"Failed to set secret '{key_name}': {e}")
+
+
+class HashiCorpVaultClient(VaultClient):
+    """
+    Real HashiCorp Vault client (KV v2).
+
+    Requires VAULT_URL and VAULT_TOKEN.
+    Key names are used as-is (no sanitization needed - Vault treats slashes as path hierarchy).
+    """
+
+    def __init__(self, vault_url: str, token: str):
+        import hvac
+
+        self.vault_url = vault_url
+        self.token = token
+        self.client = hvac.Client(url=vault_url, token=token)
+
+    def _get_kv_path(self, key_name: str) -> str:
+        """
+        Convert key name to KV v2 path.
+        KV v2 uses secret/data/<path> for reads/writes.
+        """
+        # Strip leading 'kv/' if present to avoid double prefix
+        path = key_name
+        if path.startswith("kv/"):
+            path = path[3:]
+        return f"secret/data/{path}"
+
+    async def get_secret(self, key_name: str) -> str:
+        """
+        Retrieve a secret from HashiCorp Vault (KV v2).
+
+        Args:
+            key_name: Secret path (e.g., 'kv/tenantA/db_password')
+
+        Returns:
+            Secret value as a string.
+
+        Raises:
+            VaultError if retrieval fails.
+        """
+        try:
+            import asyncio
+            loop = asyncio.get_event_loop()
+            path = self._get_kv_path(key_name)
+            response = await loop.run_in_executor(None, self.client.secrets.kv.v2.read_secret_version, path)
+            # KV v2 returns data under response['data']['data']
+            secret_data = response['data']['data']
+            # If we stored with a 'value' key, return that
+            if 'value' in secret_data:
+                value = secret_data['value']
+                if isinstance(value, str):
+                    return value
+                return str(value) if value is not None else ""
+            # Otherwise, if there's only one key, return its value
+            if len(secret_data) == 1:
+                value = list(secret_data.values())[0]
+                if isinstance(value, str):
+                    return value
+                return str(value) if value is not None else ""
+            # If the secret was stored as a dict, return JSON string
+            import json
+            return json.dumps(secret_data)
+        except Exception as e:
+            fallback = _tenant_db_password_fallback(key_name)
+            if fallback is not None:
+                return fallback
+            raise VaultError(f"Failed to get secret '{key_name}': {e}")
+
+    async def set_secret(self, key_name: str, secret_value: str) -> None:
+        """
+        Store a secret in HashiCorp Vault (KV v2).
+
+        Args:
+            key_name: Secret path
+            secret_value: Secret to store
+
+        Raises:
+            VaultError if storage fails.
+        """
+        try:
+            import asyncio
+            loop = asyncio.get_event_loop()
+            path = self._get_kv_path(key_name)
+            # KV v2 expects secret data as a dict
+            await loop.run_in_executor(
+                None,
+                self.client.secrets.kv.v2.create_or_update_secret,
+                path,
+                {'value': secret_value}
+            )
+        except Exception as e:
+            raise VaultError(f"Failed to set secret '{key_name}': {e}")
+
+    def get(self, key_name: str) -> str:
+        try:
+            path = self._get_kv_path(key_name)
+            response = self.client.secrets.kv.v2.read_secret_version(path)
+            secret_data = response['data']['data']
+            if 'value' in secret_data:
+                return secret_data['value']
+            import json
+            return json.dumps(secret_data)
+        except Exception as e:
+            fallback = _tenant_db_password_fallback(key_name)
+            if fallback is not None:
+                return fallback
+            if mock_backends_allowed() and key_name in _OPTIONAL_DEV_SECRETS:
+                return ""
+            raise VaultError(f"Failed to get secret '{key_name}': {e}")
+
+    def set(self, key_name: str, value: str) -> None:
+        try:
+            path = self._get_kv_path(key_name)
+            self.client.secrets.kv.v2.create_or_update_secret(
+                path,
+                {'value': value}
+            )
         except Exception as e:
             raise VaultError(f"Failed to set secret '{key_name}': {e}")
 
@@ -203,7 +371,7 @@ class MockVaultClient(VaultClient):
             return boot
         if settings.environment in ("development", "test") and "db_password" in key_name:
             if mock_backends_allowed():
-                return "postgres"
+                return (settings.db_password or "postgres")
         if mock_backends_allowed() and key_name in _OPTIONAL_DEV_SECRETS:
             return ""
         raise VaultError(
@@ -230,31 +398,51 @@ class MockVaultClient(VaultClient):
 def get_vault_client() -> VaultClient:
     """
     Factory function to get the appropriate VaultClient.
-    
+
     Returns:
-        AzureKeyVaultClient if VAULT_URL is set, otherwise MockVaultClient.
+        HashiCorpVaultClient if VAULT_PROVIDER=hashicorp and VAULT_URL is set
+        AzureKeyVaultClient if VAULT_PROVIDER=azure and VAULT_URL is set
+        MockVaultClient if VAULT_URL is not set
     """
     if settings.vault_url:
-        # Real Azure Key Vault
-        if not all([
-            settings.vault_tenant_id,
-            settings.vault_client_id,
-            settings.vault_client_secret,
-        ]):
-            raise VaultError(
-                "VAULT_URL is set but missing VAULT_TENANT_ID, VAULT_CLIENT_ID, or VAULT_CLIENT_SECRET"
+        provider = (settings.vault_provider or "azure").lower()
+
+        if provider == "hashicorp":
+            if not settings.vault_token:
+                raise VaultError(
+                    "VAULT_PROVIDER=hashicorp requires VAULT_TOKEN to be set"
+                )
+            logger.info("Vault client: HashiCorpVaultClient")
+            return HashiCorpVaultClient(
+                vault_url=settings.vault_url,
+                token=settings.vault_token,
             )
-        return AzureKeyVaultClient(
-            vault_url=settings.vault_url,
-            tenant_id=settings.vault_tenant_id,
-            client_id=settings.vault_client_id,
-            client_secret=settings.vault_client_secret,
-        )
+        elif provider == "azure":
+            if not all([
+                settings.vault_tenant_id,
+                settings.vault_client_id,
+                settings.vault_client_secret,
+            ]):
+                raise VaultError(
+                    "VAULT_PROVIDER=azure requires VAULT_TENANT_ID, VAULT_CLIENT_ID, and VAULT_CLIENT_SECRET"
+                )
+            logger.info("Vault client: AzureKeyVaultClient")
+            return AzureKeyVaultClient(
+                vault_url=settings.vault_url,
+                tenant_id=settings.vault_tenant_id,
+                client_id=settings.vault_client_id,
+                client_secret=settings.vault_client_secret,
+            )
+        else:
+            raise VaultError(
+                f"Unknown VAULT_PROVIDER: {provider}. Must be 'azure' or 'hashicorp'."
+            )
     else:
         if not mock_backends_allowed():
             raise VaultError(
                 "VAULT_URL is not configured; MockVaultClient is not allowed outside development/test"
             )
+        logger.info("Vault client: MockVaultClient")
         return MockVaultClient()
 
 

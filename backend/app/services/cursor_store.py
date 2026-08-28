@@ -258,6 +258,20 @@ class CursorStore:
             
             return None
     
+    async def list_tenants_with_cursor(self, source_type: str) -> List[str]:
+        """Tenant ids that have a resume cursor for this source (poll fallback)."""
+        async with ControlPlaneSessionLocal() as session:
+            result = await session.execute(
+                select(SyncCursor.tenant_id).where(
+                    and_(
+                        SyncCursor.source_type == source_type,
+                        SyncCursor.cursor.is_not(None),
+                        SyncCursor.cursor != "",
+                    )
+                )
+            )
+            return [str(row[0]) for row in result.fetchall()]
+
     async def get_expiring_watches(
         self,
         hours: int = 48,

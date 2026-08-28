@@ -36,10 +36,13 @@ async function exchangeRefreshToken(): Promise<string | null> {
   refreshInFlight = (async () => {
     const { refreshToken, email } = useAuthStore.getState()
     if (!refreshToken) return null
-    const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    const formData = new URLSearchParams()
+    formData.append("grant_type", "refresh_token")
+    formData.append("refresh_token", refreshToken)
+    const res = await fetch(`${API_BASE_URL}/oauth/token`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh_token: refreshToken }),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: formData,
     })
     if (!res.ok) {
       useAuthStore.getState().clearSession()

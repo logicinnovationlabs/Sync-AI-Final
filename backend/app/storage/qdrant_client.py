@@ -185,6 +185,75 @@ class QdrantClient:
             logger.error(f"Failed to upsert documents to Qdrant: {e}")
             raise
     
+    async def get_document_payload(
+        self,
+        tenant_id: str,
+        doc_id: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Load one indexed document by logical id, scoped to tenant.
+
+        Point IDs are uuid5(doc_id) when the source id is not a UUID, so retrieve
+        is tried first; payload ``id`` / ``document_id`` is the fallback.
+        """
+        if not tenant_id or not doc_id:
+            return None
+        tenant = str(tenant_id)
+        logical_id = str(doc_id)
+
+        def _tenant_payload(payload: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+            if not payload:
+                return None
+            if str(payload.get("tenant_id") or "") != tenant:
+                return None
+            return payload
+
+        try:
+            records = self.client.retrieve(
+                collection_name=self.collection_name,
+                ids=[_to_qdrant_id(logical_id)],
+                with_payload=True,
+                with_vectors=False,
+            )
+            for rec in records or []:
+                hit = _tenant_payload(rec.payload)
+                if hit is not None:
+                    return hit
+        except Exception as exc:
+            logger.warning("Qdrant retrieve failed id=%s: %s", logical_id, exc)
+
+        for field in ("id", "document_id"):
+            try:
+                points, _ = self.client.scroll(
+                    collection_name=self.collection_name,
+                    scroll_filter=Filter(
+                        must=[
+                            FieldCondition(
+                                key="tenant_id",
+                                match=MatchValue(value=tenant),
+                            ),
+                            FieldCondition(
+                                key=field,
+                                match=MatchValue(value=logical_id),
+                            ),
+                        ]
+                    ),
+                    limit=1,
+                    with_payload=True,
+                    with_vectors=False,
+                )
+                if points:
+                    hit = _tenant_payload(points[0].payload)
+                    if hit is not None:
+                        return hit
+            except Exception as exc:
+                logger.warning(
+                    "Qdrant scroll failed field=%s id=%s: %s",
+                    field,
+                    logical_id,
+                    exc,
+                )
+        return None
+
     async def delete_by_ids(
         self,
         ids: List[str],

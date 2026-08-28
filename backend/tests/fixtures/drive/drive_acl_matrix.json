@@ -1,0 +1,107 @@
+{
+  "version": "1.0",
+  "description": "Drive-mirrored permission test fixtures for Gmail-Mirrored Drive Permission Architecture signoff",
+  "documents": [
+    {
+      "document_id": "drive-doc-001",
+      "title": "Project Proposal",
+      "owner": "alice@example.com",
+      "drive_shares": [
+        {"emailAddress": "bob@example.com", "role": "writer"},
+        {"emailAddress": "carol@example.com", "role": "reader"}
+      ]
+    },
+    {
+      "document_id": "drive-doc-002",
+      "title": "Financial Report",
+      "owner": "alice@example.com",
+      "drive_shares": [
+        {"emailAddress": "dave@example.com", "role": "reader"}
+      ]
+    },
+    {
+      "document_id": "drive-doc-003",
+      "title": "Engineering Specs",
+      "owner": "bob@example.com",
+      "drive_shares": [
+        {"emailAddress": "alice@example.com", "role": "writer"},
+        {"emailAddress": "eve@example.com", "role": "reader"}
+      ]
+    },
+    {
+      "document_id": "drive-doc-004",
+      "title": "HR Confidential",
+      "owner": "alice@example.com",
+      "drive_shares": []
+    },
+    {
+      "document_id": "drive-doc-005",
+      "title": "Team Meeting Notes",
+      "owner": "carol@example.com",
+      "drive_shares": [
+        {"emailAddress": "alice@example.com", "role": "writer"},
+        {"emailAddress": "bob@example.com", "role": "writer"}
+      ]
+    }
+  ],
+  "share_changes": [
+    {
+      "case_id": "share-add-001",
+      "description": "Add share to existing document",
+      "document_id": "drive-doc-001",
+      "change_type": "add",
+      "emailAddress": "dave@example.com",
+      "role": "reader",
+      "expected_acl_entries": [
+        {"principal_id": "user:dave@example.com", "permission": "reader"}
+      ]
+    },
+    {
+      "case_id": "share-remove-001",
+      "description": "Remove share from document",
+      "document_id": "drive-doc-001",
+      "change_type": "remove",
+      "emailAddress": "dave@example.com",
+      "role": "reader",
+      "expected_acl_entries": [],
+      "expected_removed_principal": "user:dave@example.com"
+    },
+    {
+      "case_id": "share-readd-001",
+      "description": "Re-add previously removed share",
+      "document_id": "drive-doc-001",
+      "change_type": "add",
+      "emailAddress": "dave@example.com",
+      "role": "reader",
+      "expected_acl_entries": [
+        {"principal_id": "user:dave@example.com", "permission": "reader"}
+      ]
+    }
+  ],
+  "identity_cases": [
+    {
+      "case_id": "identity-exact-match",
+      "description": "Exact email match to existing user",
+      "drive_email": "alice@example.com",
+      "expected_principal_id": "user:alice@example.com",
+      "expected_resolution": "matched"
+    },
+    {
+      "case_id": "identity-no-match",
+      "description": "Unmatched email should queue for resolution",
+      "drive_email": "external-user@external-domain.com",
+      "expected_principal_id": null,
+      "expected_resolution": "queued"
+    }
+  ],
+  "revocation_cases": [
+    {
+      "case_id": "revocation-immediate",
+      "description": "Immediate revocation of access",
+      "document_id": "drive-doc-002",
+      "user_email": "dave@example.com",
+      "revocation_type": "unshare",
+      "expected_denial_within_seconds": 900
+    }
+  ]
+}

@@ -62,23 +62,26 @@ async def change_password(
     tenant_id = tenant_routing.tenant_id
     
     # Get tenant database session
-    async for db_session in tenant_db_manager.get_session(
+    factory = tenant_db_manager.get_session_factory(
         tenant_routing.db_host,
         tenant_routing.db_name,
         tenant_routing.db_user,
         tenant_routing.db_password,
         tenant_id,
-    ):
-        try:
-            await native_auth_service.change_password(
-                user_id=principal_id,
-                old_password=request.old_password,
-                new_password=request.new_password,
-                db_session=db_session,
-            )
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        except Exception as e:
-            raise HTTPException(status_code=401, detail=str(e))
-        
-        return {"message": "Password changed successfully"}
+    )
+    db_session = factory()
+    try:
+        await native_auth_service.change_password(
+            user_id=principal_id,
+            old_password=request.old_password,
+            new_password=request.new_password,
+            db_session=db_session,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    finally:
+        await db_session.close()
+    
+    return {"message": "Password changed successfully"}

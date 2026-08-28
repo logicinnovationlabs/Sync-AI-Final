@@ -10,7 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, create_async_engin
 from app.core.config import settings
 from app.storage.pg_connect import connect_args_for_url
 
-_connect_args = connect_args_for_url(settings.control_plane_database_url)
+# Local Docker Postgres needs ssl=False (Windows asyncpg hangs otherwise).
+# Hosted Supabase requires TLS even when ENVIRONMENT=development.
+# pg_connect.connect_args_for_url encodes that split (ssl=False local, TLS cloud).
+_connect_args = connect_args_for_url(settings.control_plane_database_url or "")
 
 # Control-plane engine (for tenants table only)
 control_plane_engine: AsyncEngine = create_async_engine(
