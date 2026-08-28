@@ -118,16 +118,20 @@ class PostgresACLChecker:
             logger.error("ACL tenant routing failed: %s", exc)
             return False
 
-        async for session in tenant_db_manager.get_session(
+        factory = tenant_db_manager.get_session_factory(
             routing.db_host,
             routing.db_name,
             routing.db_user,
             routing.db_password,
             str(routing.tenant_id),
-        ):
+        )
+        session = factory()
+        try:
             live_repo = CanonicalRepo(use_memory=False, session=session)
-            return await live_repo.principal_can_read_document(tenant, principal, doc_id)
-        return False
+            result = await live_repo.principal_can_read_document(tenant, principal, doc_id)
+            return result
+        finally:
+            await session.close()
 
 
 async def check_acl(

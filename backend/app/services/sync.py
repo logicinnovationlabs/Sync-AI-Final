@@ -144,7 +144,8 @@ class SyncOrchestrator:
                 break
 
             if result.documents:
-                _publish_raw_page(tenant_id, connector.source_type, result.documents)
+                connection_scope = str((config or {}).get("connection_scope") or "personal")
+                _publish_raw_page(tenant_id, connector.source_type, result.documents, connection_scope)
                 # Transform to UnifiedDocument (Block B contract)
                 docs = await connector.transform(result.documents)
                 try:
@@ -315,7 +316,8 @@ class SyncOrchestrator:
 
                 page_ids: List[str] = []
                 if hasattr(delta_res, "documents") and delta_res.documents:
-                    _publish_raw_page(tenant_id, connector.source_type, delta_res.documents)
+                    connection_scope = str((connector.config or {}).get("connection_scope") or "personal")
+                    _publish_raw_page(tenant_id, connector.source_type, delta_res.documents, connection_scope)
                     docs = await connector.transform(delta_res.documents)
                     try:
                         from app.connectors.google.pipeline_bridge import process_raw_batch
@@ -413,11 +415,11 @@ def _acl_from_config(config: Optional[dict]) -> List[str]:
     return terms
 
 
-def _publish_raw_page(tenant_id: str, source_type: str, documents: List) -> None:
+def _publish_raw_page(tenant_id: str, source_type: str, documents: List, connection_scope: str = "personal") -> None:
     try:
         from app.services.ingest.publisher import publish_google_item
 
-        instance_id = google_credential_ref(tenant_id)
+        instance_id = google_credential_ref(tenant_id, connection_scope=connection_scope)
         for item in documents:
             publish_google_item(
                 tenant_id=tenant_id,

@@ -265,16 +265,19 @@ class Indexer:
             logger.exception("delete ACL routing failed tenant_id=%s", tenant_id)
             raise
 
-        async for session in tenant_db_manager.get_session(
+        factory = tenant_db_manager.get_session_factory(
             routing.db_host,
             routing.db_name,
             routing.db_user,
             routing.db_password,
             str(routing.tenant_id),
-        ):
+        )
+        session = factory()
+        try:
             repo = CanonicalRepo(use_memory=False, session=session)
             await repo.delete_documents_and_acls(document_ids, tenant_uuid)
-            return
+        finally:
+            await session.close()
         
     async def reindex_by_ids(
         self,
