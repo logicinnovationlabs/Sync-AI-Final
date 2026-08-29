@@ -404,13 +404,22 @@ def get_vault_client() -> VaultClient:
     Returns:
         HashiCorpVaultClient if VAULT_PROVIDER=hashicorp and VAULT_URL is set
         AzureKeyVaultClient if VAULT_PROVIDER=azure and VAULT_URL is set
-        MockVaultClient if VAULT_URL is not set
+        MockVaultClient if VAULT_URL is not set, or if vault credentials are
+        incomplete while ENVIRONMENT is development/test (fail open for deploys
+        that still carry leftover VAULT_* vars).
     """
     if settings.vault_url:
-        provider = (settings.vault_provider or "azure").lower()
+        provider = (settings.vault_provider or "azure").lower().strip()
 
         if provider == "hashicorp":
             if not settings.vault_token:
+                if mock_backends_allowed():
+                    logger.warning(
+                        "VAULT_PROVIDER=hashicorp but VAULT_TOKEN is missing; "
+                        "using MockVaultClient (ENVIRONMENT=%s)",
+                        settings.environment,
+                    )
+                    return MockVaultClient()
                 raise VaultError(
                     "VAULT_PROVIDER=hashicorp requires VAULT_TOKEN to be set"
                 )
@@ -420,13 +429,25 @@ def get_vault_client() -> VaultClient:
                 token=settings.vault_token,
             )
         elif provider == "azure":
-            if not all([
-                settings.vault_tenant_id,
-                settings.vault_client_id,
-                settings.vault_client_secret,
-            ]):
+            if not all(
+                [
+                    settings.vault_tenant_id,
+                    settings.vault_client_id,
+                    settings.vault_client_secret,
+                ]
+            ):
+                if mock_backends_allowed():
+                    logger.warning(
+                        "VAULT_PROVIDER=azure but Azure credentials are incomplete; "
+                        "using MockVaultClient (ENVIRONMENT=%s). "
+                        "Clear VAULT_URL / VAULT_PROVIDER or set "
+                        "VAULT_TENANT_ID, VAULT_CLIENT_ID, VAULT_CLIENT_SECRET.",
+                        settings.environment,
+                    )
+                    return MockVaultClient()
                 raise VaultError(
-                    "VAULT_PROVIDER=azure requires VAULT_TENANT_ID, VAULT_CLIENT_ID, and VAULT_CLIENT_SECRET"
+                    "VAULT_PROVIDER=azure requires VAULT_TENANT_ID, "
+                    "VAULT_CLIENT_ID, and VAULT_CLIENT_SECRET"
                 )
             logger.info("Vault client: AzureKeyVaultClient")
             return AzureKeyVaultClient(
@@ -436,13 +457,22 @@ def get_vault_client() -> VaultClient:
                 client_secret=settings.vault_client_secret,
             )
         else:
+            if mock_backends_allowed():
+                logger.warning(
+                    "Unknown VAULT_PROVIDER=%r; using MockVaultClient "
+                    "(ENVIRONMENT=%s)",
+                    provider,
+                    settings.environment,
+                )
+                return MockVaultClient()
             raise VaultError(
                 f"Unknown VAULT_PROVIDER: {provider}. Must be 'azure' or 'hashicorp'."
             )
     else:
         if not mock_backends_allowed():
             raise VaultError(
-                "VAULT_URL is not configured; MockVaultClient is not allowed outside development/test"
+                "VAULT_URL is not configured; MockVaultClient is not allowed "
+                "outside development/test"
             )
         logger.info("Vault client: MockVaultClient")
         return MockVaultClient()
