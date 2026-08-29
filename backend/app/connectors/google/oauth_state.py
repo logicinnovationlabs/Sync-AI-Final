@@ -104,13 +104,19 @@ def decode_oauth_state(state: str) -> Optional[Dict[str, Any]]:
     return payload
 
 
-def frontend_connectors_redirect(status: str, error: Optional[str] = None) -> str:
-    """Redirect URL after Google OAuth callback."""
+def frontend_connectors_redirect(
+    status: str,
+    error: Optional[str] = None,
+    *,
+    provider: str = "google",
+) -> str:
+    """Redirect URL after OAuth callback."""
     base = (
         getattr(settings, "frontend_url", None)
         or "http://localhost:3000"
     ).rstrip("/")
-    url = f"{base}/connectors?google={quote(status)}"
+    key = "microsoft" if provider == "microsoft" else "google"
+    url = f"{base}/connectors?{key}={quote(status)}"
     if error:
         url += f"&error={quote(error)}"
     return url

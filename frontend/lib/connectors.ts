@@ -49,9 +49,9 @@ export const CONNECTORS: ConnectorMeta[] = [
     description: "Mail and files from Microsoft 365, kept in sync.",
     connectionModel: "oauth",
     handshake: "OAuth consent",
-    cadence: "Polled every ~3 min",
+    cadence: "Webhook on change",
     icon: Mail,
-    available: false,
+    available: true,
   },
   {
     source: "whatsapp",

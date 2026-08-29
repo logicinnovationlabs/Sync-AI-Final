@@ -26,6 +26,7 @@ class OrchestratorRequest(BaseModel):
     prompt: str
     attachments: List[BlobRef] = Field(default_factory=list)
     account_email: Optional[str] = None
+    connector_summary: Optional[str] = None
 
 
 class ToolName(str, Enum):

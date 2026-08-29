@@ -34,9 +34,9 @@ from app.api.v1.search import federated as federated_search
 from app.services.assistant.api import routes as assistant_routes
 from app.api.v1 import document as document_routes
 from app.services.mcp_gateway import router as mcp_gateway_router
-from app.connectors.google.webhooks import router as webhooks_router
 from app.connectors.router import router as connectors_router
 from app.connectors.org import router as connectors_org_router
+from app.connectors import provider_registry
 
 from app.middleware.tenant_middleware import TenantMiddleware
 from app.middleware.http_metrics import HttpMetricsMiddleware
@@ -184,8 +184,16 @@ _include_product_and_legacy(admin_router, tags=["admin"])
 app.include_router(tenant_bootstrap_router, prefix="/admin", tags=["admin"])
 _include_product_and_legacy(connectors_router)
 _include_product_and_legacy(connectors_org_router)
+# Legacy + webhook routes declared by provider plugins (e.g. /outlook/callback)
+for _plugin in provider_registry.all_plugins():
+    for path, endpoint, methods in _plugin.legacy_routes or ():
+        app.add_api_route(
+            path, endpoint, methods=list(methods), include_in_schema=False
+        )
 _include_product_and_legacy(scoped_probes.router)
-_include_product_and_legacy(webhooks_router)
+for _plugin in provider_registry.all_plugins():
+    if _plugin.webhook_router is not None:
+        _include_product_and_legacy(_plugin.webhook_router)
 _include_product_and_legacy(identity_routes.router)
 _include_product_and_legacy(acl_routes.router)
 _include_product_and_legacy(embed.router, tags=["embeddings"])

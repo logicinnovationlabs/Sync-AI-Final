@@ -324,6 +324,31 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("WEBHOOK_BASE_URL", "webhook_base_url"),
     )
 
+    microsoft_client_id: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("MICROSOFT_CLIENT_ID", "microsoft_client_id"),
+    )
+    microsoft_client_secret: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "MICROSOFT_CLIENT_SECRET", "microsoft_client_secret"
+        ),
+    )
+    microsoft_tenant: Optional[str] = Field(
+        default="common",
+        validation_alias=AliasChoices("MICROSOFT_TENANT", "microsoft_tenant"),
+    )
+    microsoft_redirect_uri: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "MICROSOFT_REDIRECT_URI", "microsoft_redirect_uri"
+        ),
+    )
+    webhook_base_url: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("WEBHOOK_BASE_URL", "webhook_base_url"),
+    )
+
     qdrant_api_key: Optional[str] = Field(default=None)
     gemini_api_key: Optional[str] = Field(default=None)
     embedding_dimension: int = Field(

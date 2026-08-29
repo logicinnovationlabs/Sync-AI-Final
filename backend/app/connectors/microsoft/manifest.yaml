@@ -1,0 +1,35 @@
+source_type: microsoft
+display_name: "Microsoft 365"
+auth_type: oauth2
+oauth_scopes:
+  - offline_access
+  - openid
+  - profile
+  - email
+  - User.Read
+  - Files.Read
+  - Files.Read.All
+  - Mail.Read
+services:
+  onedrive:
+    display_name: "OneDrive"
+    supports_deletion_detection: true
+    push_mechanism: graph_subscription
+    allowed_metadata_keys:
+      - mime_type
+      - file_extension
+      - size_bytes
+      - web_url
+      - parent_path
+      - created_by
+  outlook:
+    display_name: "Outlook"
+    supports_deletion_detection: true
+    push_mechanism: graph_subscription
+    allowed_metadata_keys:
+      - from_email
+      - to_emails
+      - conversation_id
+      - has_attachments
+      - importance
+      - received_at

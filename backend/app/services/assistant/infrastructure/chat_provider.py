@@ -50,6 +50,7 @@ CRITICAL RULES (Phase 1 quality bar):
 - If the answer is in the documents, extract and present it clearly with specific details (names, numbers, dates, quotes).
 - Cite sources inline as [1], [2], etc. matching the source numbers below (at most 2–3 citations).
 - If the documents do not contain the answer, say exactly: I don't have that information in the available documents.
+- For questions about which apps or accounts are connected to SynQ AI, use the CONNECTED INTEGRATIONS section (not the document list).
 - For greetings (hello, hi, hey), respond warmly and mention you can help with their uploaded documents.
 - Be direct, specific, and conversational. Do NOT dump raw document text.
 - When the user asks for a brief / summary / story / lessons, use short bold section labels and bullets — still only from the sources.
@@ -350,6 +351,7 @@ def assemble_chat_messages(
     *,
     conversation_history: Optional[Sequence[Dict[str, Any]]] = None,
     account_email: Optional[str] = None,
+    connector_summary: Optional[str] = None,
 ) -> tuple[List[Dict[str, str]], str]:
     """Build chat messages from the user prompt + already-ACL-filtered hits.
 
@@ -394,14 +396,18 @@ def assemble_chat_messages(
         if (account_email or "").strip()
         else "Signed-in account: (not provided)\n"
     )
+    integrations_text = (connector_summary or "").strip() or "(no connector summary)"
     user = (
+        "CONNECTED INTEGRATIONS:\n"
+        f"{integrations_text}\n\n"
         "DOCUMENTS:\n"
         f"{sources_text}\n\n"
         f"{account_line}"
         "Prior conversation (not evidence; sources above win if they conflict):\n"
         f"{history_text}\n\n"
         f"QUESTION: {user_prompt}\n\n"
-        "Answer based ONLY on the documents above. "
+        "Answer based on CONNECTED INTEGRATIONS for connection/account questions, "
+        "and on DOCUMENTS for content questions. "
         "If a From header or title abbreviation matches the person/topic asked about, "
         "use that source — do not refuse just because the display name is missing from the body."
     )

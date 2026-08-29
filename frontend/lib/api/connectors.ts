@@ -6,7 +6,11 @@ import { apiFetch } from "@/lib/api/client"
  * Google Workspace is two source types, `google_drive` and `google_gmail`.
  */
 
-export type BackendSourceType = "google_drive" | "google_gmail"
+export type BackendSourceType =
+  | "google_drive"
+  | "google_gmail"
+  | "onedrive"
+  | "outlook"
 
 export interface ConnectorStatus {
   tenant_id: string
@@ -119,6 +123,12 @@ export function toggleOrganizationConnector(token: string, request: Organization
 
 export function getOrganizationConnectorStatus(token: string, sourceType: BackendSourceType) {
   return apiFetch<ConnectorStatus>(`/api/v1/connectors/google/organization/status?source_type=${sourceType}`, {
+    token,
+  })
+}
+
+export function getMicrosoftAuthorizeUrl(token: string) {
+  return apiFetch<GoogleAuthorizeResponse>("/connectors/microsoft/authorize", {
     token,
   })
 }

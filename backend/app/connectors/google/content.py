@@ -6,7 +6,6 @@ so Block C's GoogleDriveNormalizer can consume it without owning API calls.
 """
 
 from __future__ import annotations
-
 import logging
 from typing import Any, Dict, Optional
 
@@ -23,8 +22,8 @@ GOOGLE_EXPORT_MAP = {
     "application/vnd.google-apps.presentation": "text/plain",
 }
 
-MAX_DOWNLOAD_BYTES = 15 * 1024 * 1024
-
+MAX_DOWNLOAD_BYTES = 40 * 1024 * 1024
+    
 
 async def extract_drive_text(
     drive_client,
@@ -54,8 +53,18 @@ async def extract_drive_text(
 
         blob = await drive_client.download_file(access_token, file_id)
         if not blob:
+            logger.warning("Drive download empty for %s (%s)", file_id, name)
             return name
-        return await _extract_binary(blob, mime, file_obj.get("fileExtension"))
+        text = await _extract_binary(blob, mime, file_obj.get("fileExtension"))
+        if not (text or "").strip() or (text or "").strip() == (name or "").strip():
+            logger.warning(
+                "Drive text extract produced no body for %s mime=%s size=%s name=%s",
+                file_id,
+                mime,
+                size or len(blob),
+                name,
+            )
+        return text or ""
     except Exception as exc:
         logger.warning("Drive content extract failed for %s: %s", file_id, type(exc).__name__)
         return name
@@ -64,10 +73,10 @@ async def extract_drive_text(
 async def _extract_binary(content_bytes: bytes, mime_type: str, file_extension: Optional[str]) -> str:
     """Route binary bytes through Block E's TextExtractor when possible."""
     try:
-        from app.normalizer.ocr import FakeOCRService
+        from app.normalizer.ocr import OCRService
         from app.normalizer.text_extractor import TextExtractor
 
-        extractor = TextExtractor(FakeOCRService(), max_chars=500_000)
+        extractor = TextExtractor(OCRService(), max_chars=500_000)
         text = await extractor.extract(content_bytes, mime_type, file_extension)
         return text or ""
     except Exception as exc:

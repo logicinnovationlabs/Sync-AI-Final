@@ -81,7 +81,7 @@ export const DEMO_ANSWERS: DemoAnswer[] = [
       },
       {
         n: 3,
-        source: "google",
+        source: "google_personal",
         title: "INV-2026-0334.pdf",
         snippet: "Net 30 · due 04 Mar · ₹1,12,000",
         meta: "Drive · 3 min ago",
@@ -111,14 +111,14 @@ export const DEMO_ANSWERS: DemoAnswer[] = [
     sources: [
       {
         n: 1,
-        source: "google",
+        source: "google_personal",
         title: "Kalyani — Quotation v1.docx",
         snippet: "400 units @ ₹2,100 · freight extra · valid 30 days",
         meta: "Drive · 14 Jan",
       },
       {
         n: 2,
-        source: "google",
+        source: "google_personal",
         title: "Re: Revised pricing — Kalyani",
         snippet: "“we can absorb freight and hold at ₹7,95,000”",
         meta: "Gmail · 22 Jan",
@@ -160,7 +160,7 @@ export const DEMO_ANSWERS: DemoAnswer[] = [
       },
       {
         n: 2,
-        source: "google",
+        source: "google_personal",
         title: "INV-2026-0347.pdf",
         snippet: "Buyer GSTIN field blank · place of supply not set",
         meta: "Drive · 18 Mar",

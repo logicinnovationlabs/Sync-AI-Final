@@ -24,6 +24,7 @@ from app.models.user import User
 from app.acl.filter import acl_terms_from_jwt, is_fail_closed
 from app.services.assistant.core.graph import OrchestratorGraph, default_acl_from_claims
 from app.services.assistant.domain.models import BlobRef, OrchestratorRequest
+from app.services.assistant.infrastructure.connector_context import build_connector_summary
 from app.services.assistant.infrastructure.memory_store import EpisodicMemoryStore
 from app.services.assistant.infrastructure.tools import SearchToolbox
 
@@ -156,6 +157,8 @@ async def orchestrator_chat(
         except Exception:
             account_email = None
 
+    connector_summary = await build_connector_summary(tenant_id, user_id)
+
     orch_request = OrchestratorRequest(
         tenant_id=tenant_id,
         user_id=user_id,
@@ -163,6 +166,7 @@ async def orchestrator_chat(
         prompt=body.prompt,
         attachments=body.attachments,
         account_email=str(account_email or "") or None,
+        connector_summary=connector_summary,
     )
     authorization = request.headers.get("Authorization")
 

@@ -539,6 +539,7 @@ class OrchestratorGraph:
             hits,
             conversation_history=history,
             account_email=str(req.get("account_email") or "") or None,
+            connector_summary=str(req.get("connector_summary") or "") or None,
         )
         record_prompt(
             {

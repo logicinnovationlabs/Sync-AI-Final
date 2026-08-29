@@ -49,8 +49,22 @@ celery_app.conf.update(
         "app.workers.tasks.poll_gmail_pubsub": {"queue": "google"},
         "app.workers.tasks.renew_watch_channels": {"queue": "google"},
         "app.workers.tasks.google_queue_ping": {"queue": "google"},
+        "app.workers.tasks.process_connector_notification": {"queue": "microsoft"},
+        "app.workers.tasks.process_onedrive_notification": {"queue": "microsoft"},
+        "app.workers.tasks.process_outlook_notification": {"queue": "microsoft"},
     },
 )
+
+# Merge any extra routes declared on provider plugins (future connectors).
+try:
+    from app.connectors import provider_registry as _provider_registry
+
+    celery_app.conf.task_routes = {
+        **dict(celery_app.conf.task_routes or {}),
+        **_provider_registry.celery_task_routes(),
+    }
+except Exception:
+    pass
 
 # Test mode: synchronous execution
 import os

@@ -104,6 +104,11 @@ cd SnyQ_Phase_2
 git checkout main
 ```
 
+**Do not share this project as a zip of your working folder.** That bypasses
+`.gitignore` and can leak `.env*` and `backend/keys/*.pem`. Use `git clone`,
+or `scripts/package-safe-archive.ps1` / `scripts/package-safe-archive.sh`.
+See [docs/SECURITY_SECRET_ROTATION.md](docs/SECURITY_SECRET_ROTATION.md).
+
 ### Step 2: Configure Environment
 
 ```bash

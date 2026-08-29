@@ -4,6 +4,12 @@ Modern, scalable search and knowledge management platform built with FastAPI, fe
 
 ## 🚀 Quick Start for Developers
 
+**Sharing code:** use `git clone` / a branch — never zip the working tree
+(`.env*` and JWT PEMs are gitignored but still sit on disk). Safe archive:
+`scripts/package-safe-archive.ps1` or `scripts/package-safe-archive.sh`.
+If a raw zip was already shared, rotate secrets per
+[docs/SECURITY_SECRET_ROTATION.md](docs/SECURITY_SECRET_ROTATION.md).
+
 ### 1. First Time Setup
 ```bash
 # See detailed instructions in DEVELOPER_SETUP.md

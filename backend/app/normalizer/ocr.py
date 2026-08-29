@@ -37,9 +37,12 @@ class OCRService:
         # Set tesseract path if provided
         if tesseract_path:
             import pytesseract
-            pytesseract.pytesseract.tesseract_cmd = tesseract_path
-    
-    def extract_text(self, image_bytes: bytes) -> str:
+            pytesseract.pytesseract.tesseract_cmd = tesseract_path 
+    def extract_text(
+        self,
+        image_bytes: bytes,
+        fixture_key: Optional[str] = None,
+    ) -> str:
         """
         Extract text from image bytes using OCR.
         
@@ -47,10 +50,12 @@ class OCRService:
         
         Args:
             image_bytes: Raw image bytes
+            fixture_key: Ignored (accepted for FakeOCRService API parity)
             
         Returns:
             Extracted text (may be empty on timeout or failure)
         """
+        _ = fixture_key
         try:
             import pytesseract
             import signal

@@ -12,6 +12,7 @@ import {
   disconnectOrganizationConnector,
   getConnectorStatus,
   getGoogleAuthorizeUrl,
+  getMicrosoftAuthorizeUrl,
   getOrganizationConnectorStatus,
   triggerOrganizationBackfill,
   triggerBackfill,
@@ -50,6 +51,11 @@ const GOOGLE_SOURCES: { id: BackendSourceType; label: string }[] = [
 const GOOGLE_ORGANIZATION_SOURCES: { id: BackendSourceType; label: string }[] = [
   { id: "google_drive", label: "Drive" },
   { id: "google_gmail", label: "Gmail" },
+]
+
+const MICROSOFT_SOURCES: { id: BackendSourceType; label: string }[] = [
+  { id: "onedrive", label: "OneDrive" },
+  { id: "outlook", label: "Outlook" },
 ]
 
 function sourceIsLinked(status: ConnectorStatus | undefined): boolean {
@@ -348,7 +354,9 @@ export function ConnectorCard({
   const queryClient = useQueryClient()
   const isGooglePersonal = connector.source === "google_personal"
   const isGoogleOrganization = connector.source === "google_organization"
+  const isMicrosoft = connector.source === "outlook"
   const googleLive = (isGooglePersonal || isGoogleOrganization) && connector.available
+  const microsoftLive = isMicrosoft && connector.available
 
   // Personal Google status queries
   const driveStatus = useQuery({
@@ -402,12 +410,36 @@ export function ConnectorCard({
     },
   })
 
+  const authorizeMicrosoft = useMutation({
+    mutationFn: () => getMicrosoftAuthorizeUrl(token!),
+    onSuccess: (data) => {
+      if (data.authorization_url) window.location.href = data.authorization_url
+    },
+  })
+
+  const onedriveStatus = useQuery({
+    queryKey: ["connector-status", "onedrive"],
+    queryFn: () => getConnectorStatus(token!, "onedrive"),
+    enabled: microsoftLive && hydrated && Boolean(token) && canRead,
+    retry: false,
+  })
+  const outlookStatus = useQuery({
+    queryKey: ["connector-status", "outlook"],
+    queryFn: () => getConnectorStatus(token!, "outlook"),
+    enabled: microsoftLive && hydrated && Boolean(token) && canRead,
+    retry: false,
+  })
+  const microsoftLinked =
+    microsoftLive &&
+    (sourceIsLinked(onedriveStatus.data) || sourceIsLinked(outlookStatus.data))
+
   useEffect(() => {
-    if (!isGooglePersonal && !isGoogleOrganization) return
+    if (!isGooglePersonal && !isGoogleOrganization && !isMicrosoft) return
     const google = searchParams.get("google")
-    if (!google) return
+    const microsoft = searchParams.get("microsoft")
+    if (!google && !microsoft) return
     queryClient.invalidateQueries({ queryKey: ["connector-status"] })
-  }, [connector.source, queryClient, searchParams, isGooglePersonal, isGoogleOrganization])
+  }, [connector.source, queryClient, searchParams, isGooglePersonal, isGoogleOrganization, isMicrosoft])
 
   const live = connector.available
 
@@ -453,6 +485,9 @@ export function ConnectorCard({
           {isGoogleOrganization && GOOGLE_ORGANIZATION_SOURCES.map((source) => (
             <GoogleOrganizationSource key={source.id} {...source} />
           ))}
+          {isMicrosoft && MICROSOFT_SOURCES.map((source) => (
+            <GoogleSource key={source.id} {...source} />
+          ))}
         </div>
       ) : (
         <div className="flex gap-2">
@@ -479,6 +514,23 @@ export function ConnectorCard({
               {authorize.isPending
                 ? "Opening…"
                 : googleLinked
+                  ? "Reconnect"
+                  : "Connect"}
+            </Button>
+          )
+        ) : live && isMicrosoft ? (
+          hydrated &&
+          canWrite && (
+            <Button
+              size="sm"
+              variant={microsoftLinked ? "outline" : "default"}
+              disabled={authorizeMicrosoft.isPending}
+              onClick={() => authorizeMicrosoft.mutate()}
+            >
+              <Plug className="size-3.5" />
+              {authorizeMicrosoft.isPending
+                ? "Opening…"
+                : microsoftLinked
                   ? "Reconnect"
                   : "Connect"}
             </Button>
@@ -517,6 +569,13 @@ export function ConnectorCard({
           {authorize.error instanceof ApiError
             ? authorize.error.message
             : "Couldn't start the Google consent flow."}
+        </p>
+      )}
+      {authorizeMicrosoft.error && isMicrosoft && (
+        <p role="alert" className="text-[0.8125rem] text-destructive">
+          {authorizeMicrosoft.error instanceof ApiError
+            ? authorizeMicrosoft.error.message
+            : "Couldn't start the Microsoft consent flow."}
         </p>
       )}
     </motion.li>

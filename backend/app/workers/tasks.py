@@ -396,7 +396,21 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
                 connection_status="syncing",
                 last_error="",
             )
-        if not principal_id:
+        elif source_type in ("onedrive", "outlook"):
+            from app.connectors import provider_registry
+
+            plugin = provider_registry.get_by_source(source_type)
+            if not plugin or not plugin.prepare_backfill:
+                raise ValueError(f"No provider plugin for source_type={source_type}")
+            auth = plugin.prepare_backfill(tenant_id, source_type, principal_id)
+            token_store = auth.token_store
+            oauth_manager = auth.oauth_manager
+            principal_id = str(auth.principal_id or principal_id).strip()
+            mailbox_email = auth.mailbox_email or ""
+            if principal_id:
+                scope_id = cursor_scope_id(tenant_id, principal_id)
+                user_id = principal_id
+        if source_type.startswith("google_") and not principal_id:
             seed_token_store_from_env(
                 token_store,
                 tenant_id,
@@ -1029,6 +1043,19 @@ def _register_watches_best_effort(
                 _run_async(
                     watch_manager.register_gmail_watch(tenant_id, final_cursor, full_topic)
                 )
+        elif source_type in ("onedrive", "outlook"):
+            from app.connectors import provider_registry
+
+            plugin = provider_registry.get_by_source(source_type)
+            if plugin and plugin.register_watch:
+                plugin.register_watch(
+                    oauth_manager,
+                    tenant_id,
+                    source_type,
+                    final_cursor,
+                    "",
+                    webhook_base_url,
+                )
     except Exception:
         logger.warning(
             "Watch registration failed after successful index tenant=%s source=%s",
@@ -1048,11 +1075,6 @@ def _attach_extracted_text_for_pipeline(documents: list) -> None:
         extracted = file.get("_extracted_text")
         if isinstance(extracted, str) and extracted:
             file["extractedText"] = extracted
-        logger.info(
-            "drive webhook change file_id=%s modifiedTime=%s",
-            file.get("id"),
-            file.get("modifiedTime"),
-        )
 
 
 def _acl_terms_for_user(user_id: Optional[str]) -> list:
@@ -1085,9 +1107,53 @@ def _lookup_mailbox_email(
         data = token_store.get_token(google_oauth_token_key(base_tenant_id, user_id, "personal")) or {}
         if not data.get("mailbox_email"):
             data = token_store.get_token(google_oauth_token_key(base_tenant_id, "", "personal")) or {}
+        if data.get("mailbox_email"):
+            return str(data.get("mailbox_email") or "")
+        try:
+            from app.connectors.microsoft.keys import microsoft_oauth_token_key
+
+            data = token_store.get_token(microsoft_oauth_token_key(base_tenant_id, user_id)) or {}
+            if not data.get("mailbox_email"):
+                data = token_store.get_token(microsoft_oauth_token_key(base_tenant_id)) or {}
+        except Exception:
+            pass
         return str(data.get("mailbox_email") or "")
     except Exception:
         return ""
+
+
+@celery_app.task(bind=True, max_retries=5, default_retry_delay=30)
+def process_connector_notification(
+    self, source_type: str, tenant_id: str, user_id: str = ""
+) -> dict:
+    """Generic incremental sync — dispatches to the provider plugin."""
+    try:
+        from app.connectors import provider_registry
+
+        plugin = provider_registry.get_by_source(source_type)
+        if not plugin or not plugin.process_notification:
+            raise ValueError(f"No notification handler for source_type={source_type}")
+        return plugin.process_notification(source_type, tenant_id, user_id)
+    except Exception as e:
+        logger.error(
+            "Connector notification failed source=%s tenant=%s: %s",
+            source_type,
+            tenant_id,
+            e,
+        )
+        if "429" in str(e) or "quota" in str(e).lower():
+            raise self.retry(exc=e, countdown=min(2 ** self.request.retries * 60, 3600))
+        raise
+
+
+@celery_app.task(bind=True, max_retries=5, default_retry_delay=30)
+def process_onedrive_notification(self, tenant_id: str, user_id: str = "") -> dict:
+    return process_connector_notification(self, "onedrive", tenant_id, user_id)
+
+
+@celery_app.task(bind=True, max_retries=5, default_retry_delay=30)
+def process_outlook_notification(self, tenant_id: str, user_id: str = "") -> dict:
+    return process_connector_notification(self, "outlook", tenant_id, user_id)
 
 
 @celery_app.task

@@ -69,14 +69,29 @@ def test_oauth_authorization_url_shape():
     assert decoded["nonce"]
 
 
-def test_token_blob_encrypt_decrypt_roundtrip():
-    plaintext = '{"access_token":"dummy-access","refresh_token":"dummy-refresh","token_type":"Bearer"}'
-    ciphertext = encrypt_token_blob(plaintext)
+def test_token_blob_encrypt_decrypt_roundtrip(monkeypatch):
+    from cryptography.fernet import Fernet, InvalidToken
+
+    from app.connectors.token_crypto import reset_root_fernet_key_cache
+    from app.core.config import settings
+
+    key = Fernet.generate_key().decode()
+    monkeypatch.setattr(settings, "token_encryption_key", key)
+    reset_root_fernet_key_cache()
+
+    plaintext = (
+        '{"access_token":"dummy-access","refresh_token":"dummy-refresh",'
+        '"token_type":"Bearer"}'
+    )
+    ciphertext = encrypt_token_blob(plaintext, tenant_id="tenant-a")
     assert ciphertext
     assert "dummy-access" not in ciphertext
     assert "dummy-refresh" not in ciphertext
-    recovered = decrypt_token_blob(ciphertext)
+    recovered = decrypt_token_blob(ciphertext, tenant_id="tenant-a")
     assert recovered == plaintext
+    # Different tenants must not share ciphertext decryption.
+    with pytest.raises(InvalidToken):
+        decrypt_token_blob(ciphertext, tenant_id="tenant-b")
 
 
 def test_oauth_manager_uses_per_user_token_key():
@@ -96,7 +111,15 @@ def test_oauth_manager_uses_per_user_token_key():
     assert store.get_token(manager._get_token_key("tenant-a"))["access_token"] == "mine"
 
 
-def test_persistent_token_store_roundtrip_memory_fallback():
+def test_persistent_token_store_roundtrip_memory_fallback(monkeypatch):
+    from cryptography.fernet import Fernet
+
+    from app.connectors.token_crypto import reset_root_fernet_key_cache
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "token_encryption_key", Fernet.generate_key().decode())
+    reset_root_fernet_key_cache()
+
     store = PersistentGoogleTokenStore("tenant-roundtrip")
     payload = {
         "access_token": "dummy-access-token",

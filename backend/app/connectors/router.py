@@ -38,6 +38,7 @@ from app.connectors.google.token_store import (
     google_credential_ref,
 )
 from app.connectors.google import status_store
+from app.connectors import provider_registry
 
 logger = logging.getLogger(__name__)
 
@@ -496,18 +497,26 @@ async def get_connector_status(
     scope_id = cursor_scope_id(tenant_id, user_id) if connection_scope == "personal" else f"{tenant_id}_organization"
     cursor = await cursor_store.get_cursor(scope_id, source_type)
 
+    plugin = provider_registry.get_by_source(source_type)
     watch_info = None
+    has_token = False
     try:
-        watch_info = await cursor_store.get_watch_info(tenant_id, source_type)
+        if plugin and plugin.get_watch_info and source_type in ("onedrive", "outlook"):
+            watch_info = await plugin.get_watch_info(scope_id, source_type)
+        else:
+            watch_info = await cursor_store.get_watch_info(tenant_id, source_type)
     except Exception:
         watch_info = None
 
     runtime_user_id = user_id if connection_scope == "personal" else "organization"
     runtime = status_store.get_status(tenant_id, source_type, user_id=runtime_user_id)
-    token_store = PersistentGoogleTokenStore(tenant_id)
-    has_token = token_store.get_token(google_oauth_token_key(tenant_id, user_id, connection_scope)) is not None
-    if not has_token:
-        has_token = token_store.get_token(google_oauth_token_key(tenant_id, "", connection_scope)) is not None
+    if plugin and plugin.has_token and source_type in ("onedrive", "outlook"):
+        has_token = bool(plugin.has_token(tenant_id, user_id))
+    else:
+        token_store = PersistentGoogleTokenStore(tenant_id)
+        has_token = token_store.get_token(google_oauth_token_key(tenant_id, user_id, connection_scope)) is not None
+        if not has_token:
+            has_token = token_store.get_token(google_oauth_token_key(tenant_id, "", connection_scope)) is not None
     connection_status = runtime.get("connection_status") or "not_connected"
     if connection_status == "not_connected" and (cursor or has_token):
         connection_status = "active" if cursor else "syncing"
@@ -556,6 +565,17 @@ async def disconnect_connector(
         files_indexed=0,
         last_error="",
     )
+
+    plugin = provider_registry.get_by_source(source_type)
+    if plugin and plugin.on_disconnect:
+        try:
+            await plugin.on_disconnect(tenant_id, user_id, source_type)
+        except Exception:
+            logger.exception(
+                "Disconnect cleanup failed provider=%s source=%s",
+                plugin.provider_id,
+                source_type,
+            )
 
     return {
         "status": "disconnected",
@@ -907,3 +927,36 @@ async def _record_organization_connector_rows(tenant_id: str, user_id: str, mail
             user_id,
             str(exc),
         )
+
+
+@router.get(
+    "/microsoft/authorize",
+    summary="Generate Microsoft OAuth authorization URL",
+    dependencies=[Depends(require_scope("connectors.write"))],
+)
+async def get_microsoft_authorize_url(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    tenant: TenantRouting = Depends(get_tenant),
+):
+    plugin = provider_registry.get("microsoft")
+    if not plugin or not plugin.build_authorize_url:
+        raise HTTPException(status_code=404, detail="Microsoft connector not configured")
+    tenant_id = current_user.get("tenant_id")
+    if not tenant_id or str(tenant.tenant_id) != str(tenant_id):
+        raise HTTPException(status_code=403, detail="Cross-tenant execution rejected")
+    return await plugin.build_authorize_url(str(tenant_id), _user_id(current_user))
+
+
+@router.get(
+    "/microsoft/callback",
+    summary="Microsoft OAuth callback — exchange code, store tokens, auto-sync",
+)
+async def microsoft_oauth_callback(
+    code: Optional[str] = Query(None),
+    state: Optional[str] = Query(None),
+    error: Optional[str] = Query(None),
+):
+    plugin = provider_registry.get("microsoft")
+    if not plugin or not plugin.handle_oauth_callback:
+        raise HTTPException(status_code=404, detail="Microsoft connector not configured")
+    return await plugin.handle_oauth_callback(code, state, error)

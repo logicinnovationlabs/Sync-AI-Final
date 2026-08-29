@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { Suspense } from "react"
 import { PageHeader } from "@/components/shared/page-header"
 import { ConnectorList } from "@/components/connectors/connector-list"
 
@@ -15,7 +16,9 @@ export default function ConnectorsPage() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <ConnectorList />
+        <Suspense fallback={<div className="px-6 py-8 text-sm text-muted-foreground">Loading connectors…</div>}>
+          <ConnectorList />
+        </Suspense>
       </div>
     </div>
   )

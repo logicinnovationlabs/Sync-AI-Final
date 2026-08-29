@@ -153,10 +153,36 @@ async def create_dev_tenant(session, name: str, subdomain: str, db_name: str, db
 async def _ensure_user(session, *, email: str, password: str, display_name: str, tenant_id, role: str):
     from sqlalchemy import select
 
-    existing = await session.execute(select(User).where(User.email == email))
-    if existing.scalar_one_or_none() is not None:
-        print(f"  [INFO] User already exists: {email}")
+    existing = await session.execute(
+        select(User).where(User.email == email, User.tenant_id == tenant_id)
+    )
+    user = existing.scalar_one_or_none()
+    if user is not None:
+        user.password_hash = native_auth_service.hash_password(password)
+        user.role = role
+        user.display_name = display_name
+        user.status = "active"
+        user.is_active = True
+        user.must_change_password = False
+        await session.commit()
+        print(f"  [OK] Refreshed dev user: {email}")
         return
+
+    # Legacy rows may exist under an old tenant_id after control-plane re-seed.
+    legacy = await session.execute(select(User).where(User.email == email))
+    legacy_user = legacy.scalar_one_or_none()
+    if legacy_user is not None:
+        legacy_user.tenant_id = tenant_id
+        legacy_user.password_hash = native_auth_service.hash_password(password)
+        legacy_user.role = role
+        legacy_user.display_name = display_name
+        legacy_user.status = "active"
+        legacy_user.is_active = True
+        legacy_user.must_change_password = False
+        await session.commit()
+        print(f"  [OK] Repaired legacy user tenant_id: {email}")
+        return
+
     await native_auth_service.create_native_user(
         email=email,
         password=password,

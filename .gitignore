@@ -5,13 +5,23 @@
 !.env.*.example
 .env.local
 .env.*.local
+# Explicit (also matched by .env.*); listed so reviewers see the deny rule
+.env.docker
 
 # Private keys and signing material
 backend/keys/
 **/keys/*.pem
 **/keys/*.key
+**/keys/*.burned-*
 *.pem
 *.key
+*.p12
+*.pfx
+
+# Never redistribute these as “source” archives from the worktree
+# (safe archives go outside the repo via scripts/package-safe-archive.*)
+*.zip
+!fixtures/**/*.zip
 
 # Python
 __pycache__/
@@ -42,6 +52,7 @@ ENV/
 
 # Node
 node_modules/
+frontend/.next/
 
 # Testing / local validation scratch
 .pytest_cache/

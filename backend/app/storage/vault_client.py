@@ -34,6 +34,7 @@ class PlatformSecretKeys:
     QDRANT_API_KEY = "kv/platform/qdrant_api_key"
     MINIO_SECRET_KEY = "kv/platform/minio_secret_key"
     OPENSEARCH_PASSWORD = "kv/platform/opensearch_password"
+    OAUTH_TOKEN_FERNET = "kv/platform/google-oauth-fernet"
 
 
 _SETTINGS_BOOTSTRAP = {
@@ -42,6 +43,7 @@ _SETTINGS_BOOTSTRAP = {
     PlatformSecretKeys.GOOGLE_REFRESH_TOKEN: "google_refresh_token",
     PlatformSecretKeys.QDRANT_API_KEY: "qdrant_api_key",
     PlatformSecretKeys.MINIO_SECRET_KEY: "storage_secret_key",
+    PlatformSecretKeys.OAUTH_TOKEN_FERNET: "token_encryption_key",
 }
 
 # Local OpenSearch has security disabled; local Qdrant has no API key.

@@ -1,8 +1,8 @@
-"""Stamp existing tenant DBs at 005, then alembic upgrade head (006).
+"""Stamp existing tenant DBs at 005, then alembic upgrade head.
 
 Tenant databases were created with Base.metadata.create_all, not Alembic, so they
-have no alembic_version. This command stamps 005_merge_heads then upgrades so
-only 006_pending_identity_queue runs.
+may have no alembic_version. This command stamps 005_merge_heads then upgrades so
+pending migrations (006, 007, …) run against each tenant DB.
 
 Does not print connection URLs or passwords.
 """
@@ -82,13 +82,21 @@ def migrate_one(db_name: str, subdomain: str) -> str:
         revision = _current_revision(engine)
         print(f"  alembic_version={revision or '(none)'}")
 
-        if revision == "006_pending_identity_queue":
-            print("  already at 006; skipping")
-            return "already-006"
+        head = subprocess.run(
+            [PYTHON, "-m", "alembic", "heads"],
+            cwd=str(BACKEND_ROOT),
+            env=_alembic_env(db_name),
+            capture_output=True,
+            text=True,
+        )
+        head_revision = (head.stdout or "").strip().split()[0] if head.returncode == 0 else ""
+        if revision and head_revision and revision == head_revision:
+            print(f"  already at head ({revision}); skipping")
+            return f"already-{revision}"
 
         # Manual Phase C DDL must not remain as the live table. Drop it when
         # Alembic has not yet created 006, then let upgrade recreate it.
-        if revision != "006_pending_identity_queue":
+        if revision not in (None, "006_pending_identity_queue", head_revision):
             with engine.begin() as conn:
                 conn.execute(text("DROP TABLE IF EXISTS pending_identity_queue CASCADE"))
             print("  dropped pending_identity_queue (manual patch or pre-006)")
@@ -105,7 +113,7 @@ def migrate_one(db_name: str, subdomain: str) -> str:
 
 
 def main() -> int:
-    print("Migrating registered tenant databases to alembic head (006)")
+    print("Migrating registered tenant databases to alembic head")
     cp = create_engine(_tenant_sync_url("control_plane"))
     try:
         with Session(cp) as session:
