@@ -27,11 +27,13 @@ class MicrosoftWatchManager:
     async def register_onedrive_subscription(
         self, tenant_id: str, *, user_id: str = ""
     ) -> Dict[str, Any]:
+        # Drive subscriptions only allow changeType "updated" (covers create/update/delete).
         return await self._register(
             tenant_id,
             source_type="onedrive",
             resource="/me/drive/root",
             user_id=user_id,
+            change_type="updated",
         )
 
     async def register_outlook_subscription(
@@ -42,6 +44,7 @@ class MicrosoftWatchManager:
             source_type="outlook",
             resource="me/mailFolders('inbox')/messages",
             user_id=user_id,
+            change_type="created,updated,deleted",
         )
 
     async def _register(
@@ -51,6 +54,7 @@ class MicrosoftWatchManager:
         source_type: str,
         resource: str,
         user_id: str = "",
+        change_type: str = "created,updated,deleted",
     ) -> Dict[str, Any]:
         token = await self.oauth_manager.get_valid_token(tenant_id)
         client_state = f"{tenant_id}|{user_id}|{secrets.token_urlsafe(16)}"
@@ -60,6 +64,7 @@ class MicrosoftWatchManager:
             resource=resource,
             notification_url=notification_url,
             client_state=client_state,
+            change_type=change_type,
             minutes=self.SUBSCRIPTION_MINUTES,
         )
         expiration = response.get("expirationDateTime") or ""
