@@ -372,18 +372,6 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
         scope_id = cursor_scope_id(tenant_id, principal_id)
         status_user_id = str(user_id or principal_id)
 
-        # Abort early if the user disconnected before this worker picked up the task.
-        if status_user_id and status_store.is_disconnected(
-            tenant_id, source_type, user_id=status_user_id
-        ):
-            logger.info(
-                "Backfill aborted; connector disconnected tenant=%s source=%s user=%s",
-                tenant_id,
-                source_type,
-                status_user_id,
-            )
-            return {"aborted": True, "reason": "disconnected", "indexed_count": 0}
-
         oauth_manager = None
         client_id = ""
         client_secret = ""
@@ -402,6 +390,8 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
             )
             client_id = settings.google_client_id or ""
             client_secret = settings.google_client_secret or ""
+            # Stamp "syncing" with force=True FIRST so a stale "not_connected"
+            # from a previous disconnect never kills a fresh OAuth-triggered backfill.
             status_store.set_status(
                 tenant_id,
                 source_type,
@@ -410,6 +400,17 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
                 last_error="",
                 force=True,
             )
+            # Now check if the user explicitly disconnected AFTER this task was queued.
+            if status_user_id and status_store.is_disconnected(
+                tenant_id, source_type, user_id=status_user_id
+            ):
+                logger.info(
+                    "Backfill aborted; connector disconnected after queuing tenant=%s source=%s user=%s",
+                    tenant_id,
+                    source_type,
+                    status_user_id,
+                )
+                return {"aborted": True, "reason": "disconnected", "indexed_count": 0}
         elif source_type in ("onedrive", "outlook"):
             from app.connectors import provider_registry
 
@@ -436,6 +437,7 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
                     _ms_uid,
                 )
                 return {"aborted": True, "reason": "disconnected", "indexed_count": 0}
+
         if source_type.startswith("google_") and not principal_id:
             seed_token_store_from_env(
                 token_store,
