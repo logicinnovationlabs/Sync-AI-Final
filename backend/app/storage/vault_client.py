@@ -137,14 +137,14 @@ def _tenant_db_password_fallback(key_name: str) -> Optional[str]:
 
     Hosted setups (Render, Supabase, Neon) use the same Postgres instance for
     control-plane and tenant tables, so the Postgres password is in
-    CONTROL_PLANE_DATABASE_URL or DB_PASSWORD.
+    CONTROL_PLANE_DATABASE_URL, DATABASE_URL, or DB_PASSWORD.
     """
     if "db_password" not in (key_name or ""):
         return None
     env_pw = os.getenv("DB_PASSWORD") or os.getenv("POSTGRES_PASSWORD")
     if env_pw and env_pw.strip():
         return env_pw.strip()
-    cp_url = getattr(settings, "control_plane_database_url", None)
+    cp_url = getattr(settings, "control_plane_database_url", None) or os.getenv("DATABASE_URL") or os.getenv("CONTROL_PLANE_DATABASE_URL")
     if cp_url:
         extracted = _extract_password_from_database_url(str(cp_url))
         if extracted:
