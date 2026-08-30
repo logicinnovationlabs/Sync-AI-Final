@@ -141,23 +141,42 @@ def _tenant_db_password_fallback(key_name: str) -> Optional[str]:
 
     Hosted setups (Render, Supabase, Neon) use the same Postgres instance for
     control-plane and tenant tables, so the Postgres password is in
-    CONTROL_PLANE_DATABASE_URL, DATABASE_URL, or DB_PASSWORD.
+    SUPABASE_DB_PASSWORD, CONTROL_PLANE_DATABASE_URL, SUPABASE_POOLER_URL, or DB_PASSWORD.
     """
     if "db_password" not in (key_name or ""):
         return None
-    env_pw = os.getenv("DB_PASSWORD") or os.getenv("POSTGRES_PASSWORD")
+
+    # 1. Prefer explicit SUPABASE_DB_PASSWORD
+    supabase_pw = os.getenv("SUPABASE_DB_PASSWORD")
+    if supabase_pw and supabase_pw.strip() and supabase_pw.strip() != "postgres":
+        return supabase_pw.strip()
+
+    # 2. Extract password from cloud connection URLs
+    for url_key in ("SUPABASE_POOLER_URL", "CONTROL_PLANE_DATABASE_URL", "SUPABASE_DB_URL", "DATABASE_URL"):
+        val = getattr(settings, url_key.lower(), None) or os.getenv(url_key)
+        if val:
+            extracted = _extract_password_from_database_url(str(val))
+            if extracted and extracted != "postgres":
+                return extracted
+
+    # 3. Check DB_PASSWORD only if it's not the default "postgres" placeholder
+    for env_key in ("DB_PASSWORD", "POSTGRES_PASSWORD"):
+        val = os.getenv(env_key)
+        if val and val.strip() and val.strip() != "postgres":
+            return val.strip()
+
+    # 4. Fallback to settings / env even if default
+    for url_key in ("SUPABASE_POOLER_URL", "CONTROL_PLANE_DATABASE_URL", "SUPABASE_DB_URL", "DATABASE_URL"):
+        val = getattr(settings, url_key.lower(), None) or os.getenv(url_key)
+        if val:
+            extracted = _extract_password_from_database_url(str(val))
+            if extracted:
+                return extracted
+
+    env_pw = os.getenv("SUPABASE_DB_PASSWORD") or os.getenv("DB_PASSWORD") or os.getenv("POSTGRES_PASSWORD")
     if env_pw and env_pw.strip():
         return env_pw.strip()
-    cp_url = getattr(settings, "control_plane_database_url", None) or os.getenv("DATABASE_URL") or os.getenv("CONTROL_PLANE_DATABASE_URL")
-    if cp_url:
-        extracted = _extract_password_from_database_url(str(cp_url))
-        if extracted:
-            return extracted
-    password = getattr(settings, "db_password", None)
-    if password:
-        text = str(password).strip()
-        if text:
-            return text
+
     return None
 
 

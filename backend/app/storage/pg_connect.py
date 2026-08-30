@@ -114,15 +114,16 @@ def prepare_database_url(
             cloud,
             fallback_cloud_url="",
             pooler_url="",
-            pooler_host=pooler_host,
-        )
+    cloud_db_url = (
+        pooler_url
+        or fallback_cloud_url
+        or os.getenv("CONTROL_PLANE_DATABASE_URL")
+        or getattr(settings, "control_plane_database_url", "")
+        or ""
+    ).strip()
 
-    if on_render and is_local_pg_host(host):
-        cloud = pooler_url or fallback_cloud_url
-        if cloud and cloud != url:
-            return _prefer(cloud)
-
-    # Direct db.<ref>.supabase.co is IPv6-only. Prefer any pooler URI we have.
+    if is_local_pg_host(host) and cloud_db_url and not is_local_pg_host(_host_of(cloud_db_url)):
+        return _prefer(cloud_db_url)
     pooler_candidate = ""
     for candidate in (pooler_url, fallback_cloud_url):
         if candidate and is_supabase_pooler_host(_host_of(candidate)):
