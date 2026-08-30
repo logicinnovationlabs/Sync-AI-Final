@@ -141,6 +141,37 @@ class IdentityResolver:
         if hasattr(self.repo, "get_login_user_by_email"):
             login_user = await self.repo.get_login_user_by_email(normalized_email, tenant_id)
 
+        if not login_user and hasattr(self.repo, "get_principal_by_email"):
+            principal_match = await self.repo.get_principal_by_email(normalized_email, tenant_id)
+            if principal_match:
+                login_user = (principal_match.id, principal_match.email)
+
+        if not login_user:
+            try:
+                from app.storage.control_plane_db import control_plane_db_manager
+                from app.models.user import User
+                from sqlalchemy import select, func
+                
+                async with control_plane_db_manager.session() as cp_session:
+                    res = await cp_session.execute(
+                        select(User).where(
+                            User.tenant_id == tenant_id,
+                            func.lower(User.email) == normalized_email,
+                        )
+                    )
+                    cp_user = res.scalar_one_or_none()
+                    if cp_user:
+                        login_user = (cp_user.principal_id, (cp_user.email or "").strip().lower())
+            except Exception:
+                pass
+
+        if not login_user and normalized_email:
+            try:
+                principal = await self._create_principal(normalized_email, tenant_id, hint)
+                login_user = (principal.id, principal.email)
+            except Exception:
+                pass
+
         if login_user:
             principal_id, email = login_user
             now = datetime.now(timezone.utc)
@@ -174,7 +205,7 @@ class IdentityResolver:
                 normalized_email,
                 source_account_id=source_account_id,
             )
-        logger.info(
+        logger.debug(
             "pending identity match queued email=%s document_id=%s",
             normalized_email,
             document_id,
@@ -186,6 +217,7 @@ class IdentityResolver:
             matched_on="pending",
             is_pending=True,
         )
+
     
     async def _match_by_email(
         self, normalized_email: str, tenant_id: UUID, hint: IdentityHint

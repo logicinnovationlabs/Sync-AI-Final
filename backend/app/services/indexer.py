@@ -210,8 +210,9 @@ class Indexer:
             from app.services.lexical.opensearch_store import OpenSearchLexicalStore
 
             await OpenSearchLexicalStore().index_batch(tenant_id, lexical_docs)
-        except Exception:
-            logger.warning("lexical index fan-out skipped", exc_info=True)
+        except Exception as exc:
+            logger.info("lexical index fan-out skipped (using vector search): %s", exc)
+
 
         if not pending_chunks:
             return

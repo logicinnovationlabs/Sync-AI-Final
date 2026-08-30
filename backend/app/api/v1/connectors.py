@@ -207,10 +207,12 @@ async def google_oauth_callback(
     Unauthenticated by design: Google redirects the browser here without our JWT.
     On success: encrypt+store tokens, enqueue Drive + Gmail full backfill, redirect UI.
     """
+    from app.connectors.google.oauth_state import frontend_connectors_redirect
+
     if error:
-        return RedirectResponse(f"/connectors?status=error&message={error}", status_code=302)
+        return RedirectResponse(frontend_connectors_redirect("error", error), status_code=302)
     if not code or not state:
-        return RedirectResponse("/connectors?status=error&message=missing_code_or_state", status_code=302)
+        return RedirectResponse(frontend_connectors_redirect("error", "missing_code_or_state"), status_code=302)
 
     # Simple state validation - just tenant_id for now
     try:
@@ -220,10 +222,11 @@ async def google_oauth_callback(
         tenant_id = str(payload.get("tenant_id", ""))
         user_id = str(payload.get("user_id", ""))
     except Exception:
-        return RedirectResponse("/connectors?status=error&message=invalid_state", status_code=302)
+        return RedirectResponse(frontend_connectors_redirect("error", "invalid_state"), status_code=302)
 
     if not tenant_id:
-        return RedirectResponse("/connectors?status=error&message=missing_tenant_id", status_code=302)
+        return RedirectResponse(frontend_connectors_redirect("error", "missing_tenant_id"), status_code=302)
+
 
     try:
         from app.connectors.google.token_store import PersistentGoogleTokenStore, google_oauth_token_key
@@ -367,6 +370,7 @@ async def google_oauth_callback(
         import logging
         logger = logging.getLogger(__name__)
         logger.exception("OAuth callback failed: %s", str(exc))
-        return RedirectResponse(f"/connectors?status=error&message=oauth_failed", status_code=302)
+        return RedirectResponse(frontend_connectors_redirect("error", "oauth_failed"), status_code=302)
 
-    return RedirectResponse("/connectors?status=connected", status_code=302)
+    return RedirectResponse(frontend_connectors_redirect("connected"), status_code=302)
+

@@ -584,9 +584,22 @@ class CanonicalRepo:
             )
         )
         row = result.scalar_one_or_none()
-        if row is None:
-            return None
-        return (row.principal_id, (row.email or "").strip().lower())
+        if row is not None:
+            return (row.principal_id, (row.email or "").strip().lower())
+
+        # Fallback: Check IdentityPrincipalRow in tenant database
+        p_res = await session.execute(
+            select(IdentityPrincipalRow).where(
+                IdentityPrincipalRow.tenant_id == tenant,
+                func.lower(IdentityPrincipalRow.email) == normalized,
+            )
+        )
+        p_row = p_res.scalar_one_or_none()
+        if p_row is not None:
+            return (p_row.id, (p_row.email or "").strip().lower())
+
+        return None
+
 
     async def upsert_pending_identity(
         self,

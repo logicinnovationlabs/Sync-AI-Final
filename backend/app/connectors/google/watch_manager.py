@@ -37,16 +37,17 @@ class WatchManager:
     def __init__(
         self,
         oauth_manager: GoogleOAuthManager,
-        drive_client: DriveClient,
-        gmail_client: GmailClient,
-        cursor_store: Any,  # Avoid circular import
+        cursor_store: Any = None,  # Avoid circular import
         webhook_base_url: Optional[str] = None,
+        drive_client: Optional[DriveClient] = None,
+        gmail_client: Optional[GmailClient] = None,
     ):
         self.oauth_manager = oauth_manager
-        self.drive_client = drive_client
-        self.gmail_client = gmail_client
         self.cursor_store = cursor_store
         self.webhook_base_url = webhook_base_url or settings.WEBHOOK_BASE_URL
+        self.drive_client = drive_client or DriveClient()
+        self.gmail_client = gmail_client or GmailClient()
+
     
     async def register_drive_watch(
         self,
