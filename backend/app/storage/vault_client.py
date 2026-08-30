@@ -117,19 +117,44 @@ def azure_secret_name(key_name: str) -> str:
     return name
 
 
-def _tenant_db_password_fallback(key_name: str) -> Optional[str]:
-    """When Azure has no tenant DB secret, reuse the control-plane DB_PASSWORD.
+def _extract_password_from_database_url(url: str) -> Optional[str]:
+    if not url:
+        return None
+    try:
+        from urllib.parse import urlparse, unquote
 
-    Hosted Supabase uses one database for control-plane and tenant rows, so the
-    Postgres password is already in settings.
+        clean = str(url).replace("postgresql+asyncpg://", "postgresql://").replace("postgres+asyncpg://", "postgres://")
+        parsed = urlparse(clean)
+        if parsed.password:
+            return unquote(parsed.password)
+    except Exception:
+        pass
+    return None
+
+
+def _tenant_db_password_fallback(key_name: str) -> Optional[str]:
+    """When Azure/HashiCorp/Mock Vault has no tenant DB secret, reuse the control-plane DB password.
+
+    Hosted setups (Render, Supabase, Neon) use the same Postgres instance for
+    control-plane and tenant tables, so the Postgres password is in
+    CONTROL_PLANE_DATABASE_URL or DB_PASSWORD.
     """
     if "db_password" not in (key_name or ""):
         return None
-    password = (settings.db_password or "").strip()
-    if not password:
-        return None
-    logger.warning("Azure Key Vault miss for tenant DB password; using DB_PASSWORD")
-    return password
+    env_pw = os.getenv("DB_PASSWORD") or os.getenv("POSTGRES_PASSWORD")
+    if env_pw and env_pw.strip():
+        return env_pw.strip()
+    cp_url = getattr(settings, "control_plane_database_url", None)
+    if cp_url:
+        extracted = _extract_password_from_database_url(str(cp_url))
+        if extracted:
+            return extracted
+    password = getattr(settings, "db_password", None)
+    if password:
+        text = str(password).strip()
+        if text:
+            return text
+    return None
 
 
 class AzureKeyVaultClient(VaultClient):
@@ -371,9 +396,13 @@ class MockVaultClient(VaultClient):
         if boot:
             self._in_memory_store[key_name] = boot
             return boot
-        if settings.environment in ("development", "test") and "db_password" in key_name:
+        if "db_password" in key_name:
+            fallback = _tenant_db_password_fallback(key_name)
+            if fallback:
+                self._in_memory_store[key_name] = fallback
+                return fallback
             if mock_backends_allowed():
-                return (settings.db_password or "postgres")
+                return "postgres"
         if mock_backends_allowed() and key_name in _OPTIONAL_DEV_SECRETS:
             return ""
         raise VaultError(
