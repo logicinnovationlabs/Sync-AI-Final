@@ -123,7 +123,11 @@ def _extract_password_from_database_url(url: str) -> Optional[str]:
     try:
         from urllib.parse import urlparse, unquote
 
-        clean = str(url).replace("postgresql+asyncpg://", "postgresql://").replace("postgres+asyncpg://", "postgres://")
+        clean = str(url).strip()
+        for prefix in ("postgresql+asyncpg://", "postgres+asyncpg://", "postgresql://", "postgres://"):
+            if clean.startswith(prefix):
+                clean = "http://" + clean[len(prefix):]
+                break
         parsed = urlparse(clean)
         if parsed.password:
             return unquote(parsed.password)
@@ -387,6 +391,12 @@ class MockVaultClient(VaultClient):
         return f"VAULT_SECRET_{safe_name}"
 
     def _lookup(self, key_name: str) -> str:
+        if "db_password" in key_name:
+            fallback = _tenant_db_password_fallback(key_name)
+            if fallback:
+                self._in_memory_store[key_name] = fallback
+                return fallback
+
         if key_name in self._in_memory_store:
             return self._in_memory_store[key_name]
         env_val = os.getenv(self._env_key(key_name))
@@ -396,18 +406,15 @@ class MockVaultClient(VaultClient):
         if boot:
             self._in_memory_store[key_name] = boot
             return boot
-        if "db_password" in key_name:
-            fallback = _tenant_db_password_fallback(key_name)
-            if fallback:
-                self._in_memory_store[key_name] = fallback
-                return fallback
-            if mock_backends_allowed():
+        if mock_backends_allowed():
+            if "db_password" in key_name:
                 return "postgres"
-        if mock_backends_allowed() and key_name in _OPTIONAL_DEV_SECRETS:
-            return ""
+            if key_name in _OPTIONAL_DEV_SECRETS:
+                return ""
         raise VaultError(
             f"Secret '{key_name}' not found. Set env var {self._env_key(key_name)} or call set_secret()."
         )
+
 
     async def get_secret(self, key_name: str) -> str:
         return self._lookup(key_name)
