@@ -12,6 +12,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 import uuid
 import logging
+import re
 
 from app.connectors.google.oauth import GoogleOAuthManager
 from app.connectors.google.clients.drive_client import DriveClient
@@ -28,31 +29,24 @@ class WatchManager:
     Responsibilities:
     - Register Drive watch channels
     - Register Gmail Pub/Sub watches
-    - Renew expiring watches before they expire
+    - Renew expiring channels/watches
     """
     
-    # Default expiration: 7 days (Google's maximum)
-    DEFAULT_EXPIRATION_HOURS = 168  # 7 days
+    DEFAULT_EXPIRATION_HOURS = 168  # 7 days (Google's max)
     
     def __init__(
         self,
         oauth_manager: GoogleOAuthManager,
-        cursor_store,  # Type hint omitted to avoid circular import
-        webhook_base_url: str,
+        drive_client: DriveClient,
+        gmail_client: GmailClient,
+        cursor_store: Any,  # Avoid circular import
+        webhook_base_url: Optional[str] = None,
     ):
-        """
-        Initialize watch manager.
-        
-        Args:
-            oauth_manager: Shared OAuth manager
-            cursor_store: Cursor store instance
-            webhook_base_url: Base URL for webhooks (e.g., https://api.example.com)
-        """
         self.oauth_manager = oauth_manager
+        self.drive_client = drive_client
+        self.gmail_client = gmail_client
         self.cursor_store = cursor_store
-        self.webhook_base_url = webhook_base_url
-        self.drive_client = DriveClient()
-        self.gmail_client = GmailClient()
+        self.webhook_base_url = webhook_base_url or settings.WEBHOOK_BASE_URL
     
     async def register_drive_watch(
         self,
@@ -77,8 +71,9 @@ class WatchManager:
         token = await self.oauth_manager.get_valid_token(tenant_id)
         store_id = cursor_tenant_id or tenant_id
         
-        # Generate unique channel ID
-        channel_id = f"drive-{store_id}-{uuid.uuid4().hex[:8]}"
+        # Generate unique channel ID compliant with Google regex [A-Za-z0-9\-_+/=]+
+        safe_store_id = re.sub(r"[^A-Za-z0-9\-_]", "-", str(store_id))
+        channel_id = f"drive-{safe_store_id}-{uuid.uuid4().hex[:8]}"[:64]
         channel_token = uuid.uuid4().hex  # Secret token for validation
         
         # Calculate expiration (Google's max is ~7 days)
