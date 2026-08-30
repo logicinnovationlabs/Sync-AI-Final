@@ -60,6 +60,9 @@ const MICROSOFT_SOURCES: { id: BackendSourceType; label: string }[] = [
 
 function sourceIsLinked(status: ConnectorStatus | undefined): boolean {
   const connectionStatus = String(status?.details?.connection_status || "")
+  if (connectionStatus === "not_connected") {
+    return false
+  }
   return (
     Boolean(status?.cursor) ||
     Boolean(status?.details?.token_present) ||
@@ -106,6 +109,10 @@ function GoogleSource({ id, label }: { id: BackendSourceType; label: string }) {
     queryFn: () => getConnectorStatus(token!, id),
     enabled: hydrated && Boolean(token) && canRead,
     retry: false,
+    refetchInterval: (query) =>
+      String(query.state.data?.details?.connection_status || "") === "syncing"
+        ? 3000
+        : false,
   })
 
   const invalidate = () =>
@@ -162,7 +169,9 @@ function GoogleSource({ id, label }: { id: BackendSourceType; label: string }) {
           label="Ingestion"
           value={
             connectionStatus === "syncing"
-              ? "Syncing"
+              ? filesIndexed > 0
+                ? `Syncing · ${filesIndexed}`
+                : "Syncing"
               : filesIndexed > 0
                 ? `${filesIndexed} indexed`
                 : started
@@ -225,6 +234,10 @@ function GoogleOrganizationSource({ id, label }: { id: BackendSourceType; label:
     queryFn: () => getOrganizationConnectorStatus(token!, id),
     enabled: hydrated && Boolean(token) && canRead,
     retry: false,
+    refetchInterval: (query) =>
+      String(query.state.data?.details?.connection_status || "") === "syncing"
+        ? 3000
+        : false,
   })
 
   const invalidate = () =>
@@ -289,7 +302,9 @@ function GoogleOrganizationSource({ id, label }: { id: BackendSourceType; label:
           label="Ingestion"
           value={
             connectionStatus === "syncing"
-              ? "Syncing"
+              ? filesIndexed > 0
+                ? `Syncing · ${filesIndexed}`
+                : "Syncing"
               : filesIndexed > 0
                 ? `${filesIndexed} indexed`
                 : started
@@ -364,12 +379,20 @@ export function ConnectorCard({
     queryFn: () => getConnectorStatus(token!, "google_drive", "personal"),
     enabled: isGooglePersonal && googleLive && hydrated && Boolean(token) && canRead,
     retry: false,
+    refetchInterval: (query) =>
+      String(query.state.data?.details?.connection_status || "") === "syncing"
+        ? 3000
+        : false,
   })
   const gmailStatus = useQuery({
     queryKey: ["connector-status", "google_gmail"],
     queryFn: () => getConnectorStatus(token!, "google_gmail", "personal"),
     enabled: isGooglePersonal && googleLive && hydrated && Boolean(token) && canRead,
     retry: false,
+    refetchInterval: (query) =>
+      String(query.state.data?.details?.connection_status || "") === "syncing"
+        ? 3000
+        : false,
   })
 
   // Organization Google status is read-only for members
@@ -422,12 +445,20 @@ export function ConnectorCard({
     queryFn: () => getConnectorStatus(token!, "onedrive"),
     enabled: microsoftLive && hydrated && Boolean(token) && canRead,
     retry: false,
+    refetchInterval: (query) =>
+      String(query.state.data?.details?.connection_status || "") === "syncing"
+        ? 3000
+        : false,
   })
   const outlookStatus = useQuery({
     queryKey: ["connector-status", "outlook"],
     queryFn: () => getConnectorStatus(token!, "outlook"),
     enabled: microsoftLive && hydrated && Boolean(token) && canRead,
     retry: false,
+    refetchInterval: (query) =>
+      String(query.state.data?.details?.connection_status || "") === "syncing"
+        ? 3000
+        : false,
   })
   const microsoftLinked =
     microsoftLive &&

@@ -76,6 +76,17 @@ async def on_disconnect(tenant_id: str, user_id: str, source_type: str) -> None:
     webhook_base = getattr(settings, "webhook_base_url", None) or "http://localhost:8000"
     watch_mgr = MicrosoftWatchManager(oauth, cursor_store, webhook_base)
     await watch_mgr.delete_subscription(tenant_id, source_type, user_id=user_id)
+    try:
+        await cursor_store.clear_watch_info(
+            cursor_scope_id(tenant_id, user_id), source_type
+        )
+    except Exception:
+        logger.warning(
+            "Failed to clear MS watch_data tenant=%s source=%s",
+            tenant_id,
+            source_type,
+            exc_info=True,
+        )
     other = "outlook" if source_type == "onedrive" else "onedrive"
     other_status = status_store.get_status(tenant_id, other, user_id=user_id)
     if other_status.get("connection_status") in (None, "", "not_connected"):

@@ -55,9 +55,68 @@ async def get_watch_info(scope_id: str, source_type: str) -> Any:
     return None
 
 
+async def _delete_personal_connector_row(tenant_id: str, source_type: str) -> None:
+    try:
+        tenant_uuid = UUID(tenant_id)
+    except (TypeError, ValueError):
+        return
+    try:
+        from app.services.tenant_resolver import tenant_resolver
+        from app.storage.tenant_db import tenant_db_manager
+        from app.models.tenant_connector import TenantConnector
+
+        routing = await tenant_resolver.resolve(tenant_id)
+        factory = tenant_db_manager.get_session_factory(
+            routing.db_host,
+            routing.db_name,
+            routing.db_user,
+            routing.db_password,
+            str(routing.tenant_id),
+        )
+        async with factory() as session:
+            result = await session.execute(
+                select(TenantConnector).where(
+                    TenantConnector.tenant_id == tenant_uuid,
+                    TenantConnector.source_type == source_type,
+                    TenantConnector.connection_scope == "personal",
+                )
+            )
+            row = result.scalar_one_or_none()
+            if row is not None:
+                await session.delete(row)
+                await session.commit()
+    except Exception:
+        logger.warning(
+            "Failed to delete TenantConnector row tenant=%s source=%s",
+            tenant_id,
+            source_type,
+            exc_info=True,
+        )
+
+
 async def on_disconnect(tenant_id: str, user_id: str, source_type: str) -> None:
-    # Google watches expire; cursor clear is handled by the shared router.
-    return None
+    """Clear watches, tokens (when sibling Google source is gone), and DB rows."""
+    scope_id = cursor_scope_id(tenant_id, user_id)
+    try:
+        await cursor_store.clear_watch_info(scope_id, source_type)
+    except Exception:
+        logger.warning(
+            "Failed to clear watch_data tenant=%s source=%s",
+            tenant_id,
+            source_type,
+            exc_info=True,
+        )
+
+    await _delete_personal_connector_row(tenant_id, source_type)
+
+    other = "google_gmail" if source_type == "google_drive" else "google_drive"
+    other_status = status_store.get_status(tenant_id, other, user_id=user_id)
+    if other_status.get("connection_status") in (None, "", "not_connected"):
+        token_store = PersistentGoogleTokenStore(tenant_id)
+        token_store.clear_token(google_oauth_token_key(tenant_id, user_id, "personal"))
+        token_store.clear_token(google_oauth_token_key(tenant_id, "", "personal"))
+        token_store.clear_token(google_oauth_token_key(tenant_id, user_id))
+        token_store.clear_token(google_oauth_token_key(tenant_id))
 
 
 async def build_authorize_url(tenant_id: str, user_id: str) -> Dict[str, Any]:

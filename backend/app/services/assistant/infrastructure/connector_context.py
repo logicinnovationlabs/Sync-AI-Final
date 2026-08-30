@@ -57,7 +57,10 @@ async def _source_snapshot(
     mailbox_email: str = "",
 ) -> Optional[Dict[str, Any]]:
     scope_id = cursor_scope_id(tenant_id, user_id)
-    runtime = status_store.get_status(tenant_id, source_type, user_id=user_id)
+    runtime_raw = status_store.get_status_raw(tenant_id, source_type, user_id=user_id)
+    runtime = runtime_raw if runtime_raw is not None else status_store.get_status(
+        tenant_id, source_type, user_id=user_id
+    )
     cursor = await cursor_store.get_cursor(scope_id, source_type)
 
     plugin = provider_registry.get_by_source(source_type)
@@ -72,9 +75,15 @@ async def _source_snapshot(
             google_oauth_token_key(tenant_id, "", "personal")
         ) is not None
 
-    connection_status = str(runtime.get("connection_status") or "not_connected")
-    if connection_status == "not_connected" and (cursor or has_token):
-        connection_status = "active" if cursor else "syncing"
+    if runtime_raw is None:
+        if cursor:
+            connection_status = "active"
+        elif has_token:
+            connection_status = "syncing"
+        else:
+            connection_status = "not_connected"
+    else:
+        connection_status = str(runtime.get("connection_status") or "not_connected")
 
     linked = has_token or bool(cursor) or connection_status not in (
         "not_connected",

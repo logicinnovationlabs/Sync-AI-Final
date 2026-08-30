@@ -370,6 +370,19 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
                 logger.info("Organization scope: using admin user_id %s", principal_id)
         
         scope_id = cursor_scope_id(tenant_id, principal_id)
+        status_user_id = str(user_id or principal_id)
+
+        # Abort early if the user disconnected before this worker picked up the task.
+        if status_user_id and status_store.is_disconnected(
+            tenant_id, source_type, user_id=status_user_id
+        ):
+            logger.info(
+                "Backfill aborted; connector disconnected tenant=%s source=%s user=%s",
+                tenant_id,
+                source_type,
+                status_user_id,
+            )
+            return {"aborted": True, "reason": "disconnected", "indexed_count": 0}
 
         oauth_manager = None
         client_id = ""
@@ -392,10 +405,17 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
             status_store.set_status(
                 tenant_id,
                 source_type,
-                user_id=str(user_id or principal_id),  # Use original user_id for status tracking
+                user_id=status_user_id,
                 connection_status="syncing",
                 last_error="",
             )
+            if status_store.is_disconnected(tenant_id, source_type, user_id=status_user_id):
+                logger.info(
+                    "Backfill aborted after syncing stamp; disconnected tenant=%s source=%s",
+                    tenant_id,
+                    source_type,
+                )
+                return {"aborted": True, "reason": "disconnected", "indexed_count": 0}
         elif source_type in ("onedrive", "outlook"):
             from app.connectors import provider_registry
 
@@ -464,9 +484,25 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
             ``_run_async`` from inside ``asyncio.run`` opens a second loop and
             breaks SQLAlchemy/asyncpg connection pooling.
             """
+            if status_store.is_disconnected(
+                tenant_id, source_type, user_id=str(user_id or principal_id)
+            ):
+                raise RuntimeError("connector_disconnected")
             await cursor_store.update_cursor(scope_id, source_type, next_cursor or None)
             logger.debug(
                 f"Checkpoint saved tenant={tenant_id} source={source_type} cursor={next_cursor!r}"
+            )
+
+        async def _report_progress(indexed_count: int) -> None:
+            uid = str(user_id or principal_id)
+            if status_store.is_disconnected(tenant_id, source_type, user_id=uid):
+                raise RuntimeError("connector_disconnected")
+            status_store.set_status(
+                tenant_id,
+                source_type,
+                user_id=uid,
+                connection_status="syncing",
+                files_indexed=int(indexed_count),
             )
 
         # Stamp the SynQ user who connected Google so federated search ACL matches JWT ``sub``
@@ -476,14 +512,25 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
 
         # Run sync orchestrator (two-pass: deletions then delta, paginated + checkpointed)
         since = datetime.utcnow() - timedelta(days=365)  # Look back 1 year
-        result = sync_orchestrator.run_two_pass_sync(
-            connector=connector,
-            tenant_id=tenant_id,
-            since=since,
-            cursor=resume_cursor,
-            on_cursor_update=_persist_checkpoint,
-            extra_acl=owner_acl,
-        )
+        try:
+            result = sync_orchestrator.run_two_pass_sync(
+                connector=connector,
+                tenant_id=tenant_id,
+                since=since,
+                cursor=resume_cursor,
+                on_cursor_update=_persist_checkpoint,
+                on_progress=_report_progress,
+                extra_acl=owner_acl,
+            )
+        except RuntimeError as exc:
+            if "connector_disconnected" in str(exc):
+                logger.info(
+                    "Backfill stopped mid-crawl; user disconnected tenant=%s source=%s",
+                    tenant_id,
+                    source_type,
+                )
+                return {"aborted": True, "reason": "disconnected", "indexed_count": 0}
+            raise
         
         # Store final cursor (may already match last per-page checkpoint)
         final_cursor = result.get("final_cursor")
@@ -498,6 +545,7 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
                 token = _run_async(connector.get_valid_token())
                 start_page_token = _run_async(drive_client.get_start_page_token(token))
                 if start_page_token:
+                    final_cursor = start_page_token
                     _run_async(cursor_store.update_cursor(scope_id, source_type, start_page_token))
                     logger.info(
                         f"Stored Drive startPageToken for ACL delta polling tenant={tenant_id} token={start_page_token}"
@@ -508,7 +556,11 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
                 )
 
         _register_watches_best_effort(
-            oauth_manager, scope_id, source_type, final_cursor
+            oauth_manager,
+            tenant_id,
+            source_type,
+            final_cursor,
+            cursor_tenant_id=scope_id,
         )
         
         # For Gmail, override cursor with historyId from watch_data (not page token from backfill)
@@ -522,10 +574,17 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
             f"{result.get('indexed_count', 0)} indexed, {result.get('deleted_count', 0)} deleted, "
             f"{result.get('pages_processed', 0)} pages"
         )
+        status_uid = str(user_id or principal_id)
+        if status_store.is_disconnected(tenant_id, source_type, user_id=status_uid):
+            return {
+                "aborted": True,
+                "reason": "disconnected",
+                "indexed_count": int(result.get("indexed_count") or 0),
+            }
         status_store.set_status(
             tenant_id,
             source_type,
-            user_id=str(user_id or principal_id),  # Use original user_id for correct Redis key (organization vs personal)
+            user_id=status_uid,
             connection_status="active",
             files_indexed=int(result.get("indexed_count") or 0),
             last_error="",
@@ -534,6 +593,13 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
         return result
     
     except Exception as e:
+        if "connector_disconnected" in str(e):
+            logger.info(
+                "Backfill aborted; disconnected tenant=%s source=%s",
+                tenant_id,
+                source_type,
+            )
+            return {"aborted": True, "reason": "disconnected", "indexed_count": 0}
         logger.error(f"Backfill failed for tenant {tenant_id}, source {source_type}: {e}")
         err = str(e)
         conn_status = "needs_reauth" if "refresh" in err.lower() or "re-authorize" in err.lower() or "Unauthorized" in err else "error"
@@ -1009,7 +1075,12 @@ def google_queue_ping() -> dict:
 
 
 def _register_watches_best_effort(
-    oauth_manager, tenant_id: str, source_type: str, final_cursor: Optional[str]
+    oauth_manager,
+    tenant_id: str,
+    source_type: str,
+    final_cursor: Optional[str],
+    *,
+    cursor_tenant_id: Optional[str] = None,
 ) -> None:
     """Push watches are optional. Never fail a completed crawl over them.
 
@@ -1031,17 +1102,27 @@ def _register_watches_best_effort(
             source_type,
         )
         return
+    store_id = cursor_tenant_id or tenant_id
     watch_manager = WatchManager(oauth_manager, cursor_store, webhook_base_url)
     try:
         if source_type == "google_drive":
-            _run_async(watch_manager.register_drive_watch(tenant_id, final_cursor))
+            _run_async(
+                watch_manager.register_drive_watch(
+                    tenant_id, final_cursor, cursor_tenant_id=store_id
+                )
+            )
         elif source_type == "google_gmail":
             pubsub_topic = getattr(settings, "google_pubsub_topic", None) or ""
             project_id = getattr(settings, "google_pubsub_project_id", None) or ""
             if pubsub_topic and project_id:
                 full_topic = f"projects/{project_id}/topics/{pubsub_topic}"
                 _run_async(
-                    watch_manager.register_gmail_watch(tenant_id, final_cursor, full_topic)
+                    watch_manager.register_gmail_watch(
+                        tenant_id,
+                        final_cursor,
+                        full_topic,
+                        cursor_tenant_id=store_id,
+                    )
                 )
         elif source_type in ("onedrive", "outlook"):
             from app.connectors import provider_registry
@@ -1050,7 +1131,7 @@ def _register_watches_best_effort(
             if plugin and plugin.register_watch:
                 plugin.register_watch(
                     oauth_manager,
-                    tenant_id,
+                    store_id,
                     source_type,
                     final_cursor,
                     "",

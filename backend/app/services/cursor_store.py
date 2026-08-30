@@ -134,7 +134,7 @@ class CursorStore:
             source_type: Source type
             watch_data: Watch metadata (channel IDs, expiration, etc.)
         """
-        expiration_ms = watch_data.get("expiration", 0)
+        expiration_ms = watch_data.get("expiration", 0) if watch_data else 0
         
         async with ControlPlaneSessionLocal() as session:
             result = await session.execute(
@@ -148,9 +148,11 @@ class CursorStore:
             record = result.scalar_one_or_none()
             
             if record:
-                record.watch_data = watch_data
-                record.watch_expiration = expiration_ms
+                record.watch_data = watch_data or None
+                record.watch_expiration = expiration_ms or None
             else:
+                if not watch_data:
+                    return
                 record = SyncCursor(
                     tenant_id=tenant_id,
                     source_type=source_type,
@@ -159,6 +161,24 @@ class CursorStore:
                 )
                 session.add(record)
             
+            await session.commit()
+
+    async def clear_watch_info(self, tenant_id: str, source_type: str) -> None:
+        """Remove watch metadata after disconnect."""
+        async with ControlPlaneSessionLocal() as session:
+            result = await session.execute(
+                select(SyncCursor).where(
+                    and_(
+                        SyncCursor.tenant_id == tenant_id,
+                        SyncCursor.source_type == source_type,
+                    )
+                )
+            )
+            record = result.scalar_one_or_none()
+            if record is None:
+                return
+            record.watch_data = None
+            record.watch_expiration = None
             await session.commit()
     
     async def get_watch_info(

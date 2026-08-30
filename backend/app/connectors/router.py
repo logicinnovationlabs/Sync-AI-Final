@@ -270,6 +270,11 @@ async def disconnect_organization_connector(
                     await session.delete(row)
             await session.commit()
 
+        for source_type in GOOGLE_SOURCES:
+            status_store.clear_status(
+                tenant_id, source_type, user_id="organization"
+            )
+
         return {
             "status": "disconnected",
             "tenant_id": tenant_id,
@@ -504,12 +509,18 @@ async def get_connector_status(
         if plugin and plugin.get_watch_info and source_type in ("onedrive", "outlook"):
             watch_info = await plugin.get_watch_info(scope_id, source_type)
         else:
-            watch_info = await cursor_store.get_watch_info(tenant_id, source_type)
+            # Personal cursors/watches are keyed by tenant:user (scope_id).
+            watch_info = await cursor_store.get_watch_info(scope_id, source_type)
+            if not watch_info and connection_scope != "personal":
+                watch_info = await cursor_store.get_watch_info(tenant_id, source_type)
     except Exception:
         watch_info = None
 
     runtime_user_id = user_id if connection_scope == "personal" else "organization"
-    runtime = status_store.get_status(tenant_id, source_type, user_id=runtime_user_id)
+    runtime_raw = status_store.get_status_raw(tenant_id, source_type, user_id=runtime_user_id)
+    runtime = runtime_raw if runtime_raw is not None else status_store.get_status(
+        tenant_id, source_type, user_id=runtime_user_id
+    )
     if plugin and plugin.has_token and source_type in ("onedrive", "outlook"):
         has_token = bool(plugin.has_token(tenant_id, user_id))
     else:
@@ -517,9 +528,17 @@ async def get_connector_status(
         has_token = token_store.get_token(google_oauth_token_key(tenant_id, user_id, connection_scope)) is not None
         if not has_token:
             has_token = token_store.get_token(google_oauth_token_key(tenant_id, "", connection_scope)) is not None
-    connection_status = runtime.get("connection_status") or "not_connected"
-    if connection_status == "not_connected" and (cursor or has_token):
-        connection_status = "active" if cursor else "syncing"
+
+    # Trust an explicit Redis status. Only infer when the key is missing (legacy).
+    if runtime_raw is None:
+        if cursor:
+            connection_status = "active"
+        elif has_token:
+            connection_status = "syncing"
+        else:
+            connection_status = "not_connected"
+    else:
+        connection_status = runtime.get("connection_status") or "not_connected"
 
     details: Dict[str, Any] = {
         "connection_status": connection_status,
@@ -536,7 +555,7 @@ async def get_connector_status(
         tenant_id=tenant_id,
         source_type=source_type,
         cursor=cursor,
-        watch_active=watch_info is not None,
+        watch_active=bool(watch_info),
         details=details,
     )
 
@@ -556,15 +575,9 @@ async def disconnect_connector(
         raise HTTPException(status_code=403, detail="Cross-tenant execution rejected")
 
     user_id = _user_id(current_user)
-    await cursor_store.update_cursor(cursor_scope_id(tenant_id, user_id), source_type, "")
-    status_store.set_status(
-        tenant_id,
-        source_type,
-        user_id=user_id,
-        connection_status="not_connected",
-        files_indexed=0,
-        last_error="",
-    )
+    scope_id = cursor_scope_id(tenant_id, user_id)
+    await cursor_store.update_cursor(scope_id, source_type, "")
+    status_store.clear_status(tenant_id, source_type, user_id=user_id)
 
     plugin = provider_registry.get_by_source(source_type)
     if plugin and plugin.on_disconnect:

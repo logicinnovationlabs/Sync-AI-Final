@@ -149,6 +149,25 @@ class PersistentGoogleTokenStore(TokenStore):
         except Exception as exc:
             logger.warning("Vault token persist failed: %s", type(exc).__name__)
 
+    def clear_token(self, key: str) -> None:
+        """Remove OAuth blob from memory, Redis, and Vault."""
+        self._memory.pop(key, None)
+        tenant_id = self.tenant_id or tenant_from_token_key(key)
+        if self._redis is not None and tenant_id:
+            try:
+                self._redis.delete(_redis_blob_key(tenant_id, key))
+            except Exception:
+                pass
+        if tenant_id:
+            vault_name = vault_google_oauth_key(
+                tenant_id, principal_from_token_key(key), scope_from_token_key(key)
+            )
+            try:
+                if hasattr(vault_client, "delete"):
+                    vault_client.delete(vault_name)
+            except Exception:
+                pass
+
 
 def google_credential_ref(
     tenant_id: str, user_id: str = "", connection_scope: str = "personal"

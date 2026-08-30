@@ -29,7 +29,7 @@ from app.connectors.google.clients.gmail_client import GmailClient
 
 
 _GMAIL_BACKFILL_QUERY = (
-    "-category:promotions -category:social -category:forums -in:spam -in:trash"
+    "newer_than:365d -category:promotions -category:social -category:forums -in:spam -in:trash"
 )
 _OTP_SUBJECT = re.compile(
     r"\b(otp|one[ -]?time (code|password|passcode)|verification code|security code)\b",
@@ -88,23 +88,35 @@ class GmailConnector(BaseConnector):
         Fetch messages (backfill path).
         
         Used only by the one-time backfill task.
-        Note: Gmail API doesn't support time-based filtering directly,
-        so we fetch all messages and filter by internalDate in transform.
+        Gmail list supports ``newer_than`` in the query string so we bound
+        the crawl to the same ~365-day window as ``since``.
         
         Args:
-            since: Messages after this timestamp (applied in transform)
+            since: Messages after this timestamp (also reflected in list query)
             cursor: Page token from previous call
             
         Returns:
             DeltaResult with messages and next cursor
         """
         token = await self.get_valid_token()
+
+        query = _GMAIL_BACKFILL_QUERY
+        # Keep query aligned with the orchestrator's ``since`` window when possible.
+        if since is not None:
+            try:
+                days = max(1, (datetime.utcnow() - since.replace(tzinfo=None)).days)
+                query = (
+                    f"newer_than:{days}d -category:promotions -category:social "
+                    f"-category:forums -in:spam -in:trash"
+                )
+            except Exception:
+                query = _GMAIL_BACKFILL_QUERY
         
         response = await self.gmail_client.list_messages(
             access_token=token,
             page_size=100,
             page_token=cursor,
-            query=_GMAIL_BACKFILL_QUERY,
+            query=query,
         )
         
         message_ids = [msg["id"] for msg in response.get("messages", [])]

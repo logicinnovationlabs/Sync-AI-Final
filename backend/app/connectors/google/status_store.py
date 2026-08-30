@@ -40,6 +40,27 @@ def _key(tenant_id: str, source_type: str, user_id: str = "") -> str:
     return f"connector_status:{tenant_id}:{source_type}"
 
 
+def get_status_raw(
+    tenant_id: str, source_type: str, user_id: str = ""
+) -> Optional[Dict[str, Any]]:
+    """Return stored status, or None when the Redis key is missing."""
+    client = _sync_redis()
+    if client is None:
+        return None
+    try:
+        raw = client.get(_key(tenant_id, source_type, user_id))
+        if not raw:
+            return None
+        data = json.loads(raw)
+        if not isinstance(data, dict):
+            return None
+        data.setdefault("connection_status", "not_connected")
+        data.setdefault("files_indexed", 0)
+        return data
+    except Exception:
+        return None
+
+
 def get_status(tenant_id: str, source_type: str, user_id: str = "") -> Dict[str, Any]:
     empty = {
         "connection_status": "not_connected",
@@ -47,19 +68,33 @@ def get_status(tenant_id: str, source_type: str, user_id: str = "") -> Dict[str,
         "last_sync_at": None,
         "last_error": None,
     }
+    data = get_status_raw(tenant_id, source_type, user_id=user_id)
+    return data if data is not None else empty
+
+
+def is_disconnected(tenant_id: str, source_type: str, user_id: str = "") -> bool:
+    """True only when Redis explicitly records ``not_connected`` (after disconnect)."""
+    data = get_status_raw(tenant_id, source_type, user_id=user_id)
+    if data is None:
+        return False
+    return str(data.get("connection_status") or "") == "not_connected"
+
+
+def clear_status(tenant_id: str, source_type: str, user_id: str = "") -> Dict[str, Any]:
+    """Mark disconnected and keep the key so GET cannot re-infer Syncing from leftover tokens."""
+    current = {
+        "connection_status": "not_connected",
+        "files_indexed": 0,
+        "last_sync_at": None,
+        "last_error": None,
+    }
     client = _sync_redis()
-    if client is None:
-        return empty
-    try:
-        raw = client.get(_key(tenant_id, source_type, user_id))
-        if not raw:
-            return empty
-        data = json.loads(raw)
-        data.setdefault("connection_status", "not_connected")
-        data.setdefault("files_indexed", 0)
-        return data
-    except Exception:
-        return empty
+    if client is not None:
+        try:
+            client.set(_key(tenant_id, source_type, user_id), json.dumps(current))
+        except Exception as exc:
+            logger.warning("Failed to clear connector status: %s", type(exc).__name__)
+    return current
 
 
 def set_status(
@@ -71,7 +106,22 @@ def set_status(
     files_indexed: Optional[int] = None,
     last_error: Optional[str] = None,
     increment_indexed: int = 0,
+    force: bool = False,
 ) -> Dict[str, Any]:
+    # Never let an in-flight backfill resurrect a disconnected connector.
+    if (
+        not force
+        and is_disconnected(tenant_id, source_type, user_id=user_id)
+        and connection_status != "not_connected"
+    ):
+        logger.info(
+            "Skipping status update; connector disconnected tenant=%s source=%s user=%s",
+            tenant_id,
+            source_type,
+            user_id,
+        )
+        return get_status(tenant_id, source_type, user_id=user_id)
+
     current = get_status(tenant_id, source_type, user_id=user_id)
     if connection_status:
         current["connection_status"] = connection_status

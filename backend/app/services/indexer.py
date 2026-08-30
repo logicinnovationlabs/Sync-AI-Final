@@ -54,6 +54,9 @@ class Indexer:
                 if k in allowed_keys
             }
             owner_acl = list(extra_acl or [])
+            permissions = list(
+                dict.fromkeys(list(doc.permissions or []) + owner_acl)
+            )
             processed_docs.append(
                 {
                     "id": doc.id,
@@ -61,7 +64,8 @@ class Indexer:
                     "content": doc.content or "",
                     "source_type": doc.source_type,
                     "url": doc.url,
-                    "permissions": owner_acl or list(doc.permissions),
+                    "permissions": permissions,
+                    "acl_terms": _acl_terms(permissions, None),
                     "created_at": doc.created_at.isoformat(),
                     "updated_at": doc.updated_at.isoformat(),
                     "source_updated_at": doc.source_updated_at.isoformat(),
@@ -116,11 +120,7 @@ class Indexer:
 
         for doc in processed_docs:
             doc_id = str(doc["id"])
-            acl_terms = (
-                _acl_terms(extra_acl, None)
-                if extra_acl
-                else _acl_terms(doc.get("permissions") or [], extra_acl)
-            )
+            acl_terms = _acl_terms(doc.get("permissions") or [], extra_acl)
             body = doc.get("content") or ""
             title = doc.get("title") or ""
             local_ingest_index.upsert(

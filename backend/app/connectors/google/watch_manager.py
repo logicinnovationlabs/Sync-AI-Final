@@ -58,6 +58,8 @@ class WatchManager:
         self,
         tenant_id: str,
         page_token: str,
+        *,
+        cursor_tenant_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Register a Drive watch channel for push notifications.
@@ -65,16 +67,18 @@ class WatchManager:
         Should be called once after initial backfill completes.
         
         Args:
-            tenant_id: Tenant identifier
+            tenant_id: Tenant identifier used for OAuth token lookup
             page_token: Start page token (from backfill's final cursor)
+            cursor_tenant_id: Optional sync_cursors key (tenant:user). Defaults to tenant_id.
             
         Returns:
             Channel info dict with id, resourceId, expiration
         """
         token = await self.oauth_manager.get_valid_token(tenant_id)
+        store_id = cursor_tenant_id or tenant_id
         
         # Generate unique channel ID
-        channel_id = f"drive-{tenant_id}-{uuid.uuid4().hex[:8]}"
+        channel_id = f"drive-{store_id}-{uuid.uuid4().hex[:8]}"
         channel_token = uuid.uuid4().hex  # Secret token for validation
         
         # Calculate expiration (Google's max is ~7 days)
@@ -96,7 +100,7 @@ class WatchManager:
             
             # Store channel info in cursor_store
             await self.cursor_store.set_watch_info(
-                tenant_id=tenant_id,
+                tenant_id=store_id,
                 source_type="google_drive",
                 watch_data={
                     "channel_id": response["id"],
@@ -123,6 +127,8 @@ class WatchManager:
         tenant_id: str,
         history_id: str,
         pubsub_topic: str,
+        *,
+        cursor_tenant_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Register a Gmail Pub/Sub watch for push notifications.
@@ -130,14 +136,16 @@ class WatchManager:
         Should be called once after initial backfill completes.
         
         Args:
-            tenant_id: Tenant identifier
+            tenant_id: Tenant identifier used for OAuth token lookup
             history_id: Start history ID (from backfill's final cursor)
             pubsub_topic: Full Pub/Sub topic name (projects/{project}/topics/{topic})
+            cursor_tenant_id: Optional sync_cursors key (tenant:user). Defaults to tenant_id.
             
         Returns:
             Watch info dict with historyId and expiration
         """
         token = await self.oauth_manager.get_valid_token(tenant_id)
+        store_id = cursor_tenant_id or tenant_id
         
         try:
             response = await self.gmail_client.watch(
@@ -150,7 +158,7 @@ class WatchManager:
             
             # Store watch info in cursor_store
             await self.cursor_store.set_watch_info(
-                tenant_id=tenant_id,
+                tenant_id=store_id,
                 source_type="google_gmail",
                 watch_data={
                     "history_id": response["historyId"],

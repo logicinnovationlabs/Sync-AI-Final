@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
 # May be sync or async — async is preferred inside Celery so DB I/O stays on the
 # same event loop (avoids "Future attached to a different loop").
 CursorUpdateCallback = Callable[[str], Union[None, Awaitable[None]]]
+# Called after each indexed page with cumulative indexed_count.
+ProgressCallback = Callable[[int], Union[None, Awaitable[None]]]
 
 
 def _is_tenant_routing_failure(exc: BaseException) -> bool:
@@ -155,7 +157,7 @@ class SyncOrchestrator:
                         result.documents,
                         connector.source_type,
                         tenant_id,
-                        require_postgres=True,
+                        require_postgres=False,
                     )
                     if piped:
                         docs = piped
@@ -218,6 +220,7 @@ class SyncOrchestrator:
         cursor: Optional[str] = None,
         on_cursor_update: Optional[CursorUpdateCallback] = None,
         extra_acl: Optional[List[str]] = None,
+        on_progress: Optional[ProgressCallback] = None,
     ) -> dict:
         """
         Run a two-pass sync (called synchronously or from Celery tasks):
@@ -231,6 +234,7 @@ class SyncOrchestrator:
             cursor: Resume cursor from a prior mid-crawl checkpoint (delta pages)
             on_cursor_update: Called with next_cursor after each successfully
                 processed delta page so a kill/restart can resume without loss
+            on_progress: Called with cumulative indexed_count after each page
         """
         import asyncio
 
@@ -326,7 +330,10 @@ class SyncOrchestrator:
                             delta_res.documents,
                             connector.source_type,
                             tenant_id,
-                            require_postgres=True,
+                            # Prefer Block C when Postgres is healthy; fall back
+                            # to transform+bulk_index when tenant DB auth fails
+                            # so crawls finish instead of stalling on retries.
+                            require_postgres=False,
                         )
                         if piped:
                             docs = piped
@@ -366,6 +373,10 @@ class SyncOrchestrator:
                         page_ids = [d.id for d in docs]
                         stats["indexed_count"] += len(docs)
                         stats["indexed_ids"].extend(page_ids)
+                        if on_progress:
+                            maybe = on_progress(int(stats["indexed_count"]))
+                            if inspect.isawaitable(maybe):
+                                await maybe
 
                 stats["pages_processed"] += 1
                 next_c = getattr(delta_res, "next_cursor", None)

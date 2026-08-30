@@ -396,6 +396,9 @@ class MockVaultClient(VaultClient):
     def get(self, key_name: str) -> str:
         return self._lookup(key_name)
 
+    def delete(self, key_name: str) -> None:
+        self._in_memory_store.pop(key_name, None)
+
 
 def get_vault_client() -> VaultClient:
     """
