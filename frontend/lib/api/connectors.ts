@@ -62,6 +62,14 @@ export function disconnectConnector(token: string, source: BackendSourceType) {
   )
 }
 
+/** Disconnect both personal Google sources (Drive + Gmail). */
+export async function disconnectAllGooglePersonal(token: string) {
+  await Promise.all([
+    disconnectConnector(token, "google_drive"),
+    disconnectConnector(token, "google_gmail"),
+  ])
+}
+
 export interface GoogleAuthorizeResponse {
   authorization_url: string
   tenant_id: string

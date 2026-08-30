@@ -500,7 +500,17 @@ async def get_connector_status(
 
     user_id = _user_id(current_user)
     scope_id = cursor_scope_id(tenant_id, user_id) if connection_scope == "personal" else f"{tenant_id}_organization"
-    cursor = await cursor_store.get_cursor(scope_id, source_type)
+    cursor = None
+    try:
+        cursor = await cursor_store.get_cursor(scope_id, source_type)
+    except Exception:
+        logger.warning(
+            "cursor lookup failed tenant=%s source=%s scope=%s",
+            tenant_id,
+            source_type,
+            scope_id,
+            exc_info=True,
+        )
 
     plugin = provider_registry.get_by_source(source_type)
     watch_info = None
@@ -514,6 +524,13 @@ async def get_connector_status(
             if not watch_info and connection_scope != "personal":
                 watch_info = await cursor_store.get_watch_info(tenant_id, source_type)
     except Exception:
+        logger.warning(
+            "watch lookup failed tenant=%s source=%s scope=%s",
+            tenant_id,
+            source_type,
+            scope_id,
+            exc_info=True,
+        )
         watch_info = None
 
     runtime_user_id = user_id if connection_scope == "personal" else "organization"

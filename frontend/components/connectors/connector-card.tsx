@@ -8,6 +8,7 @@ import { Plug, RefreshCw, Unplug } from "lucide-react"
 import { ConnectorLogo } from "@/components/connector-logo"
 import { Button } from "@/components/ui/button"
 import {
+  disconnectAllGooglePersonal,
   disconnectConnector,
   disconnectOrganizationConnector,
   getConnectorStatus,
@@ -58,15 +59,25 @@ const MICROSOFT_SOURCES: { id: BackendSourceType; label: string }[] = [
   { id: "outlook", label: "Outlook" },
 ]
 
-function sourceIsLinked(status: ConnectorStatus | undefined): boolean {
+function shouldPollConnectorStatus(status: ConnectorStatus | undefined): boolean {
   const connectionStatus = String(status?.details?.connection_status || "")
-  if (connectionStatus === "not_connected") {
+  if (connectionStatus === "syncing") return true
+  if (status?.details?.token_present && connectionStatus !== "active") return true
+  return false
+}
+
+function sourceIsLinked(status: ConnectorStatus | undefined): boolean {
+  if (!status) return false
+  const connectionStatus = String(status.details?.connection_status || "")
+  const tokenPresent = Boolean(status.details?.token_present)
+  // Explicit disconnect clears tokens; not_connected without a token is truly off.
+  if (connectionStatus === "not_connected" && !tokenPresent) {
     return false
   }
   return (
-    Boolean(status?.cursor) ||
-    Boolean(status?.details?.token_present) ||
-    ["active", "syncing"].includes(connectionStatus)
+    Boolean(status.cursor) ||
+    tokenPresent ||
+    ["active", "syncing", "error", "needs_reauth"].includes(connectionStatus)
   )
 }
 
@@ -106,13 +117,11 @@ function GoogleSource({ id, label }: { id: BackendSourceType; label: string }) {
 
   const status = useQuery({
     queryKey: ["connector-status", id],
-    queryFn: () => getConnectorStatus(token!, id),
+    queryFn: () => getConnectorStatus(token!, id, "personal"),
     enabled: hydrated && Boolean(token) && canRead,
     retry: false,
     refetchInterval: (query) =>
-      String(query.state.data?.details?.connection_status || "") === "syncing"
-        ? 3000
-        : false,
+      shouldPollConnectorStatus(query.state.data) ? 3000 : false,
   })
 
   const invalidate = () =>
@@ -131,13 +140,15 @@ function GoogleSource({ id, label }: { id: BackendSourceType; label: string }) {
   const watching = Boolean(status.data?.watch_active)
   const connectionStatus = String(status.data?.details?.connection_status || "")
   const filesIndexed = Number(status.data?.details?.files_indexed || 0)
+  const isSyncing =
+    connectionStatus === "syncing" || backfill.isPending
   const statusLabel = !hydrated
     ? "Checking…"
     : !canRead
       ? "Needs connectors.read"
-      : status.isPending
+      : status.isPending && !status.data
         ? "Checking…"
-        : connectionStatus === "syncing"
+        : isSyncing
           ? "Syncing"
           : connectionStatus === "needs_reauth"
             ? "Needs re-auth"
@@ -168,7 +179,7 @@ function GoogleSource({ id, label }: { id: BackendSourceType; label: string }) {
         <StatTile
           label="Ingestion"
           value={
-            connectionStatus === "syncing"
+            isSyncing
               ? filesIndexed > 0
                 ? `Syncing · ${filesIndexed}`
                 : "Syncing"
@@ -178,7 +189,7 @@ function GoogleSource({ id, label }: { id: BackendSourceType; label: string }) {
                   ? "Started"
                   : "Not started"
           }
-          on={started || connectionStatus === "syncing"}
+          on={started || isSyncing}
         />
         <StatTile
           label="Live updates"
@@ -264,15 +275,16 @@ function GoogleOrganizationSource({ id, label }: { id: BackendSourceType; label:
   const watching = Boolean(status.data?.watch_active)
   const connectionStatus = String(status.data?.details?.connection_status || "")
   const filesIndexed = Number(status.data?.details?.files_indexed || 0)
+  const isSyncing = connectionStatus === "syncing" || backfill.isPending
   const statusLabel = !hydrated
     ? "Checking…"
     : !canRead
       ? "Needs connectors.read"
-      : status.isPending
+      : status.isPending && !status.data
         ? "Checking…"
         : !orgEnabled
           ? "Disabled by admin"
-          : connectionStatus === "syncing"
+          : isSyncing
             ? "Syncing"
             : connectionStatus === "error"
               ? "Error"
@@ -301,7 +313,7 @@ function GoogleOrganizationSource({ id, label }: { id: BackendSourceType; label:
         <StatTile
           label="Ingestion"
           value={
-            connectionStatus === "syncing"
+            isSyncing
               ? filesIndexed > 0
                 ? `Syncing · ${filesIndexed}`
                 : "Syncing"
@@ -311,7 +323,7 @@ function GoogleOrganizationSource({ id, label }: { id: BackendSourceType; label:
                   ? "Started"
                   : "Not started"
           }
-          on={started || connectionStatus === "syncing"}
+          on={started || isSyncing}
         />
         <StatTile
           label="Live updates"
@@ -380,9 +392,7 @@ export function ConnectorCard({
     enabled: isGooglePersonal && googleLive && hydrated && Boolean(token) && canRead,
     retry: false,
     refetchInterval: (query) =>
-      String(query.state.data?.details?.connection_status || "") === "syncing"
-        ? 3000
-        : false,
+      shouldPollConnectorStatus(query.state.data) ? 3000 : false,
   })
   const gmailStatus = useQuery({
     queryKey: ["connector-status", "google_gmail"],
@@ -390,9 +400,7 @@ export function ConnectorCard({
     enabled: isGooglePersonal && googleLive && hydrated && Boolean(token) && canRead,
     retry: false,
     refetchInterval: (query) =>
-      String(query.state.data?.details?.connection_status || "") === "syncing"
-        ? 3000
-        : false,
+      shouldPollConnectorStatus(query.state.data) ? 3000 : false,
   })
 
   // Organization Google status is read-only for members
@@ -413,6 +421,13 @@ export function ConnectorCard({
     isGooglePersonal &&
     googleLive &&
     (sourceIsLinked(driveStatus.data) || sourceIsLinked(gmailStatus.data))
+
+  const disconnectGoogle = useMutation({
+    mutationFn: () => disconnectAllGooglePersonal(token!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["connector-status"] })
+    },
+  })
 
   const googleOrgLinked =
     isGoogleOrganization &&
@@ -446,9 +461,7 @@ export function ConnectorCard({
     enabled: microsoftLive && hydrated && Boolean(token) && canRead,
     retry: false,
     refetchInterval: (query) =>
-      String(query.state.data?.details?.connection_status || "") === "syncing"
-        ? 3000
-        : false,
+      shouldPollConnectorStatus(query.state.data) ? 3000 : false,
   })
   const outlookStatus = useQuery({
     queryKey: ["connector-status", "outlook"],
@@ -456,9 +469,7 @@ export function ConnectorCard({
     enabled: microsoftLive && hydrated && Boolean(token) && canRead,
     retry: false,
     refetchInterval: (query) =>
-      String(query.state.data?.details?.connection_status || "") === "syncing"
-        ? 3000
-        : false,
+      shouldPollConnectorStatus(query.state.data) ? 3000 : false,
   })
   const microsoftLinked =
     microsoftLive &&
@@ -470,6 +481,10 @@ export function ConnectorCard({
     const microsoft = searchParams.get("microsoft")
     if (!google && !microsoft) return
     queryClient.invalidateQueries({ queryKey: ["connector-status"] })
+    const timer = window.setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ["connector-status"] })
+    }, 3000)
+    return () => window.clearInterval(timer)
   }, [connector.source, queryClient, searchParams, isGooglePersonal, isGoogleOrganization, isMicrosoft])
 
   const live = connector.available
@@ -535,19 +550,40 @@ export function ConnectorCard({
         </p>
         {live && isGooglePersonal ? (
           hydrated && canWrite && (
-            <Button
-              size="sm"
-              variant={googleLinked ? "outline" : "default"}
-              disabled={authorize.isPending}
-              onClick={() => authorize.mutate()}
-            >
-              <Plug className="size-3.5" />
-              {authorize.isPending
-                ? "Opening…"
-                : googleLinked
-                  ? "Reconnect"
-                  : "Connect"}
-            </Button>
+            <div className="flex gap-1.5">
+              {googleLinked ? (
+                <>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={disconnectGoogle.isPending}
+                    onClick={() => disconnectGoogle.mutate()}
+                  >
+                    <Unplug className="size-3.5" />
+                    {disconnectGoogle.isPending ? "Disconnecting…" : "Disconnect"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={authorize.isPending}
+                    onClick={() => authorize.mutate()}
+                  >
+                    <Plug className="size-3.5" />
+                    {authorize.isPending ? "Opening…" : "Reconnect"}
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="default"
+                  disabled={authorize.isPending}
+                  onClick={() => authorize.mutate()}
+                >
+                  <Plug className="size-3.5" />
+                  {authorize.isPending ? "Opening…" : "Connect"}
+                </Button>
+              )}
+            </div>
           )
         ) : live && isMicrosoft ? (
           hydrated &&
