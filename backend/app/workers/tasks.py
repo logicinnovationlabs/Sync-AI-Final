@@ -408,14 +408,8 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
                 user_id=status_user_id,
                 connection_status="syncing",
                 last_error="",
+                force=True,
             )
-            if status_store.is_disconnected(tenant_id, source_type, user_id=status_user_id):
-                logger.info(
-                    "Backfill aborted after syncing stamp; disconnected tenant=%s source=%s",
-                    tenant_id,
-                    source_type,
-                )
-                return {"aborted": True, "reason": "disconnected", "indexed_count": 0}
         elif source_type in ("onedrive", "outlook"):
             from app.connectors import provider_registry
 

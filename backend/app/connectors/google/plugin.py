@@ -250,6 +250,7 @@ async def handle_oauth_callback(
             user_id=user_id,
             connection_status="syncing",
             last_error="",
+            force=True,
         )
         try:
             backfill_source.delay(
@@ -265,6 +266,7 @@ async def handle_oauth_callback(
                 user_id=user_id,
                 connection_status="error",
                 last_error="celery_enqueue_failed",
+                force=True,
             )
             logger.exception(
                 "Failed to enqueue backfill tenant=%s source=%s",

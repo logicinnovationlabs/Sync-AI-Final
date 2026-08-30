@@ -106,7 +106,8 @@ async def trigger_backfill(
 
     user_id = _user_id(current_user)
     status_store.set_status(
-        tenant_id, source_type, user_id=user_id, connection_status="syncing", last_error=""
+        tenant_id, source_type, user_id=user_id, connection_status="syncing", last_error="",
+        force=True,
     )
     task_result = backfill_tenant_source.delay(
         tenant_id=tenant_id,
