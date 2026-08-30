@@ -18,7 +18,7 @@ import inspect
 import logging
 
 from app.core.base_connector import BaseConnector
-from app.core.exceptions import TenantNotFoundError, VaultError
+from app.core.exceptions import TenantNotFoundError, UnauthorizedError, VaultError
 from app.services.registry import connector_registry
 from app.services.indexer import indexer
 from app.connectors.google.token_store import google_credential_ref
@@ -258,6 +258,9 @@ class SyncOrchestrator:
                     del_res = await connector.fetch_deleted_ids(since=since, cursor=del_cursor)
                 except NotImplementedError:
                     break
+                except UnauthorizedError:
+                    # Re-raise auth failures so the calling task can set needs_reauth status.
+                    raise
                 except Exception:
                     logger.exception(
                         "fetch_deleted_ids failed tenant=%s source=%s",
@@ -285,6 +288,9 @@ class SyncOrchestrator:
             while True:
                 try:
                     delta_res = await connector.fetch_delta(since=since, cursor=delta_cursor)
+                except UnauthorizedError:
+                    # Re-raise auth failures so the calling task can set needs_reauth status.
+                    raise
                 except Exception as exc:
                     err = str(exc)
                     # Stale/corrupt list pageToken → reset and retry once from start

@@ -430,6 +430,18 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
             if principal_id:
                 scope_id = cursor_scope_id(tenant_id, principal_id)
                 user_id = principal_id
+            # Abort early if user disconnected before worker picked up the task.
+            _ms_uid = str(user_id or principal_id)
+            if _ms_uid and status_store.is_disconnected(
+                tenant_id, source_type, user_id=_ms_uid
+            ):
+                logger.info(
+                    "Backfill aborted; connector disconnected tenant=%s source=%s user=%s",
+                    tenant_id,
+                    source_type,
+                    _ms_uid,
+                )
+                return {"aborted": True, "reason": "disconnected", "indexed_count": 0}
         if source_type.startswith("google_") and not principal_id:
             seed_token_store_from_env(
                 token_store,
@@ -602,7 +614,8 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
             return {"aborted": True, "reason": "disconnected", "indexed_count": 0}
         logger.error(f"Backfill failed for tenant {tenant_id}, source {source_type}: {e}")
         err = str(e)
-        conn_status = "needs_reauth" if "refresh" in err.lower() or "re-authorize" in err.lower() or "Unauthorized" in err else "error"
+        is_auth_failure = isinstance(e, _AUTH_FAILURE_TYPES) or "Unauthorized" in err or "refresh" in err.lower() or "re-authorize" in err.lower() or "No Microsoft OAuth tokens" in err
+        conn_status = "needs_reauth" if is_auth_failure else "error"
         try:
             status_store.set_status(
                 tenant_id,
