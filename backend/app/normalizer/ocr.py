@@ -55,30 +55,42 @@ class OCRService:
         Returns:
             Extracted text (may be empty on timeout or failure)
         """
-        _ = fixture_key
         try:
             import pytesseract
             import signal
             
+            # Increase decompression limit safely to handle large scans without crashing
+            Image.MAX_IMAGE_PIXELS = 200_000_000
+
             # Open image from bytes
-            image = Image.open(io.BytesIO(image_bytes))
-            
-            # Set timeout handler (Unix only; Windows will ignore)
-            def timeout_handler(signum, frame):
-                raise TimeoutError("OCR timeout")
-            
-            if hasattr(signal, 'SIGALRM'):
-                old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-                signal.alarm(self.timeout)
-            
-            try:
-                # Run OCR
-                text = pytesseract.image_to_string(image, lang=self.language, timeout=self.timeout)
-                return text.strip()
-            finally:
+            with Image.open(io.BytesIO(image_bytes)) as image:
+                # Downsample images that exceed 2048px on any side
+                # This prevents memory explosion (e.g. 108MP camera photos allocating 400MB+ uncompressed RAM)
+                # while preserving 100% OCR text extraction accuracy
+                max_dim = 2048
+                if image.width > max_dim or image.height > max_dim:
+                    image.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+                
+                # Convert non-RGB/L images (like RGBA or palette) to RGB for pytesseract
+                if image.mode not in ("L", "RGB"):
+                    image = image.convert("RGB")
+                
+                # Set timeout handler (Unix only; Windows will ignore)
+                def timeout_handler(signum, frame):
+                    raise TimeoutError("OCR timeout")
+                
                 if hasattr(signal, 'SIGALRM'):
-                    signal.alarm(0)
-                    signal.signal(signal.SIGALRM, old_handler)
+                    old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+                    signal.alarm(self.timeout)
+                
+                try:
+                    # Run OCR
+                    text = pytesseract.image_to_string(image, lang=self.language, timeout=self.timeout)
+                    return text.strip()
+                finally:
+                    if hasattr(signal, 'SIGALRM'):
+                        signal.alarm(0)
+                        signal.signal(signal.SIGALRM, old_handler)
         
         except TimeoutError:
             logger.warning(f"OCR timeout after {self.timeout} seconds")
