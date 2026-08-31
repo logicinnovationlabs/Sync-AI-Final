@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from app.core.base_connector import UnifiedDocument
 
 logger = logging.getLogger(__name__)
+
+# Max concurrent pipeline.process_raw() calls per batch.
+# Higher = faster but more DB connection pressure. 8 is a safe default for
+# the Render free-tier Postgres (max 20 connections, 2 Celery workers).
+_PIPELINE_CONCURRENCY = 8
 
 _memory_pipeline = None
 
@@ -58,23 +63,33 @@ async def _run_pipeline(
     tenant_uuid: UUID,
     tenant_id: str,
 ) -> Optional[List[UnifiedDocument]]:
+    sem = asyncio.Semaphore(_PIPELINE_CONCURRENCY)
+
+    async def _process_one(raw: Dict[str, Any]):
+        async with sem:
+            return await pipeline.process_raw(raw, source_type, tenant_uuid)
+
+    results = await asyncio.gather(
+        *[_process_one(raw) for raw in raw_documents],
+        return_exceptions=True,
+    )
+
     unified: List[UnifiedDocument] = []
     failures = 0
-    for raw in raw_documents:
-        try:
-            result = await pipeline.process_raw(raw, source_type, tenant_uuid)
-            doc = result.get("unified_document")
-            if doc is not None:
-                unified.append(doc)
-        except Exception as extra:
+    for raw, result in zip(raw_documents, results):
+        if isinstance(result, Exception):
             failures += 1
             logger.warning(
                 "pipeline=block_c_item_failed source=%s id=%s exc_type=%s exc=%s",
                 source_type,
                 raw.get("id"),
-                type(extra).__name__,
-                extra,
+                type(result).__name__,
+                result,
             )
+            continue
+        doc = result.get("unified_document") if isinstance(result, dict) else None
+        if doc is not None:
+            unified.append(doc)
 
     if unified:
         logger.info(

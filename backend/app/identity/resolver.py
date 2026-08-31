@@ -6,7 +6,7 @@ race-condition duplicate Principal rows.
 """
 
 import logging
-from typing import List, Optional
+from typing import Dict, List, Optional
 from uuid import uuid4, UUID
 from datetime import datetime, timezone
 from email_validator import validate_email, EmailNotValidError
@@ -41,6 +41,11 @@ class IdentityResolver:
         """
         self.matchers = matchers
         self.repo = canonical_repo
+        # Per-instance cache: (tenant_id, email) -> (principal_id, email)
+        # Eliminates redundant DB lookups when the same email appears
+        # across many documents in a single backfill batch (e.g. same Gmail
+        # owner across 73 messages = 73 DB queries without this cache -> 1).
+        self._email_principal_cache: Dict[tuple, Optional[tuple]] = {}
     
     async def resolve(
         self,
@@ -136,23 +141,58 @@ class IdentityResolver:
         document_id: str,
         source_account_id: Optional[UUID],
     ) -> ResolvedIdentity:
-        """Bind a Drive share or Gmail mailbox email to users.principal_id or queue it."""
+        """Bind a Drive share or Gmail mailbox email to users.principal_id or queue it.
+
+        Uses an in-process cache keyed by (tenant_id, email) to avoid hitting the
+        database on every document in a batch (e.g. same mailbox owner across 73 emails).
+        """
+        cache_key = (tenant_id, normalized_email)
+
+        # --- Cache hit: return immediately without any DB round-trip ---
+        if cache_key in self._email_principal_cache:
+            cached = self._email_principal_cache[cache_key]
+            if cached is not None:
+                principal_id, email = cached
+                now = datetime.now(timezone.utc)
+                principal = Principal(
+                    id=principal_id,
+                    tenant_id=tenant_id,
+                    email=email,
+                    name=hint.name,
+                    source_identities={hint.source_type: hint.external_id},
+                    created_at=now,
+                    updated_at=now,
+                )
+                return ResolvedIdentity(
+                    principal_id=principal_id,
+                    principal=principal,
+                    confidence=1.0,
+                    matched_on="email",
+                )
+            # Cached None means this email was already tried and queued as pending
+            if hasattr(self.repo, "upsert_pending_identity"):
+                await self.repo.upsert_pending_identity(
+                    tenant_id, document_id, normalized_email,
+                    source_account_id=source_account_id,
+                )
+            return ResolvedIdentity(
+                principal_id=None, principal=None, confidence=0.0,
+                matched_on="pending", is_pending=True,
+            )
+
+        # --- Step 1: Check the tenant DB (users table + identity_principals) ---
         login_user = None
         if hasattr(self.repo, "get_login_user_by_email"):
             login_user = await self.repo.get_login_user_by_email(normalized_email, tenant_id)
 
-        if not login_user and hasattr(self.repo, "get_principal_by_email"):
-            principal_match = await self.repo.get_principal_by_email(normalized_email, tenant_id)
-            if principal_match:
-                login_user = (principal_match.id, principal_match.email)
-
+        # --- Step 2: Fallback to ControlPlaneSessionLocal (correct import) ---
         if not login_user:
             try:
-                from app.storage.control_plane_db import control_plane_db_manager
+                from app.storage.control_plane_db import ControlPlaneSessionLocal
                 from app.models.user import User
                 from sqlalchemy import select, func
-                
-                async with control_plane_db_manager.session() as cp_session:
+
+                async with ControlPlaneSessionLocal() as cp_session:
                     res = await cp_session.execute(
                         select(User).where(
                             User.tenant_id == tenant_id,
@@ -165,6 +205,7 @@ class IdentityResolver:
             except Exception:
                 pass
 
+        # --- Step 3: Create a new principal if still not found ---
         if not login_user and normalized_email:
             try:
                 principal = await self._create_principal(normalized_email, tenant_id, hint)
@@ -174,6 +215,8 @@ class IdentityResolver:
 
         if login_user:
             principal_id, email = login_user
+            # Cache the result for subsequent documents in this batch
+            self._email_principal_cache[cache_key] = (principal_id, email)
             now = datetime.now(timezone.utc)
             principal = Principal(
                 id=principal_id,
@@ -184,7 +227,7 @@ class IdentityResolver:
                 created_at=now,
                 updated_at=now,
             )
-            logger.info(
+            logger.debug(
                 "mirror identity bound source=%s email=%s principal_id=%s document_id=%s",
                 hint.source_type,
                 normalized_email,
@@ -197,6 +240,9 @@ class IdentityResolver:
                 confidence=1.0,
                 matched_on="email",
             )
+
+        # Cache the negative result to avoid repeating these DB calls
+        self._email_principal_cache[cache_key] = None
 
         if hasattr(self.repo, "upsert_pending_identity"):
             await self.repo.upsert_pending_identity(
@@ -218,7 +264,7 @@ class IdentityResolver:
             is_pending=True,
         )
 
-    
+
     async def _match_by_email(
         self, normalized_email: str, tenant_id: UUID, hint: IdentityHint
     ) -> Optional[Principal]:

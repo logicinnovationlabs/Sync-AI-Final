@@ -594,8 +594,29 @@ async def disconnect_connector(
 
     user_id = _user_id(current_user)
     scope_id = cursor_scope_id(tenant_id, user_id)
-    await cursor_store.update_cursor(scope_id, source_type, "")
-    status_store.clear_status(tenant_id, source_type, user_id=user_id)
+
+    # Clear cursor — failure is non-fatal; log and continue.
+    try:
+        await cursor_store.update_cursor(scope_id, source_type, "")
+    except Exception:
+        logger.warning(
+            "Failed to clear cursor on disconnect tenant=%s source=%s scope=%s",
+            tenant_id,
+            source_type,
+            scope_id,
+            exc_info=True,
+        )
+
+    # Always mark as not_connected in Redis regardless of DB state.
+    try:
+        status_store.clear_status(tenant_id, source_type, user_id=user_id)
+    except Exception:
+        logger.warning(
+            "Failed to clear status on disconnect tenant=%s source=%s",
+            tenant_id,
+            source_type,
+            exc_info=True,
+        )
 
     plugin = provider_registry.get_by_source(source_type)
     if plugin and plugin.on_disconnect:
