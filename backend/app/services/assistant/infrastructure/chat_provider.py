@@ -622,6 +622,7 @@ class OpenRouterChatProvider:
         http_referer: Optional[str] = None,
     ) -> None:
         # Import here so fake/unit tests do not require the openai package.
+        import httpx
         from openai import AsyncOpenAI
 
         self.model = model
@@ -631,7 +632,7 @@ class OpenRouterChatProvider:
         self._client = AsyncOpenAI(
             api_key=api_key,
             base_url=base_url,
-            timeout=timeout_s,
+            http_client=httpx.AsyncClient(timeout=httpx.Timeout(timeout_s)),
             default_headers={
                 "HTTP-Referer": referer,
                 "X-Title": "SynQ",

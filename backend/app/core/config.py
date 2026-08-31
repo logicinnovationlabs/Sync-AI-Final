@@ -600,7 +600,14 @@ class Settings(BaseSettings):
 
     @property
     def embedding_provider(self) -> str:
-        return self.llm_provider
+        env_val = (os.environ.get("EMBEDDING_PROVIDER") or os.environ.get("embedding_provider") or "").strip().lower()
+        if env_val:
+            return env_val
+        if getattr(self, "gemini_api_key", None) or os.environ.get("GEMINI_API_KEY"):
+            return "gemini"
+        if str(getattr(self, "llm_provider", "")).strip().lower() in ("gemini", "fake"):
+            return str(self.llm_provider).strip().lower()
+        return "fake"
 
     @property
     def embedding_model(self) -> str:

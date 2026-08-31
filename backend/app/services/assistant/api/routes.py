@@ -214,10 +214,11 @@ async def orchestrator_chat(
         gen_error = result.get("generation_error") or ""
         # Do not stream a fabricated answer. Provider errors stay in `final`.
         if not gen_error:
-            chunk_size = 48
+            chunk_size = 28
             for i in range(0, len(text), chunk_size):
                 piece = text[i : i + chunk_size]
                 yield (json.dumps({"type": "token", "text": piece}) + "\n").encode("utf-8")
+                await asyncio.sleep(0.012)
         final = {
             "type": "final",
             "response_text": text,
@@ -243,7 +244,15 @@ async def orchestrator_chat(
         )
         yield (json.dumps(final) + "\n").encode("utf-8")
 
-    return StreamingResponse(event_stream(), media_type="application/x-ndjson")
+    return StreamingResponse(
+        event_stream(),
+        media_type="application/x-ndjson",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @router.get("/orchestrator/sessions", response_model=List[SessionSummaryOut])

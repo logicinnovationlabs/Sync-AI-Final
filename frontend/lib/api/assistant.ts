@@ -222,12 +222,10 @@ export function getAssistantSession(token: string, sessionId: string) {
   )
 }
 
-/** Strip model citation markup like `[5, 6]` / `[1, p.1]` from displayed prose. */
+/** Strip model citation markup like `[5, 6]` / `[1, p.1]` from displayed prose while preserving markdown formatting. */
 export function stripInlineCitations(text: string): string {
+  if (!text) return ""
   return text
     .replace(/\s*\[\s*\d+(?:\s*,\s*(?:p\.\s*)?\d+)*\s*\]/gi, "")
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/[^\S\n]{2,}/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
     .trim()
 }

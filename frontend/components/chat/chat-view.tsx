@@ -6,6 +6,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import { ChevronDown, ChevronUp } from "lucide-react"
 import { Composer } from "@/components/chat/composer"
 import { SourceCard, type SourceCardData } from "@/components/chat/source-card"
+import { MarkdownContent } from "@/components/chat/markdown-content"
 import { Loader } from "@/components/motion/loader"
 import {
   getAssistantSession,
@@ -324,7 +325,7 @@ export function ChatView() {
               setTurns((prev) =>
                 prev.map((t) =>
                   t.kind === "answer" && t.id === answerId
-                    ? { ...t, text: stripInlineCitations(t.text + event.text) }
+                    ? { ...t, text: (t.text || "") + event.text }
                     : t
                 )
               )
@@ -485,7 +486,7 @@ export function ChatView() {
                     transition={{ duration: 0.2, ease: EASE_OUT }}
                     className="flex justify-end"
                   >
-                    <div className="max-w-[min(85%,36rem)] rounded-[1.35rem] bg-neutral-100 px-4 py-2.5 text-[0.9875rem] leading-[1.55] tracking-[-0.011em] text-neutral-800">
+                    <div className="max-w-[min(85%,36rem)] rounded-2xl bg-neutral-100/90 px-4 py-2.5 text-[0.9875rem] leading-[1.55] tracking-[-0.011em] text-neutral-900 shadow-xs border border-neutral-200/50 dark:border-neutral-700/50 dark:bg-neutral-800 dark:text-neutral-100">
                       {turn.text}
                     </div>
                   </motion.div>
@@ -598,14 +599,14 @@ function AnswerTurn({
       )}
 
       {turn.text && (
-        <div className="min-w-0 wrap-break-word whitespace-pre-wrap text-[1.0625rem] leading-[1.75] tracking-[-0.014em] text-neutral-800">
-          {turn.text}
+        <div className="relative min-w-0">
+          <MarkdownContent content={turn.text} />
           {streaming && (
             <motion.span
               aria-hidden
-              animate={{ opacity: [1, 0.25, 1] }}
-              transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut" }}
-              className="ml-0.5 inline-block h-[1.05em] w-0.5 translate-y-[0.18em] rounded-full bg-ink-blue"
+              animate={{ opacity: [1, 0.2, 1] }}
+              transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
+              className="ml-1 inline-block h-[1.1em] w-1.5 translate-y-[0.15em] rounded-xs bg-blue-600 dark:bg-blue-400"
             />
           )}
         </div>
