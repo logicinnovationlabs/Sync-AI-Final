@@ -170,9 +170,23 @@ async def orchestrator_chat(
     )
     authorization = request.headers.get("Authorization")
 
-    result = await graph.arun(
-        orch_request, acl_compiled_filter=acl_bytes, authorization=authorization
-    )
+    try:
+        result = await graph.arun(
+            orch_request, acl_compiled_filter=acl_bytes, authorization=authorization
+        )
+    except Exception as exc:
+        logger.exception("[assistant.pipeline] Error during graph execution: %s", exc)
+        result = {
+            "response_text": "I encountered an issue processing your request. Please try again in a moment.",
+            "generation_error": str(exc),
+            "citations": [],
+            "ranked_hits": [],
+            "base_hits": [],
+            "intent": "chat",
+            "timings_ms": {},
+            "latency_ms": 0.0,
+            "chat_provider_name": "fallback",
+        }
 
     async def event_stream() -> AsyncIterator[bytes]:
         # NDJSON stream: meta, then token chunks, then final.
@@ -236,7 +250,11 @@ async def list_sessions(
     tenant_id, user_id = _principal_ids(current_user)
     if not tenant_id or not user_id:
         raise HTTPException(status_code=401, detail="tenant_id / principal_id missing")
-    rows = memory.list_sessions_for_user(tenant_id, user_id)
+    try:
+        rows = memory.list_sessions_for_user(tenant_id, user_id)
+    except Exception as exc:
+        logger.warning("[assistant.sessions] Error listing sessions: %s", exc)
+        rows = []
     return [SessionSummaryOut.model_validate(row) for row in rows]
 
 
@@ -247,7 +265,11 @@ async def get_session(
     memory: EpisodicMemoryStore = Depends(get_memory),
 ):
     tenant_id, user_id = _principal_ids(current_user)
-    ctx = memory.load_session(tenant_id, session_id)
+    try:
+        ctx = memory.load_session(tenant_id, session_id)
+    except Exception as exc:
+        logger.warning("[assistant.get_session] Error loading session %s: %s", session_id, exc)
+        ctx = None
     if ctx is None:
         raise HTTPException(status_code=404, detail="session not found")
     if ctx.tenant_id != tenant_id:

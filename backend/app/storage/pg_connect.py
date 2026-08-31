@@ -144,7 +144,10 @@ def prepare_database_url(
             user = f"postgres.{ref}"
         host = pooler_host
         if port == 5432 and "pooler.supabase.com" in pooler_host:
-            port = 5432
+            port = 6543
+
+    if is_supabase_pooler_host(host) and port == 5432:
+        port = 6543
 
     if host in ("localhost", "::1"):
         host = "127.0.0.1"
