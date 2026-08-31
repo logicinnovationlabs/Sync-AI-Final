@@ -6,6 +6,7 @@ No unsigned-JWT fallback and no test-user invention.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import Any, AsyncIterator, Dict, List, Optional
