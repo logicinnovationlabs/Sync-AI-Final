@@ -379,7 +379,6 @@ async def trigger_organization_backfill(
 async def get_organization_connector_status(
     source_type: str = Query(..., description="Source type (google_drive or google_gmail)"),
     current_user: Dict[str, Any] = Depends(get_current_user),
-    tenant: TenantRouting = Depends(get_tenant),
 ):
     """
     Get organization connector status (read-only for members).
@@ -388,8 +387,8 @@ async def get_organization_connector_status(
     admin-only actions or credentials. Resilient against unconfigured state.
     """
     tenant_id = current_user.get("tenant_id")
-    if not tenant_id or str(tenant.tenant_id) != tenant_id:
-        raise HTTPException(status_code=403, detail="Cross-tenant execution rejected")
+    if not tenant_id:
+        raise HTTPException(status_code=401, detail="Token missing tenant_id claim")
 
     try:
         tenant_uuid = UUID(tenant_id)
@@ -411,44 +410,40 @@ async def get_organization_connector_status(
         org_enabled = False
 
     row = None
-    try:
-        from app.services.tenant_resolver import tenant_resolver
-        from app.storage.tenant_db import tenant_db_manager
-        from app.models.tenant_connector import TenantConnector
+    if org_enabled:
+        try:
+            from app.services.tenant_resolver import tenant_resolver
+            from app.storage.tenant_db import tenant_db_manager
+            from app.models.tenant_connector import TenantConnector
 
-        routing = await tenant_resolver.resolve(tenant_id)
-        factory = tenant_db_manager.get_session_factory(
-            routing.db_host,
-            routing.db_name,
-            routing.db_user,
-            routing.db_password,
-            str(routing.tenant_id),
-        )
-        async with factory() as session:
-            result = await session.execute(
-                select(TenantConnector).where(
-                    TenantConnector.tenant_id == tenant_uuid,
-                    TenantConnector.source_type == source_type,
-                    TenantConnector.connection_scope == "organization",
-                )
+            routing = await tenant_resolver.resolve(tenant_id)
+            factory = tenant_db_manager.get_session_factory(
+                routing.db_host,
+                routing.db_name,
+                routing.db_user,
+                routing.db_password,
+                str(routing.tenant_id),
             )
-            row = result.scalar_one_or_none()
-    except Exception as e:
-        logger.warning("Failed to query TenantConnector for tenant=%s source=%s: %s", tenant_id, source_type, e)
-        row = None
+            async with factory() as session:
+                result = await session.execute(
+                    select(TenantConnector).where(
+                        TenantConnector.tenant_id == tenant_uuid,
+                        TenantConnector.source_type == source_type,
+                        TenantConnector.connection_scope == "organization",
+                    )
+                )
+                row = result.scalar_one_or_none()
+        except Exception as e:
+            logger.warning("Failed to query TenantConnector for tenant=%s source=%s: %s", tenant_id, source_type, e)
+            row = None
 
     scope_id = f"{tenant_id}_organization"
     cursor = None
-    try:
-        cursor = await cursor_store.get_cursor(scope_id, source_type)
-    except Exception:
-        cursor = None
-
     watch_info = None
     try:
-        watch_info = await cursor_store.get_watch_info(tenant_id, source_type)
+        cursor, watch_info = await cursor_store.get_cursor_and_watch(scope_id, source_type)
     except Exception:
-        watch_info = None
+        cursor, watch_info = None, None
 
     runtime = {}
     try:
@@ -493,20 +488,21 @@ async def get_connector_status(
     source_type: str,
     connection_scope: str = Query("personal", description="Connection scope (personal or organization)"),
     current_user: Dict[str, Any] = Depends(get_current_user),
-    tenant: TenantRouting = Depends(get_tenant),
 ):
     """
     Retrieve sync cursor, watch flag, and runtime connection status.
+    Fast read-only status query with minimal DB roundtrips.
     """
     tenant_id = current_user.get("tenant_id")
-    if not tenant_id or str(tenant.tenant_id) != tenant_id:
-        raise HTTPException(status_code=403, detail="Cross-tenant execution rejected")
+    if not tenant_id:
+        raise HTTPException(status_code=401, detail="Token missing tenant_id claim")
 
     user_id = _user_id(current_user)
     scope_id = cursor_scope_id(tenant_id, user_id) if connection_scope == "personal" else f"{tenant_id}_organization"
     cursor = None
+    watch_info = None
     try:
-        cursor = await cursor_store.get_cursor(scope_id, source_type)
+        cursor, watch_info = await cursor_store.get_cursor_and_watch(scope_id, source_type)
     except Exception:
         logger.warning(
             "cursor lookup failed tenant=%s source=%s scope=%s",
@@ -517,16 +513,12 @@ async def get_connector_status(
         )
 
     plugin = provider_registry.get_by_source(source_type)
-    watch_info = None
     has_token = False
     try:
         if plugin and plugin.get_watch_info and source_type in ("onedrive", "outlook"):
             watch_info = await plugin.get_watch_info(scope_id, source_type)
-        else:
-            # Personal cursors/watches are keyed by tenant:user (scope_id).
-            watch_info = await cursor_store.get_watch_info(scope_id, source_type)
-            if not watch_info and connection_scope != "personal":
-                watch_info = await cursor_store.get_watch_info(tenant_id, source_type)
+        elif not watch_info and connection_scope != "personal":
+            watch_info = await cursor_store.get_watch_info(tenant_id, source_type)
     except Exception:
         logger.warning(
             "watch lookup failed tenant=%s source=%s scope=%s",
@@ -579,6 +571,7 @@ async def get_connector_status(
         watch_active=bool(watch_info),
         details=details,
     )
+
 
 
 @router.post(

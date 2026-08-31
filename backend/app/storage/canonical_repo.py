@@ -569,36 +569,47 @@ class CanonicalRepo:
     async def get_login_user_by_email(
         self, email: str, tenant_id: UUID
     ) -> Optional[Tuple[UUID, str]]:
-        """Return (principal_id, email) from the login ``users`` table, not identity_principals."""
+        """Return (principal_id, email) from the login ``users`` table or identity_principals."""
         normalized = (email or "").strip().lower()
         if not normalized:
             return None
         tenant = _as_uuid(tenant_id)
         if self.use_memory:
             return self._login_users_by_email.get((tenant, normalized))
-        session = self._sql()
-        result = await session.execute(
-            select(User).where(
-                User.tenant_id == tenant,
-                func.lower(User.email) == normalized,
-            )
-        )
-        row = result.scalar_one_or_none()
-        if row is not None:
-            return (row.principal_id, (row.email or "").strip().lower())
+
+        # Check Control Plane DB for login User
+        try:
+            from app.storage.control_plane_db import ControlPlaneSessionLocal
+            async with ControlPlaneSessionLocal() as cp_session:
+                result = await cp_session.execute(
+                    select(User).where(
+                        User.tenant_id == tenant,
+                        func.lower(User.email) == normalized,
+                    )
+                )
+                row = result.scalar_one_or_none()
+                if row is not None:
+                    return (row.principal_id, (row.email or "").strip().lower())
+        except Exception:
+            pass
 
         # Fallback: Check IdentityPrincipalRow in tenant database
-        p_res = await session.execute(
-            select(IdentityPrincipalRow).where(
-                IdentityPrincipalRow.tenant_id == tenant,
-                func.lower(IdentityPrincipalRow.email) == normalized,
+        try:
+            session = self._sql()
+            p_res = await session.execute(
+                select(IdentityPrincipalRow).where(
+                    IdentityPrincipalRow.tenant_id == tenant,
+                    func.lower(IdentityPrincipalRow.email) == normalized,
+                )
             )
-        )
-        p_row = p_res.scalar_one_or_none()
-        if p_row is not None:
-            return (p_row.id, (p_row.email or "").strip().lower())
+            p_row = p_res.scalar_one_or_none()
+            if p_row is not None:
+                return (p_row.id, (p_row.email or "").strip().lower())
+        except Exception:
+            pass
 
         return None
+
 
 
     async def upsert_pending_identity(

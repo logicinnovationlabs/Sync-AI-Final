@@ -91,8 +91,8 @@ class OpenSearchLexicalStore(LexicalStore):
             getattr(settings, "opensearch_url", None)
             or getattr(settings, "lexical_search_url", None)
         )
-        # Increase timeout to 60 seconds for slow Docker/test environments
-        timeout = 60
+        # Fast failure timeout (5 seconds) so unreachable instances do not block pipeline
+        timeout = 5
         
         if opensearch_url:
             use_ssl = opensearch_url.startswith("https://")
@@ -104,6 +104,7 @@ class OpenSearchLexicalStore(LexicalStore):
                 verify_certs=False,
                 ssl_show_warn=False,
                 timeout=timeout,
+                max_retries=1,
             )
         else:
             # Fallback to host/port config
@@ -117,6 +118,7 @@ class OpenSearchLexicalStore(LexicalStore):
                 verify_certs=False,
                 ssl_show_warn=False,
                 timeout=timeout,
+                max_retries=1,
             )
 
         

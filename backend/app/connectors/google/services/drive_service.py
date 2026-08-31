@@ -365,7 +365,7 @@ class DriveConnector(BaseConnector):
         self, access_token: str, files: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """Always re-list ACLs via permissions.list, then extract text."""
-        semaphore = asyncio.Semaphore(5)
+        semaphore = asyncio.Semaphore(15)
 
         async def _one(file: Dict[str, Any]) -> Dict[str, Any]:
             async with semaphore:

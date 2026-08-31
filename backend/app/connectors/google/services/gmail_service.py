@@ -36,7 +36,7 @@ _OTP_SUBJECT = re.compile(
     re.IGNORECASE,
 )
 _OTP_BODY_SHORT = re.compile(r"\b\d{4,8}\b")
-_FETCH_CONCURRENCY = 8
+_FETCH_CONCURRENCY = 20
 
 
 class GmailConnector(BaseConnector):
@@ -367,10 +367,17 @@ class GmailConnector(BaseConnector):
 
         async def _one(msg_id: str) -> Optional[Dict[str, Any]]:
             async with semaphore:
-                try:
-                    return await self.gmail_client.get_message(token, msg_id)
-                except Exception:
-                    return None
+                for attempt in range(3):
+                    try:
+                        return await self.gmail_client.get_message(token, msg_id)
+                    except Exception as e:
+                        err_str = str(e).lower()
+                        if attempt < 2 and ("429" in err_str or "500" in err_str or "503" in err_str or "rate" in err_str):
+                            await asyncio.sleep(0.5 * (2 ** attempt))
+                            continue
+                        logger.debug(f"Failed to fetch message {msg_id}: {e}")
+                        return None
+                return None
 
         if not message_ids:
             return []

@@ -205,11 +205,14 @@ class IdentityResolver:
             except Exception:
                 pass
 
-        # --- Step 3: Create a new principal if still not found ---
-        if not login_user and normalized_email:
+        # --- Step 3: Create a new principal if still not found and role is owner/creator ---
+        is_new = False
+        is_owner = getattr(hint, "role", None) in ("owner", "creator")
+        if not login_user and normalized_email and is_owner:
             try:
                 principal = await self._create_principal(normalized_email, tenant_id, hint)
                 login_user = (principal.id, principal.email)
+                is_new = True
             except Exception:
                 pass
 
@@ -238,7 +241,7 @@ class IdentityResolver:
                 principal_id=principal_id,
                 principal=principal,
                 confidence=1.0,
-                matched_on="email",
+                matched_on="new" if is_new else "email",
             )
 
         # Cache the negative result to avoid repeating these DB calls
@@ -322,8 +325,9 @@ class IdentityResolver:
             )
             return principal
         except Exception as e:
-            # Check if uniqueness constraint violation
-            if "duplicate" in str(e).lower() or "unique" in str(e).lower():
+            # Check if uniqueness constraint violation or duplicate
+            err_str = str(e).lower()
+            if "duplicate" in err_str or "unique" in err_str or "already exists" in err_str:
                 logger.info(
                     f"Race condition detected creating principal for {normalized_email}, "
                     f"re-querying..."

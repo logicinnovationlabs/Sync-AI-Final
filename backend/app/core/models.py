@@ -15,7 +15,7 @@ Models:
 
 from enum import Enum
 from uuid import UUID
-from pydantic import BaseModel, UUID4, Field
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
@@ -72,7 +72,7 @@ class Principal(BaseModel):
     within a tenant, but never merges across tenants.
     """
     id: UUID
-    tenant_id: UUID4
+    tenant_id: UUID
     email: str                            # normalized (lowercase, stripped)
     name: Optional[str] = None
     source_identities: Dict[str, str] = Field(default_factory=dict)     # {source_type: external_id}
@@ -108,7 +108,7 @@ class ACLEntry(BaseModel):
     """
     document_id: str
     principal_id: Optional[UUID] = None   # set if grant is to an individual
-    group_id: Optional[UUID4] = None       # set if grant is to a group (mutually exclusive with principal_id)
+    group_id: Optional[UUID] = None       # set if grant is to a group (mutually exclusive with principal_id)
     permission: PermissionLevel
     granted_via: str                       # "direct" | "inherited" | "group_membership"
     source_container_id: Optional[str] = None   # which container the inheritance came from

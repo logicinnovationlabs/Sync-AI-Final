@@ -94,22 +94,29 @@ class WatchManager:
                 expiration=expiration_ms,
             )
             
+            # Parse expiration safely as integer milliseconds
+            drive_exp_raw = response.get("expiration")
+            try:
+                drive_exp_ms = int(drive_exp_raw) if drive_exp_raw else expiration_ms
+            except (ValueError, TypeError):
+                drive_exp_ms = expiration_ms
+
             # Store channel info in cursor_store
             await self.cursor_store.set_watch_info(
                 tenant_id=store_id,
                 source_type="google_drive",
                 watch_data={
-                    "channel_id": response["id"],
-                    "resource_id": response["resourceId"],
+                    "channel_id": response.get("id") or channel_id,
+                    "resource_id": response.get("resourceId", ""),
                     "channel_token": channel_token,
-                    "expiration": response["expiration"],
+                    "expiration": drive_exp_ms,
                     "page_token": page_token,
                 },
             )
             
             logger.info(
                 f"Registered Drive watch for tenant {tenant_id}: "
-                f"channel={response['id']}, expires={response['expiration']}"
+                f"channel={response.get('id', channel_id)}, expires={drive_exp_ms}"
             )
             
             return response

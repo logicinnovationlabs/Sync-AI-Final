@@ -206,12 +206,13 @@ class Indexer:
                     "document store upsert failed id=%s", doc_id, exc_info=True
                 )
 
-        try:
-            from app.services.lexical.opensearch_store import OpenSearchLexicalStore
+        if getattr(settings, "opensearch_url", None) or getattr(settings, "lexical_search_url", None):
+            try:
+                from app.services.lexical.opensearch_store import OpenSearchLexicalStore
 
-            await OpenSearchLexicalStore().index_batch(tenant_id, lexical_docs)
-        except Exception as exc:
-            logger.info("lexical index fan-out skipped (using vector search): %s", exc)
+                await OpenSearchLexicalStore().index_batch(tenant_id, lexical_docs)
+            except Exception as exc:
+                logger.info("lexical index fan-out skipped (using vector search): %s", exc)
 
 
         if not pending_chunks:

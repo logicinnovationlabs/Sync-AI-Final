@@ -68,6 +68,24 @@ class CursorStore:
         Returns:
             Cursor string or None
         """
+        cursor, _ = await self.get_cursor_and_watch(tenant_id, source_type)
+        return cursor
+
+    async def get_cursor_and_watch(
+        self,
+        tenant_id: str,
+        source_type: str,
+    ) -> tuple[Optional[str], Optional[Dict[str, Any]]]:
+        """
+        Get both resume cursor and watch info in a single database round-trip.
+        
+        Args:
+            tenant_id: Tenant identifier
+            source_type: Source type (e.g., 'google_drive', 'google_gmail')
+            
+        Returns:
+            Tuple of (cursor, watch_data)
+        """
         async with ControlPlaneSessionLocal() as session:
             result = await session.execute(
                 select(SyncCursor).where(
@@ -78,7 +96,10 @@ class CursorStore:
                 )
             )
             record = result.scalar_one_or_none()
-            return record.cursor if record else None
+            if not record:
+                return None, None
+            return record.cursor, record.watch_data
+
     
     async def update_cursor(
         self,
@@ -134,8 +155,14 @@ class CursorStore:
             source_type: Source type
             watch_data: Watch metadata (channel IDs, expiration, etc.)
         """
-        expiration_ms = watch_data.get("expiration", 0) if watch_data else 0
+        expiration_val = watch_data.get("expiration", 0) if watch_data else 0
+        try:
+            expiration_ms = int(expiration_val) if expiration_val else 0
+        except (ValueError, TypeError):
+            expiration_ms = 0
         
+        watch_exp_db = int(expiration_ms) if expiration_ms else None
+
         async with ControlPlaneSessionLocal() as session:
             result = await session.execute(
                 select(SyncCursor).where(
@@ -149,7 +176,7 @@ class CursorStore:
             
             if record:
                 record.watch_data = watch_data or None
-                record.watch_expiration = expiration_ms or None
+                record.watch_expiration = watch_exp_db
             else:
                 if not watch_data:
                     return
@@ -157,7 +184,7 @@ class CursorStore:
                     tenant_id=tenant_id,
                     source_type=source_type,
                     watch_data=watch_data,
-                    watch_expiration=expiration_ms,
+                    watch_expiration=watch_exp_db,
                 )
                 session.add(record)
             
