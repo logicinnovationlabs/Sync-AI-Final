@@ -57,11 +57,13 @@ def get_pipeline(session=None):
 
 
 async def _run_pipeline(
-    pipeline,
     raw_documents: List[Dict[str, Any]],
     source_type: str,
     tenant_uuid: UUID,
     tenant_id: str,
+    *,
+    session_factory=None,
+    pipeline=None,
 ) -> Optional[List[UnifiedDocument]]:
     sem = asyncio.Semaphore(_PIPELINE_CONCURRENCY)
     failures = 0
@@ -70,7 +72,13 @@ async def _run_pipeline(
         nonlocal failures
         async with sem:
             try:
-                result = await pipeline.process_raw(raw, source_type, tenant_uuid)
+                if session_factory is not None:
+                    async with session_factory() as session:
+                        pipe = get_pipeline(session=session)
+                        result = await pipe.process_raw(raw, source_type, tenant_uuid)
+                else:
+                    pipe = pipeline or get_pipeline()
+                    result = await pipe.process_raw(raw, source_type, tenant_uuid)
                 return result.get("unified_document") if isinstance(result, dict) else None
             except Exception as item_err:
                 failures += 1
@@ -187,26 +195,13 @@ async def process_raw_batch(
             routing.db_password,
             str(routing.tenant_id),
         )
-        session = factory()
-        try:
-            pipeline = get_pipeline(session=session)
-        except Exception as extra:
-            if require_postgres:
-                raise
-            logger.warning(
-                "pipeline=fallback_transform source=%s tenant=%s reason=pipeline_init_failed "
-                "exc_type=%s exc=%s",
-                source_type,
-                tenant_id,
-                type(extra).__name__,
-                extra,
-            )
-            return None
-        result = await _run_pipeline(
-            pipeline, raw_documents, source_type, tenant_uuid, tenant_id
+        return await _run_pipeline(
+            raw_documents,
+            source_type,
+            tenant_uuid,
+            tenant_id,
+            session_factory=factory,
         )
-        await session.close()
-        return result
 
     if require_postgres:
         raise RuntimeError(
@@ -230,5 +225,9 @@ async def process_raw_batch(
         )
         return None
     return await _run_pipeline(
-        pipeline, raw_documents, source_type, tenant_uuid, tenant_id
+        raw_documents,
+        source_type,
+        tenant_uuid,
+        tenant_id,
+        pipeline=pipeline,
     )

@@ -21,6 +21,11 @@ logger = logging.getLogger(__name__)
 MIRROR_BIND_SOURCES = frozenset({"google_drive", "google_gmail"})
 
 
+# Shared cross-instance cache: (tenant_id, lower(email)) -> (principal_id, email)
+# Eliminates redundant DB lookups across all documents in a batch and across pipeline instances.
+_GLOBAL_EMAIL_PRINCIPAL_CACHE: Dict[tuple, Optional[tuple]] = {}
+
+
 class IdentityResolver:
     """
     Resolves identity hints to stable principal IDs.
@@ -41,11 +46,7 @@ class IdentityResolver:
         """
         self.matchers = matchers
         self.repo = canonical_repo
-        # Per-instance cache: (tenant_id, email) -> (principal_id, email)
-        # Eliminates redundant DB lookups when the same email appears
-        # across many documents in a single backfill batch (e.g. same Gmail
-        # owner across 73 messages = 73 DB queries without this cache -> 1).
-        self._email_principal_cache: Dict[tuple, Optional[tuple]] = {}
+        self._email_principal_cache = _GLOBAL_EMAIL_PRINCIPAL_CACHE
     
     async def resolve(
         self,
