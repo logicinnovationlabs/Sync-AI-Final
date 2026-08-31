@@ -69,16 +69,13 @@ function shouldPollConnectorStatus(status: ConnectorStatus | undefined): boolean
 function sourceIsLinked(status: ConnectorStatus | undefined): boolean {
   if (!status) return false
   const connectionStatus = String(status.details?.connection_status || "")
-  const tokenPresent = Boolean(status.details?.token_present)
-  // Explicit disconnect clears tokens; not_connected without a token is truly off.
-  if (connectionStatus === "not_connected" && !tokenPresent) {
+  if (connectionStatus === "not_connected") {
     return false
   }
-  return (
-    Boolean(status.cursor) ||
-    tokenPresent ||
-    ["active", "syncing", "error", "needs_reauth"].includes(connectionStatus)
-  )
+  if (["active", "syncing", "error", "needs_reauth"].includes(connectionStatus)) {
+    return true
+  }
+  return Boolean(status.cursor) || Boolean(status.details?.token_present)
 }
 
 function StatTile({ label, value, on }: { label: string; value: string; on: boolean }) {
@@ -140,9 +137,10 @@ function GoogleSource({ id, label }: { id: BackendSourceType; label: string }) {
     },
   })
 
-  const started = sourceIsLinked(status.data)
-  const watching = Boolean(status.data?.watch_active)
   const connectionStatus = String(status.data?.details?.connection_status || "")
+  const started = sourceIsLinked(status.data)
+  const isConnected = connectionStatus !== "not_connected" && (started || connectionStatus === "active")
+  const watching = Boolean(status.data?.watch_active) && isConnected
   const filesIndexed = Number(status.data?.details?.files_indexed || 0)
   const isSyncing =
     connectionStatus === "syncing" || backfill.isPending
@@ -158,7 +156,7 @@ function GoogleSource({ id, label }: { id: BackendSourceType; label: string }) {
             ? "Needs re-auth"
             : connectionStatus === "error"
               ? "Error"
-              : started || connectionStatus === "active"
+              : isConnected
                 ? "Connected"
                 : "Not connected"
 
@@ -187,13 +185,13 @@ function GoogleSource({ id, label }: { id: BackendSourceType; label: string }) {
               ? filesIndexed > 0
                 ? `Syncing · ${filesIndexed}`
                 : "Syncing"
-              : filesIndexed > 0
-                ? `${filesIndexed} indexed`
-                : started
-                  ? "Started"
-                  : "Not started"
+              : isConnected
+                ? filesIndexed > 0
+                  ? `${filesIndexed} indexed`
+                  : "Started"
+                : "Not started"
           }
-          on={started || isSyncing}
+          on={isConnected || isSyncing}
         />
         <StatTile
           label="Live updates"
@@ -202,7 +200,7 @@ function GoogleSource({ id, label }: { id: BackendSourceType; label: string }) {
         />
       </div>
 
-      {hydrated && canWrite && !status.error && (
+      {hydrated && canWrite && !status.error && isConnected && (
         <div className="flex justify-end gap-1.5">
           <Button
             size="sm"
@@ -215,17 +213,15 @@ function GoogleSource({ id, label }: { id: BackendSourceType; label: string }) {
             />
             {backfill.isPending ? "Syncing…" : "Resync"}
           </Button>
-          {started && (
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={disconnect.isPending}
-              onClick={() => disconnect.mutate()}
-            >
-              <Unplug className="size-3.5" />
-              {disconnect.isPending ? "Disconnecting…" : "Disconnect"}
-            </Button>
-          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={disconnect.isPending}
+            onClick={() => disconnect.mutate()}
+          >
+            <Unplug className="size-3.5" />
+            {disconnect.isPending ? "Disconnecting…" : "Disconnect"}
+          </Button>
         </div>
       )}
     </div>
@@ -274,10 +270,11 @@ function GoogleOrganizationSource({ id, label }: { id: BackendSourceType; label:
     onSuccess: invalidate,
   })
 
-  const started = Boolean(status.data?.details?.connected)
-  const orgEnabled = Boolean(status.data?.details?.org_enabled)
-  const watching = Boolean(status.data?.watch_active)
   const connectionStatus = String(status.data?.details?.connection_status || "")
+  const started = Boolean(status.data?.details?.connected) && connectionStatus !== "not_connected"
+  const isConnected = connectionStatus !== "not_connected" && (started || connectionStatus === "active")
+  const orgEnabled = Boolean(status.data?.details?.org_enabled)
+  const watching = Boolean(status.data?.watch_active) && isConnected
   const filesIndexed = Number(status.data?.details?.files_indexed || 0)
   const isSyncing = connectionStatus === "syncing" || backfill.isPending
   const statusLabel = !hydrated
@@ -292,7 +289,7 @@ function GoogleOrganizationSource({ id, label }: { id: BackendSourceType; label:
             ? "Syncing"
             : connectionStatus === "error"
               ? "Error"
-              : started || connectionStatus === "active"
+              : isConnected
                 ? "Connected"
                 : "Not connected"
 
@@ -321,13 +318,13 @@ function GoogleOrganizationSource({ id, label }: { id: BackendSourceType; label:
               ? filesIndexed > 0
                 ? `Syncing · ${filesIndexed}`
                 : "Syncing"
-              : filesIndexed > 0
-                ? `${filesIndexed} indexed`
-                : started
-                  ? "Started"
-                  : "Not started"
+              : isConnected
+                ? filesIndexed > 0
+                  ? `${filesIndexed} indexed`
+                  : "Started"
+                : "Not started"
           }
-          on={started || isSyncing}
+          on={isConnected || isSyncing}
         />
         <StatTile
           label="Live updates"
@@ -336,7 +333,7 @@ function GoogleOrganizationSource({ id, label }: { id: BackendSourceType; label:
         />
       </div>
 
-      {hydrated && canWrite && isAdmin && !status.error && (
+      {hydrated && canWrite && isAdmin && !status.error && isConnected && (
         <div className="flex justify-end gap-1.5">
           <Button
             size="sm"
@@ -347,17 +344,15 @@ function GoogleOrganizationSource({ id, label }: { id: BackendSourceType; label:
             <RefreshCw className={cn("size-3.5", backfill.isPending && "animate-spin")} />
             {backfill.isPending ? "Syncing…" : "Resync"}
           </Button>
-          {started && (
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={!orgEnabled || disconnect.isPending}
-              onClick={() => disconnect.mutate()}
-            >
-              <Unplug className="size-3.5" />
-              {disconnect.isPending ? "Disconnecting…" : "Disconnect"}
-            </Button>
-          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={!orgEnabled || disconnect.isPending}
+            onClick={() => disconnect.mutate()}
+          >
+            <Unplug className="size-3.5" />
+            {disconnect.isPending ? "Disconnecting…" : "Disconnect"}
+          </Button>
         </div>
       )}
     </div>

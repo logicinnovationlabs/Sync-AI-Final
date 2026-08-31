@@ -70,6 +70,44 @@ async def get_watch_info(scope_id: str, source_type: str) -> Any:
     }
 
 
+async def _delete_personal_connector_row(tenant_id: str, source_type: str) -> None:
+    try:
+        tenant_uuid = UUID(tenant_id)
+    except (TypeError, ValueError):
+        return
+    try:
+        from app.services.tenant_resolver import tenant_resolver
+        from app.storage.tenant_db import tenant_db_manager
+        from app.models.tenant_connector import TenantConnector
+
+        routing = await tenant_resolver.resolve(tenant_id)
+        factory = tenant_db_manager.get_session_factory(
+            routing.db_host,
+            routing.db_name,
+            routing.db_user,
+            routing.db_password,
+            str(routing.tenant_id),
+        )
+        async with factory() as session:
+            result = await session.execute(
+                select(TenantConnector).where(
+                    TenantConnector.tenant_id == tenant_uuid,
+                    TenantConnector.source_type == source_type,
+                )
+            )
+            row = result.scalar_one_or_none()
+            if row is not None:
+                await session.delete(row)
+                await session.commit()
+    except Exception:
+        logger.warning(
+            "Failed to delete Microsoft TenantConnector row tenant=%s source=%s",
+            tenant_id,
+            source_type,
+            exc_info=True,
+        )
+
+
 async def on_disconnect(tenant_id: str, user_id: str, source_type: str) -> None:
     ms_store = PersistentMicrosoftTokenStore(tenant_id)
     oauth = microsoft_oauth_from_settings(ms_store, principal_id=user_id)
@@ -87,6 +125,7 @@ async def on_disconnect(tenant_id: str, user_id: str, source_type: str) -> None:
             source_type,
             exc_info=True,
         )
+    await _delete_personal_connector_row(tenant_id, source_type)
     other = "outlook" if source_type == "onedrive" else "onedrive"
     other_status = status_store.get_status(tenant_id, other, user_id=user_id)
     if other_status.get("connection_status") in (None, "", "not_connected"):

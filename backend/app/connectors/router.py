@@ -589,12 +589,16 @@ async def get_connector_status(
     else:
         connection_status = runtime.get("connection_status") or "not_connected"
 
+    if connection_status == "not_connected":
+        watch_info = None
+        cursor = None
+
     details: Dict[str, Any] = {
         "connection_status": connection_status,
         "files_indexed": runtime.get("files_indexed") or 0,
         "last_sync_at": runtime.get("last_sync_at"),
         "last_error": runtime.get("last_error"),
-        "token_present": has_token,
+        "token_present": has_token if connection_status != "not_connected" else False,
         "connection_scope": connection_scope,
     }
     if watch_info:
