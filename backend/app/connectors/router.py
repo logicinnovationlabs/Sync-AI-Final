@@ -306,29 +306,19 @@ async def toggle_organization_connector(
         raise HTTPException(status_code=403, detail="Cross-tenant execution rejected")
 
     try:
-        from app.services.tenant_resolver import tenant_resolver
-        from app.storage.tenant_db import tenant_db_manager
+        from app.storage.control_plane_db import ControlPlaneSessionLocal
         from app.models.tenant import Tenant
 
         tenant_uuid = UUID(tenant_id)
 
-        routing = await tenant_resolver.resolve(tenant_id)
-        factory = tenant_db_manager.get_session_factory(
-            routing.db_host,
-            routing.db_name,
-            routing.db_user,
-            routing.db_password,
-            str(routing.tenant_id),
-        )
-
-        async with factory() as session:
-            result = await session.execute(
+        async with ControlPlaneSessionLocal() as cp_session:
+            result = await cp_session.execute(
                 select(Tenant).where(Tenant.tenant_id == tenant_uuid)
             )
             tenant_row = result.scalar_one_or_none()
             if tenant_row:
                 tenant_row.google_org_workspace_enabled = request.enabled
-                await session.commit()
+                await cp_session.commit()
 
         return {
             "status": "toggled",
@@ -395,19 +385,36 @@ async def get_organization_connector_status(
     Get organization connector status (read-only for members).
 
     Returns connection state, enabled state, and sync status without exposing
-    admin-only actions or credentials.
+    admin-only actions or credentials. Resilient against unconfigured state.
     """
     tenant_id = current_user.get("tenant_id")
     if not tenant_id or str(tenant.tenant_id) != tenant_id:
         raise HTTPException(status_code=403, detail="Cross-tenant execution rejected")
 
     try:
+        tenant_uuid = UUID(tenant_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid tenant ID format")
+
+    org_enabled = False
+    try:
+        from app.storage.control_plane_db import ControlPlaneSessionLocal
+        from app.models.tenant import Tenant
+        async with ControlPlaneSessionLocal() as cp_session:
+            tenant_result = await cp_session.execute(
+                select(Tenant).where(Tenant.tenant_id == tenant_uuid)
+            )
+            tenant_row = tenant_result.scalar_one_or_none()
+            org_enabled = bool(getattr(tenant_row, "google_org_workspace_enabled", False)) if tenant_row else False
+    except Exception as e:
+        logger.warning("Failed to check org_enabled for tenant=%s: %s", tenant_id, e)
+        org_enabled = False
+
+    row = None
+    try:
         from app.services.tenant_resolver import tenant_resolver
         from app.storage.tenant_db import tenant_db_manager
         from app.models.tenant_connector import TenantConnector
-        from app.models.tenant import Tenant
-
-        tenant_uuid = UUID(tenant_id)
 
         routing = await tenant_resolver.resolve(tenant_id)
         factory = tenant_db_manager.get_session_factory(
@@ -417,18 +424,7 @@ async def get_organization_connector_status(
             routing.db_password,
             str(routing.tenant_id),
         )
-
-        # Check tenant-level enabled flag from control_plane database
-        from app.storage.control_plane_db import ControlPlaneSessionLocal
-        async with ControlPlaneSessionLocal() as cp_session:
-            tenant_result = await cp_session.execute(
-                select(Tenant).where(Tenant.tenant_id == tenant_uuid)
-            )
-            tenant_row = tenant_result.scalar_one_or_none()
-            org_enabled = tenant_row.google_org_workspace_enabled if tenant_row else False
-
         async with factory() as session:
-            # Get organization connector row
             result = await session.execute(
                 select(TenantConnector).where(
                     TenantConnector.tenant_id == tenant_uuid,
@@ -437,47 +433,54 @@ async def get_organization_connector_status(
                 )
             )
             row = result.scalar_one_or_none()
-
-            # Get cursor and watch info
-            scope_id = f"{tenant_id}_organization"
-            cursor = await cursor_store.get_cursor(scope_id, source_type)
-            watch_info = None
-            try:
-                watch_info = await cursor_store.get_watch_info(tenant_id, source_type)
-            except Exception:
-                watch_info = None
-
-            # Get runtime status
-            runtime = status_store.get_status(tenant_id, source_type, user_id="organization")
-            connection_status = runtime.get("connection_status") or "not_connected"
-            # If no organization connector row exists, force not_connected regardless of stale Redis status
-            if row is None:
-                connection_status = "not_connected"
-            # Only show active/syncing if the organization connector is actually enabled
-            elif connection_status == "not_connected" and org_enabled and cursor:
-                connection_status = "active" if cursor else "syncing"
-
-            details: Dict[str, Any] = {
-                "connection_status": connection_status,
-                "files_indexed": runtime.get("files_indexed") or 0,
-                "last_sync_at": runtime.get("last_sync_at"),
-                "last_error": runtime.get("last_error"),
-                "org_enabled": org_enabled,
-                "connected": row is not None,
-            }
-            if watch_info:
-                details["watch_info"] = watch_info
-
-            return ConnectorStatusResponse(
-                tenant_id=tenant_id,
-                source_type=source_type,
-                cursor=cursor,
-                watch_active=watch_info is not None,
-                details=details,
-            )
     except Exception as e:
-        logger.exception("Organization connector status fetch failed")
-        raise HTTPException(status_code=500, detail=f"Status fetch failed: {str(e)}")
+        logger.warning("Failed to query TenantConnector for tenant=%s source=%s: %s", tenant_id, source_type, e)
+        row = None
+
+    scope_id = f"{tenant_id}_organization"
+    cursor = None
+    try:
+        cursor = await cursor_store.get_cursor(scope_id, source_type)
+    except Exception:
+        cursor = None
+
+    watch_info = None
+    try:
+        watch_info = await cursor_store.get_watch_info(tenant_id, source_type)
+    except Exception:
+        watch_info = None
+
+    runtime = {}
+    try:
+        runtime = status_store.get_status(tenant_id, source_type, user_id="organization") or {}
+    except Exception:
+        runtime = {}
+
+    connection_status = runtime.get("connection_status") or "not_connected"
+    if row is None:
+        connection_status = "not_connected"
+    elif connection_status == "not_connected" and org_enabled and cursor:
+        connection_status = "active" if cursor else "syncing"
+
+    details: Dict[str, Any] = {
+        "connection_status": connection_status,
+        "files_indexed": runtime.get("files_indexed") or 0,
+        "last_sync_at": runtime.get("last_sync_at"),
+        "last_error": runtime.get("last_error"),
+        "org_enabled": org_enabled,
+        "connected": row is not None,
+    }
+    if watch_info:
+        details["watch_info"] = watch_info
+
+    return ConnectorStatusResponse(
+        tenant_id=tenant_id,
+        source_type=source_type,
+        cursor=cursor,
+        watch_active=watch_info is not None,
+        details=details,
+    )
+
 
 
 @router.get(
