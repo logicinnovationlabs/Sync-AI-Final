@@ -157,7 +157,11 @@ async def orchestrator_chat(
         except Exception:
             account_email = None
 
-    connector_summary = await build_connector_summary(tenant_id, user_id)
+    try:
+        connector_summary = await build_connector_summary(tenant_id, user_id)
+    except Exception as exc:
+        logger.warning("[assistant.chat] build_connector_summary error: %s", exc)
+        connector_summary = ""
 
     orch_request = OrchestratorRequest(
         tenant_id=tenant_id,

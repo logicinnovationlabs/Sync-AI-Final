@@ -61,7 +61,11 @@ async def _source_snapshot(
     runtime = runtime_raw if runtime_raw is not None else status_store.get_status(
         tenant_id, source_type, user_id=user_id
     )
-    cursor = await cursor_store.get_cursor(scope_id, source_type)
+    try:
+        cursor = await cursor_store.get_cursor(scope_id, source_type)
+    except Exception as exc:
+        logger.warning("[connector_context] Error reading cursor for %s: %s", source_type, exc)
+        cursor = None
 
     plugin = provider_registry.get_by_source(source_type)
     has_token = False
