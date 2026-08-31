@@ -63,23 +63,28 @@ async def _run_pipeline(
     tenant_uuid: UUID,
     tenant_id: str,
 ) -> Optional[List[UnifiedDocument]]:
-    unified: List[UnifiedDocument] = []
+    sem = asyncio.Semaphore(_PIPELINE_CONCURRENCY)
     failures = 0
-    for raw in raw_documents:
-        try:
-            result = await pipeline.process_raw(raw, source_type, tenant_uuid)
-            doc = result.get("unified_document") if isinstance(result, dict) else None
-            if doc is not None:
-                unified.append(doc)
-        except Exception as item_err:
-            failures += 1
-            logger.warning(
-                "pipeline=block_c_item_failed source=%s id=%s exc_type=%s exc=%s",
-                source_type,
-                raw.get("id"),
-                type(item_err).__name__,
-                item_err,
-            )
+
+    async def _process_one(raw: Dict[str, Any]) -> Optional[UnifiedDocument]:
+        nonlocal failures
+        async with sem:
+            try:
+                result = await pipeline.process_raw(raw, source_type, tenant_uuid)
+                return result.get("unified_document") if isinstance(result, dict) else None
+            except Exception as item_err:
+                failures += 1
+                logger.warning(
+                    "pipeline=block_c_item_failed source=%s id=%s exc_type=%s exc=%s",
+                    source_type,
+                    raw.get("id"),
+                    type(item_err).__name__,
+                    item_err,
+                )
+                return None
+
+    results = await asyncio.gather(*[_process_one(raw) for raw in raw_documents])
+    unified: List[UnifiedDocument] = [doc for doc in results if doc is not None]
 
     if unified:
         logger.info(

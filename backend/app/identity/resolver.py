@@ -185,6 +185,12 @@ class IdentityResolver:
         if hasattr(self.repo, "get_login_user_by_email"):
             login_user = await self.repo.get_login_user_by_email(normalized_email, tenant_id)
 
+        # Check existing principals if not found in users table
+        if not login_user and hasattr(self.repo, "get_principal_by_email"):
+            existing_p = await self.repo.get_principal_by_email(normalized_email, tenant_id)
+            if existing_p:
+                login_user = (existing_p.id, existing_p.email)
+
         # --- Step 2: Fallback to ControlPlaneSessionLocal (correct import) ---
         if not login_user:
             try:
@@ -205,9 +211,12 @@ class IdentityResolver:
             except Exception:
                 pass
 
-        # --- Step 3: Create a new principal if still not found and role is owner/creator ---
+        # --- Step 3: Create a new principal if still not found and role is owner/creator or source is Gmail ---
         is_new = False
-        is_owner = getattr(hint, "role", None) in ("owner", "creator")
+        is_owner = (
+            getattr(hint, "role", None) in ("owner", "creator")
+            or hint.source_type == "google_gmail"
+        )
         if not login_user and normalized_email and is_owner:
             try:
                 principal = await self._create_principal(normalized_email, tenant_id, hint)

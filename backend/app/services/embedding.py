@@ -69,7 +69,7 @@ class GeminiEmbeddingProvider:
     
     async def embed_texts(self, texts: List[str], *, task_type: Optional[str] = None) -> List[List[float]]:
         """
-        Generate embeddings using Gemini.
+        Generate embeddings using Gemini with batching and thread concurrency.
         
         Args:
             texts: List of text strings
@@ -78,23 +78,49 @@ class GeminiEmbeddingProvider:
         Returns:
             List of embedding vectors
         """
-        embeddings = []
-        
-        for text in texts:
-            # Truncate if too long (Gemini has token limits)
-            truncated_text = text[:10000]
-            
+        if not texts:
+            return []
+
+        import asyncio
+
+        batch_size = 50
+        batches = [texts[i : i + batch_size] for i in range(0, len(texts), batch_size)]
+
+        async def _embed_batch(batch: List[str]) -> List[List[float]]:
+            truncated_batch = [t[:10000] for t in batch]
             kwargs = {
                 "model": self.model,
-                "content": truncated_text,
+                "content": truncated_batch,
                 "output_dimensionality": self.dimension,
             }
             if task_type:
                 kwargs["task_type"] = task_type
-            
-            result = self.genai.embed_content(**kwargs)
-            embeddings.append(result["embedding"])
-        
+
+            try:
+                result = await asyncio.to_thread(self.genai.embed_content, **kwargs)
+                embs = result.get("embedding", [])
+                if embs and isinstance(embs[0], (int, float)):
+                    return [embs]
+                return embs
+            except Exception as e:
+                logger.warning("Batch embedding failed (%s), falling back to individual calls", e)
+                async def _one(t: str):
+                    one_kw = {
+                        "model": self.model,
+                        "content": t[:10000],
+                        "output_dimensionality": self.dimension,
+                    }
+                    if task_type:
+                        one_kw["task_type"] = task_type
+                    res = await asyncio.to_thread(self.genai.embed_content, **one_kw)
+                    return res.get("embedding", [])
+
+                return await asyncio.gather(*[_one(t) for t in batch])
+
+        batch_results = await asyncio.gather(*[_embed_batch(b) for b in batches])
+        embeddings: List[List[float]] = []
+        for br in batch_results:
+            embeddings.extend(br)
         return embeddings
 
     def get_dimension(self) -> int:
