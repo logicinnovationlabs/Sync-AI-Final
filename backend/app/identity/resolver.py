@@ -170,12 +170,7 @@ class IdentityResolver:
                     confidence=1.0,
                     matched_on="email",
                 )
-            # Cached None means this email was already tried and queued as pending
-            if hasattr(self.repo, "upsert_pending_identity"):
-                await self.repo.upsert_pending_identity(
-                    tenant_id, document_id, normalized_email,
-                    source_account_id=source_account_id,
-                )
+            # Cached None: return pending immediately without hitting the database again
             return ResolvedIdentity(
                 principal_id=None, principal=None, confidence=0.0,
                 matched_on="pending", is_pending=True,
@@ -184,35 +179,21 @@ class IdentityResolver:
         # --- Step 1: Check the tenant DB (users table + identity_principals) ---
         login_user = None
         if hasattr(self.repo, "get_login_user_by_email"):
-            login_user = await self.repo.get_login_user_by_email(normalized_email, tenant_id)
+            try:
+                login_user = await self.repo.get_login_user_by_email(normalized_email, tenant_id)
+            except Exception:
+                login_user = None
 
         # Check existing principals if not found in users table
         if not login_user and hasattr(self.repo, "get_principal_by_email"):
-            existing_p = await self.repo.get_principal_by_email(normalized_email, tenant_id)
-            if existing_p:
-                login_user = (existing_p.id, existing_p.email)
-
-        # --- Step 2: Fallback to ControlPlaneSessionLocal (correct import) ---
-        if not login_user:
             try:
-                from app.storage.control_plane_db import ControlPlaneSessionLocal
-                from app.models.user import User
-                from sqlalchemy import select, func
-
-                async with ControlPlaneSessionLocal() as cp_session:
-                    res = await cp_session.execute(
-                        select(User).where(
-                            User.tenant_id == tenant_id,
-                            func.lower(User.email) == normalized_email,
-                        )
-                    )
-                    cp_user = res.scalar_one_or_none()
-                    if cp_user:
-                        login_user = (cp_user.principal_id, (cp_user.email or "").strip().lower())
+                existing_p = await self.repo.get_principal_by_email(normalized_email, tenant_id)
+                if existing_p:
+                    login_user = (existing_p.id, existing_p.email)
             except Exception:
                 pass
 
-        # --- Step 3: Create a new principal if still not found and role is owner/creator or source is Gmail ---
+        # --- Step 2: Create a new principal if role is owner/creator or source is Gmail ---
         is_new = False
         is_owner = (
             getattr(hint, "role", None) in ("owner", "creator")
@@ -228,7 +209,7 @@ class IdentityResolver:
 
         if login_user:
             principal_id, email = login_user
-            # Cache the result for subsequent documents in this batch
+            # Cache the result globally for subsequent documents in this batch
             self._email_principal_cache[cache_key] = (principal_id, email)
             now = datetime.now(timezone.utc)
             principal = Principal(
@@ -254,21 +235,21 @@ class IdentityResolver:
                 matched_on="new" if is_new else "email",
             )
 
-        # Cache the negative result to avoid repeating these DB calls
+        # Cache the negative result so we never re-query PostgreSQL for this email
         self._email_principal_cache[cache_key] = None
 
-        if hasattr(self.repo, "upsert_pending_identity"):
-            await self.repo.upsert_pending_identity(
-                tenant_id,
-                document_id,
-                normalized_email,
-                source_account_id=source_account_id,
-            )
-        logger.debug(
-            "pending identity match queued email=%s document_id=%s",
-            normalized_email,
-            document_id,
-        )
+        # Only queue pending identities for drive shares, not for gmail incoming message creators
+        if hint.source_type != "google_gmail" and hasattr(self.repo, "upsert_pending_identity"):
+            try:
+                await self.repo.upsert_pending_identity(
+                    tenant_id,
+                    document_id,
+                    normalized_email,
+                    source_account_id=source_account_id,
+                )
+            except Exception as e:
+                logger.debug("Failed to upsert pending identity: %s", e)
+
         return ResolvedIdentity(
             principal_id=None,
             principal=None,

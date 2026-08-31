@@ -12,9 +12,9 @@ from app.core.base_connector import UnifiedDocument
 logger = logging.getLogger(__name__)
 
 # Max concurrent pipeline.process_raw() calls per batch.
-# Higher = faster but more DB connection pressure. 8 is a safe default for
-# the Render free-tier Postgres (max 20 connections, 2 Celery workers).
-_PIPELINE_CONCURRENCY = 8
+# Set to 4 to safely fit within database session pool limits (e.g. Supabase pool_size: 15)
+# with 2 Celery workers (4 * 2 = 8 connections max).
+_PIPELINE_CONCURRENCY = 4
 
 _memory_pipeline = None
 
