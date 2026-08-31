@@ -73,8 +73,8 @@ class WatchManager:
         store_id = cursor_tenant_id or tenant_id
         
         # Generate unique channel ID compliant with Google regex [A-Za-z0-9\-_+/=]+
-        safe_store_id = re.sub(r"[^A-Za-z0-9\-_]", "-", str(store_id))
-        channel_id = f"drive-{safe_store_id}-{uuid.uuid4().hex[:8]}"[:64]
+        safe_store_id = re.sub(r"[^A-Za-z0-9\-_]", "-", str(store_id))[:32]
+        channel_id = f"drv-{uuid.uuid4().hex[:12]}-{safe_store_id}"[:64]
         channel_token = uuid.uuid4().hex  # Secret token for validation
         
         # Calculate expiration (Google's max is ~7 days)
