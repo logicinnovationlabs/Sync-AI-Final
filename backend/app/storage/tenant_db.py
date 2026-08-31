@@ -47,22 +47,29 @@ class TenantDatabaseManager:
         if tenant_id in self._engines:
             return self._engines[tenant_id]
 
-        host = db_host if ":" in db_host else f"{db_host}:5432"
+        if "pooler.supabase.com" in db_host:
+            host = db_host if ":" in db_host else f"{db_host}:6543"
+        else:
+            host = db_host if ":" in db_host else f"{db_host}:5432"
         hostname, _, port_str = host.partition(":")
+        port_num = int(port_str or (6543 if "pooler.supabase.com" in hostname else 5432))
         database_url = build_asyncpg_url(
             user=db_user,
             password=db_password,
             host=hostname,
-            port=int(port_str or 5432),
+            port=port_num,
             database=db_name,
         )
+        cargs = connect_args_for_url(database_url)
+        cargs["statement_cache_size"] = 0
+        cargs["prepared_statement_cache_size"] = 0
         engine = create_async_engine(
             database_url,
             echo=False,  # Never log tenant DB URLs in prod
             pool_pre_ping=True,
             pool_size=5,
             max_overflow=10,
-            connect_args=connect_args_for_url(database_url),
+            connect_args=cargs,
         )
         self._engines[tenant_id] = engine
         return engine

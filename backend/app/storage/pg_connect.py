@@ -186,8 +186,11 @@ def connect_args_for_url(url: str) -> Dict[str, Any]:
     port = parsed.port or 5432
     if is_local_pg_host(host):
         return {"ssl": False}
-    args: Dict[str, Any] = {"ssl": _cloud_ssl_context(host=host), "timeout": 10}
-    # Transaction-mode pooler (PgBouncer / Supavisor :6543) cannot cache statements.
-    if port == 6543 or is_supabase_pooler_host(host):
-        args["statement_cache_size"] = 0
+    args: Dict[str, Any] = {
+        "ssl": _cloud_ssl_context(host=host),
+        "timeout": 10,
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+        "prepared_statement_name_func": lambda *a: "",
+    }
     return args
