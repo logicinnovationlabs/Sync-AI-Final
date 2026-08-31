@@ -298,6 +298,62 @@ class Indexer:
             await repo.delete_documents_and_acls(document_ids, tenant_uuid)
         finally:
             await session.close()
+
+    async def delete_by_source(
+        self,
+        tenant_id: str,
+        source_type: str,
+    ) -> int:
+        """Purge all canonical documents, ACLs, and vector/search indexes for a source."""
+        from uuid import UUID
+        from app.core.exceptions import TenantNotFoundError
+        from app.services.tenant_resolver import tenant_resolver
+        from app.storage.canonical_repo import CanonicalRepo
+        from app.storage.tenant_db import tenant_db_manager
+
+        try:
+            tenant_uuid = UUID(str(tenant_id))
+        except (TypeError, ValueError):
+            logger.error("delete_by_source skipped: invalid tenant_id %s", tenant_id)
+            return 0
+
+        try:
+            routing = await tenant_resolver.resolve(str(tenant_id))
+        except TenantNotFoundError:
+            logger.error("delete_by_source tenant not found tenant_id=%s", tenant_id)
+            return 0
+        except Exception:
+            logger.exception("delete_by_source routing failed tenant_id=%s", tenant_id)
+            raise
+
+        factory = tenant_db_manager.get_session_factory(
+            routing.db_host,
+            routing.db_name,
+            routing.db_user,
+            routing.db_password,
+            str(routing.tenant_id),
+        )
+        deleted_ids: List[str] = []
+        session = factory()
+        try:
+            repo = CanonicalRepo(use_memory=False, session=session)
+            deleted_ids = await repo.delete_documents_by_source(source_type, tenant_uuid)
+        finally:
+            await session.close()
+
+        if deleted_ids:
+            logger.info(
+                "Purging %s documents for source %s in tenant %s from vector and search stores",
+                len(deleted_ids),
+                source_type,
+                tenant_id,
+            )
+            try:
+                await self.qdrant.delete_by_ids(deleted_ids, tenant_id=tenant_id)
+            except Exception:
+                logger.warning("Vector purge failed during delete_by_source", exc_info=True)
+
+        return len(deleted_ids)
         
     async def reindex_by_ids(
         self,

@@ -253,6 +253,74 @@ class CanonicalRepo:
             )
             await session.commit()
 
+    async def delete_documents_by_source(self, source_type: str, tenant_id: UUID) -> List[str]:
+        """Delete all documents and ACL entries belonging to a given source_type and return deleted doc IDs."""
+        tenant = _as_uuid(tenant_id)
+        if self.use_memory:
+            matched_ids = [
+                doc_id
+                for doc_id, doc in self._documents.items()
+                if doc.source_type == source_type and _as_uuid(doc.tenant_id) == tenant
+            ]
+            for doc_id in matched_ids:
+                for alias in _document_id_aliases(doc_id):
+                    self._documents.pop(alias, None)
+                    self._acl_entries.pop(alias, None)
+            # Also clean up any lingering ACLs matching source_type in memory
+            to_remove_acls = []
+            for doc_key, entries in self._acl_entries.items():
+                self._acl_entries[doc_key] = [
+                    e for e in entries if not (e.source_type == source_type and _as_uuid(e.tenant_id) == tenant)
+                ]
+                if not self._acl_entries[doc_key]:
+                    to_remove_acls.append(doc_key)
+            for k in to_remove_acls:
+                self._acl_entries.pop(k, None)
+            return matched_ids
+
+        session = self._sql()
+        result = await session.execute(
+            select(CanonicalDocumentRow.id).where(
+                CanonicalDocumentRow.source_type == source_type,
+                CanonicalDocumentRow.tenant_id == tenant,
+            )
+        )
+        doc_ids = [row[0] for row in result.all()]
+
+        aliases: List[str] = []
+        for doc_id in doc_ids:
+            aliases.extend(_document_id_aliases(doc_id))
+        aliases = list(dict.fromkeys(aliases))
+
+        await session.execute(
+            delete(ACLEntryRow).where(
+                ACLEntryRow.source_type == source_type,
+                ACLEntryRow.tenant_id == tenant,
+            )
+        )
+        if aliases:
+            await session.execute(
+                delete(ACLEntryRow).where(
+                    ACLEntryRow.document_id.in_(aliases),
+                    ACLEntryRow.tenant_id == tenant,
+                )
+            )
+            await session.execute(
+                delete(CanonicalDocumentRow).where(
+                    CanonicalDocumentRow.id.in_(aliases),
+                    CanonicalDocumentRow.tenant_id == tenant,
+                )
+            )
+        else:
+            await session.execute(
+                delete(CanonicalDocumentRow).where(
+                    CanonicalDocumentRow.source_type == source_type,
+                    CanonicalDocumentRow.tenant_id == tenant,
+                )
+            )
+        await session.commit()
+        return doc_ids
+
     # ============================================================
     # PRINCIPAL METHODS
     # ============================================================

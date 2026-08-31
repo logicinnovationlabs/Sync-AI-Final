@@ -21,7 +21,7 @@ import { useChatSessionStore } from "@/lib/chat/session-store"
 import { EASE_OUT } from "@/lib/ease"
 
 type Turn =
-  | { kind: "user"; id: number; text: string }
+  | { kind: "user"; id: number; text: string; timestamp?: number }
   | {
       kind: "answer"
       id: number
@@ -29,12 +29,37 @@ type Turn =
       sources: SourceCardData[]
       error?: string
       settled: boolean
+      timestamp?: number
     }
 
 type ChatWindow = {
   id: string
   title: string
   updatedAt: number
+}
+
+function formatMessageTime(ts?: number): string {
+  if (!ts) return ""
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(ts))
+  } catch {
+    return ""
+  }
+}
+
+function formatFullDate(ts?: number): string {
+  if (!ts) return ""
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(ts))
+  } catch {
+    return ""
+  }
 }
 
 function citationsToSources(citations: AssistantCitation[]): SourceCardData[] {
@@ -90,12 +115,12 @@ function titleFromTurns(turns: Turn[]): string {
   return text ? text.slice(0, 80) : "New chat"
 }
 
-function historyToTurns(history: Array<{ role: string; content: string; citations?: AssistantCitation[] }>): Turn[] {
+function historyToTurns(history: Array<{ role: string; content: string; citations?: AssistantCitation[]; timestamp?: number }>): Turn[] {
   const turns: Turn[] = []
   let id = 0
   for (const item of history) {
     if (item.role === "user") {
-      turns.push({ kind: "user", id: id++, text: item.content })
+      turns.push({ kind: "user", id: id++, text: item.content, timestamp: item.timestamp || Date.now() })
     } else if (item.role === "assistant") {
       turns.push({
         kind: "answer",
@@ -103,6 +128,7 @@ function historyToTurns(history: Array<{ role: string; content: string; citation
         text: stripInlineCitations(item.content || ""),
         sources: citationsToSources(item.citations || []),
         settled: true,
+        timestamp: item.timestamp || Date.now(),
       })
     }
   }
@@ -134,13 +160,22 @@ export function ChatView() {
 
   turnsRef.current = turns
   sessionRef.current = sessionId
-  windowsRef.current = windows
-
   const last = turns[turns.length - 1]
   const busy = last?.kind === "answer" && !last.settled
 
   const stopGeneration = useCallback(() => {
     abortRef.current?.abort()
+    setTurns((prev) =>
+      prev.map((t) =>
+        t.kind === "answer" && !t.settled
+          ? {
+              ...t,
+              text: t.text || "Stopped.",
+              settled: true,
+            }
+          : t
+      )
+    )
   }, [])
 
   const syncSessionStore = useChatSessionStore((s) => s.sync)
@@ -299,10 +334,11 @@ export function ChatView() {
       setSourcesOpen(false)
       const userTurnId = nextId.current++
       const answerId = nextId.current++
+      const now = Date.now()
       setTurns((prev) => [
         ...prev,
-        { kind: "user", id: userTurnId, text },
-        { kind: "answer", id: answerId, text: "", sources: [], settled: false },
+        { kind: "user", id: userTurnId, text, timestamp: now },
+        { kind: "answer", id: answerId, text: "", sources: [], settled: false, timestamp: now },
       ])
       setWindows((prev) => {
         const exists = prev.some((w) => w.id === sessionRef.current)
@@ -324,7 +360,7 @@ export function ChatView() {
             if (event.type === "token") {
               setTurns((prev) =>
                 prev.map((t) =>
-                  t.kind === "answer" && t.id === answerId
+                  t.kind === "answer" && t.id === answerId && !t.settled
                     ? { ...t, text: (t.text || "") + event.text }
                     : t
                 )
@@ -484,11 +520,19 @@ export function ChatView() {
                     initial={reduce ? false : { opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.2, ease: EASE_OUT }}
-                    className="flex justify-end"
+                    className="group flex flex-col items-end gap-1"
                   >
-                    <div className="max-w-[min(85%,36rem)] rounded-2xl bg-neutral-100/90 px-4 py-2.5 text-[0.9875rem] leading-[1.55] tracking-[-0.011em] text-neutral-900 shadow-xs border border-neutral-200/50 dark:border-neutral-700/50 dark:bg-neutral-800 dark:text-neutral-100">
+                    <div
+                      title={formatFullDate(turn.timestamp)}
+                      className="max-w-[min(85%,36rem)] rounded-2xl bg-neutral-100/90 px-4 py-2.5 text-[0.9875rem] leading-[1.55] tracking-[-0.011em] text-neutral-900 shadow-xs border border-neutral-200/50 dark:border-neutral-700/50 dark:bg-neutral-800 dark:text-neutral-100"
+                    >
                       {turn.text}
                     </div>
+                    {turn.timestamp && (
+                      <span className="text-[0.6875rem] font-medium text-neutral-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 px-1 select-none pointer-events-none">
+                        {formatMessageTime(turn.timestamp)}
+                      </span>
+                    )}
                   </motion.div>
                 ) : (
                   <AnswerTurn
@@ -575,7 +619,7 @@ function AnswerTurn({
   const [sourcesOpen, setSourcesOpen] = useState(false)
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-4">
+    <div className="group flex w-full min-w-0 flex-col gap-4">
       <AnimatePresence>
         {!turn.settled && !turn.text && !turn.error && (
           <motion.p
@@ -599,7 +643,7 @@ function AnswerTurn({
       )}
 
       {turn.text && (
-        <div className="relative min-w-0">
+        <div className="relative min-w-0" title={formatFullDate(turn.timestamp)}>
           <MarkdownContent content={turn.text} />
           {streaming && (
             <motion.span
@@ -646,6 +690,14 @@ function AnswerTurn({
               ))}
             </ul>
           )}
+        </div>
+      )}
+
+      {turn.timestamp && turn.settled && (
+        <div className="flex items-center gap-2">
+          <span className="text-[0.6875rem] font-medium text-neutral-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 select-none pointer-events-none">
+            {formatMessageTime(turn.timestamp)}
+          </span>
         </div>
       )}
     </div>

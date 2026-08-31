@@ -129,11 +129,15 @@ function GoogleSource({ id, label }: { id: BackendSourceType; label: string }) {
 
   const backfill = useMutation({
     mutationFn: () => triggerBackfill(token!, id),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["connector-status"] })
+    },
   })
   const disconnect = useMutation({
     mutationFn: () => disconnectConnector(token!, id),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["connector-status"] })
+    },
   })
 
   const started = sourceIsLinked(status.data)
@@ -219,7 +223,7 @@ function GoogleSource({ id, label }: { id: BackendSourceType; label: string }) {
               onClick={() => disconnect.mutate()}
             >
               <Unplug className="size-3.5" />
-              Disconnect
+              {disconnect.isPending ? "Disconnecting…" : "Disconnect"}
             </Button>
           )}
         </div>
@@ -429,6 +433,18 @@ export function ConnectorCard({
     },
   })
 
+  const disconnectMicrosoft = useMutation({
+    mutationFn: async () => {
+      await Promise.all([
+        disconnectConnector(token!, "onedrive"),
+        disconnectConnector(token!, "outlook"),
+      ])
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["connector-status"] })
+    },
+  })
+
   const googleOrgLinked =
     isGoogleOrganization &&
     googleLive &&
@@ -588,19 +604,32 @@ export function ConnectorCard({
         ) : live && isMicrosoft ? (
           hydrated &&
           canWrite && (
-            <Button
-              size="sm"
-              variant={microsoftLinked ? "outline" : "default"}
-              disabled={authorizeMicrosoft.isPending}
-              onClick={() => authorizeMicrosoft.mutate()}
-            >
-              <Plug className="size-3.5" />
-              {authorizeMicrosoft.isPending
-                ? "Opening…"
-                : microsoftLinked
-                  ? "Reconnect"
-                  : "Connect"}
-            </Button>
+            <div className="flex gap-1.5">
+              {microsoftLinked && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={disconnectMicrosoft.isPending}
+                  onClick={() => disconnectMicrosoft.mutate()}
+                >
+                  <Unplug className="size-3.5" />
+                  {disconnectMicrosoft.isPending ? "Disconnecting…" : "Disconnect"}
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant={microsoftLinked ? "outline" : "default"}
+                disabled={authorizeMicrosoft.isPending}
+                onClick={() => authorizeMicrosoft.mutate()}
+              >
+                <Plug className="size-3.5" />
+                {authorizeMicrosoft.isPending
+                  ? "Opening…"
+                  : microsoftLinked
+                    ? "Reconnect"
+                    : "Connect"}
+              </Button>
+            </div>
           )
         ) : live && isGoogleOrganization ? (
           hydrated && canWrite && isAdmin ? (

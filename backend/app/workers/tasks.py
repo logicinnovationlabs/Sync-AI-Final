@@ -1288,3 +1288,32 @@ def run_scheduled_tenant_backups() -> dict:
         return {"backed_up": backed_up, "errors": errors, "count": len(backed_up)}
 
     return _run_async(_run())
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=10)
+def purge_connector_documents_task(self, tenant_id: str, source_type: str) -> dict:
+    """Purge all documents, vectors, ACLs, and indexes for a disconnected connector."""
+    try:
+        from app.services.indexer import indexer
+
+        deleted_count = _run_async(indexer.delete_by_source(tenant_id, source_type))
+        logger.info(
+            "Purged %s documents for disconnected connector source=%s tenant=%s",
+            deleted_count,
+            source_type,
+            tenant_id,
+        )
+        return {
+            "tenant_id": tenant_id,
+            "source_type": source_type,
+            "deleted_count": deleted_count,
+            "status": "purged",
+        }
+    except Exception as e:
+        logger.error(
+            "Failed to purge connector documents source=%s tenant=%s: %s",
+            source_type,
+            tenant_id,
+            e,
+        )
+        raise self.retry(exc=e, countdown=10)

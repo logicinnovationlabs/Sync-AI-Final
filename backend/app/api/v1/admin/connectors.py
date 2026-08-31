@@ -176,5 +176,18 @@ async def remove_connector(
         ip_address=client_ip(request),
     )
     await db_session.commit()
+
+    try:
+        from app.workers.tasks import purge_connector_documents_task
+
+        purge_connector_documents_task.delay(str(tenant_id), source_type)
+    except Exception:
+        try:
+            from app.services.indexer import indexer
+
+            await indexer.delete_by_source(str(tenant_id), source_type)
+        except Exception:
+            pass
+
     snapshot.enabled = False
     return snapshot

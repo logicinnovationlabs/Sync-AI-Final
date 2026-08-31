@@ -116,6 +116,15 @@ export async function streamAssistantChat(params: {
     let sawToken = false
     let sawFinal = false
 
+    const onAbort = () => {
+      try {
+        void reader.cancel()
+      } catch {
+        // ignore
+      }
+    }
+    controller.signal.addEventListener("abort", onAbort, { once: true })
+
     const handleLine = (line: string) => {
       const trimmed = line.trim()
       if (!trimmed) return
@@ -165,25 +174,43 @@ export async function streamAssistantChat(params: {
       params.onEvent(event)
     }
 
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split("\n")
-      buffer = lines.pop() ?? ""
-      for (const line of lines) {
-        handleLine(line)
+    try {
+      while (true) {
+        if (controller.signal.aborted || params.signal?.aborted) {
+          break
+        }
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split("\n")
+        buffer = lines.pop() ?? ""
+        for (const line of lines) {
+          handleLine(line)
+        }
       }
+      if (buffer.trim()) {
+        handleLine(buffer)
+      }
+    } catch (readErr) {
+      if (controller.signal.aborted || params.signal?.aborted) {
+        throw new DOMException("The operation was aborted.", "AbortError")
+      }
+      throw readErr
     }
-    if (buffer.trim()) {
-      handleLine(buffer)
+
+    const wasAborted = controller.signal.aborted || Boolean(params.signal?.aborted)
+    if (wasAborted) {
+      throw new DOMException("The operation was aborted.", "AbortError")
     }
+
     if (!sawFinal) {
       throw new ApiError(502, "Incomplete assistant response (no final event).")
     }
   } finally {
     clearTimeout(timeoutId)
-    params.signal?.removeEventListener("abort", onExternalAbort)
+    if (params.signal) {
+      params.signal.removeEventListener("abort", onExternalAbort)
+    }
   }
 }
 

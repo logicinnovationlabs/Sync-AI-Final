@@ -11,16 +11,21 @@ Endpoints:
 
 from typing import Dict, Any, Optional
 from uuid import UUID
+import asyncio
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
-import logging
 
 from app.api.deps import get_current_user, get_tenant, require_scope, require_admin
 from app.services.tenant_resolver import TenantRouting
-from app.workers.tasks import backfill_source, backfill_tenant_source
+from app.workers.tasks import (
+    backfill_source,
+    backfill_tenant_source,
+    purge_connector_documents_task,
+)
 from app.services.cursor_store import cursor_store
 from app.core.config import settings
 from app.connectors.google.oauth import google_oauth_from_settings
@@ -241,6 +246,20 @@ async def disconnect_organization_connector(
     if not tenant_id or str(tenant.tenant_id) != tenant_id:
         raise HTTPException(status_code=403, detail="Cross-tenant execution rejected")
 
+    # Clear status in Redis immediately
+    for source_type in GOOGLE_SOURCES:
+        try:
+            status_store.clear_status(
+                tenant_id, source_type, user_id="organization"
+            )
+        except Exception:
+            logger.warning(
+                "Failed to clear organization status on disconnect tenant=%s source=%s",
+                tenant_id,
+                source_type,
+                exc_info=True,
+            )
+
     try:
         from app.services.tenant_resolver import tenant_resolver
         from app.storage.tenant_db import tenant_db_manager
@@ -248,33 +267,50 @@ async def disconnect_organization_connector(
 
         tenant_uuid = UUID(tenant_id)
 
-        routing = await tenant_resolver.resolve(tenant_id)
-        factory = tenant_db_manager.get_session_factory(
-            routing.db_host,
-            routing.db_name,
-            routing.db_user,
-            routing.db_password,
-            str(routing.tenant_id),
-        )
-
-        async with factory() as session:
-            for source_type in GOOGLE_SOURCES:
-                result = await session.execute(
-                    select(TenantConnector).where(
-                        TenantConnector.tenant_id == tenant_uuid,
-                        TenantConnector.source_type == source_type,
-                        TenantConnector.connection_scope == "organization",
-                    )
-                )
-                row = result.scalar_one_or_none()
-                if row:
-                    await session.delete(row)
-            await session.commit()
-
-        for source_type in GOOGLE_SOURCES:
-            status_store.clear_status(
-                tenant_id, source_type, user_id="organization"
+        async def _delete_org_rows():
+            routing = await tenant_resolver.resolve(tenant_id)
+            factory = tenant_db_manager.get_session_factory(
+                routing.db_host,
+                routing.db_name,
+                routing.db_user,
+                routing.db_password,
+                str(routing.tenant_id),
             )
+            async with factory() as session:
+                for source_type in GOOGLE_SOURCES:
+                    result = await session.execute(
+                        select(TenantConnector).where(
+                            TenantConnector.tenant_id == tenant_uuid,
+                            TenantConnector.source_type == source_type,
+                            TenantConnector.connection_scope == "organization",
+                        )
+                    )
+                    row = result.scalar_one_or_none()
+                    if row:
+                        await session.delete(row)
+                await session.commit()
+
+        try:
+            await asyncio.wait_for(_delete_org_rows(), timeout=3.0)
+        except Exception as exc:
+            logger.warning("DB cleanup timed out or failed on org disconnect: %s", exc)
+
+        # Purge indexed documents and vector embeddings for disconnected org sources
+        for src in GOOGLE_SOURCES:
+            try:
+                purge_connector_documents_task.delay(tenant_id, src)
+            except Exception:
+                try:
+                    from app.services.indexer import indexer
+
+                    await asyncio.wait_for(indexer.delete_by_source(tenant_id, src), timeout=5.0)
+                except Exception:
+                    logger.warning(
+                        "Document purge failed on org disconnect tenant=%s source=%s",
+                        tenant_id,
+                        src,
+                        exc_info=True,
+                    )
 
         return {
             "status": "disconnected",
@@ -591,19 +627,7 @@ async def disconnect_connector(
     user_id = _user_id(current_user)
     scope_id = cursor_scope_id(tenant_id, user_id)
 
-    # Clear cursor — failure is non-fatal; log and continue.
-    try:
-        await cursor_store.update_cursor(scope_id, source_type, "")
-    except Exception:
-        logger.warning(
-            "Failed to clear cursor on disconnect tenant=%s source=%s scope=%s",
-            tenant_id,
-            source_type,
-            scope_id,
-            exc_info=True,
-        )
-
-    # Always mark as not_connected in Redis regardless of DB state.
+    # 1. Mark as not_connected in Redis immediately so UI / status checks update instantly.
     try:
         status_store.clear_status(tenant_id, source_type, user_id=user_id)
     except Exception:
@@ -614,15 +638,44 @@ async def disconnect_connector(
             exc_info=True,
         )
 
+    # 2. Clear cursor with timeout — failure is non-fatal.
+    try:
+        await asyncio.wait_for(cursor_store.update_cursor(scope_id, source_type, ""), timeout=3.0)
+    except Exception:
+        logger.warning(
+            "Failed to clear cursor on disconnect tenant=%s source=%s scope=%s",
+            tenant_id,
+            source_type,
+            scope_id,
+            exc_info=True,
+        )
+
+    # 3. Call provider plugin on_disconnect with timeout — failure is non-fatal.
     plugin = provider_registry.get_by_source(source_type)
     if plugin and plugin.on_disconnect:
         try:
-            await plugin.on_disconnect(tenant_id, user_id, source_type)
+            await asyncio.wait_for(plugin.on_disconnect(tenant_id, user_id, source_type), timeout=3.0)
         except Exception:
             logger.exception(
                 "Disconnect cleanup failed provider=%s source=%s",
                 plugin.provider_id,
                 source_type,
+            )
+
+    # 4. Purge indexed documents and vector embeddings for this connector source
+    try:
+        purge_connector_documents_task.delay(tenant_id, source_type)
+    except Exception:
+        try:
+            from app.services.indexer import indexer
+
+            await asyncio.wait_for(indexer.delete_by_source(tenant_id, source_type), timeout=5.0)
+        except Exception:
+            logger.warning(
+                "Document purge failed on disconnect tenant=%s source=%s",
+                tenant_id,
+                source_type,
+                exc_info=True,
             )
 
     return {
