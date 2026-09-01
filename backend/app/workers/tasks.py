@@ -737,6 +737,18 @@ def process_drive_notification(self, tenant_id: str) -> dict:
             _run_async(cursor_store.update_cursor(tenant_id, "google_drive", delta_result.next_cursor))
         
         doc_count = len(unified_docs)
+        if doc_count > 0:
+            try:
+                from app.connectors.google.status_store import set_status
+                set_status(
+                    base_tenant_id,
+                    "google_drive",
+                    user_id=principal_id,
+                    increment_indexed=doc_count,
+                )
+            except Exception as exc:
+                logger.warning("Failed to update status store on drive notification: %s", exc)
+
         logger.info(
             f"Drive notification processed for tenant {tenant_id}: "
             f"{doc_count} indexed, {len(deleted_ids)} deleted"
