@@ -5,14 +5,14 @@ from fastapi import APIRouter, Depends
 from typing import Dict, Any
 
 from app.core.config import settings
-from app.api.deps import get_current_active_user
+from app.api.deps import get_current_user
 
 router = APIRouter()
 
 
 @router.get("/env-check", response_model=Dict[str, Any])
 async def check_environment(
-    current_user = Depends(get_current_active_user)
+    current_user = Depends(get_current_user)
 ):
     """
     Check critical environment variable configurations (non-sensitive values only).
