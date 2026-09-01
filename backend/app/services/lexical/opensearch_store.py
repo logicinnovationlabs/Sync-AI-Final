@@ -91,6 +91,11 @@ class OpenSearchLexicalStore(LexicalStore):
             getattr(settings, "opensearch_url", None)
             or getattr(settings, "lexical_search_url", None)
         )
+        
+        # Skip if explicitly disabled or localhost (likely not configured in production)
+        if opensearch_url in ("", "disabled", "localhost", None):
+            opensearch_url = None
+            
         # Fast failure timeout (5 seconds) so unreachable instances do not block pipeline
         timeout = 5
         
@@ -110,6 +115,18 @@ class OpenSearchLexicalStore(LexicalStore):
             # Fallback to host/port config
             host = getattr(settings, 'opensearch_host', 'localhost')
             port = getattr(settings, 'opensearch_port', 9200)
+            
+            # Skip if using default localhost (likely not configured in production)
+            if host in ('localhost', 'disabled', ''):
+                logger.warning(
+                    "OpenSearch not configured (host=%s). Lexical search disabled. "
+                    "Set OPENSEARCH_URL environment variable to enable.", 
+                    host
+                )
+                self._client = None
+                self.index_prefix = getattr(settings, 'opensearch_index_prefix', 'snyq')
+                return
+                
             use_ssl = getattr(settings, 'opensearch_use_ssl', False)
             self._client = OpenSearch(
                 hosts=[{"host": host, "port": port}],
@@ -140,6 +157,10 @@ class OpenSearchLexicalStore(LexicalStore):
         size: int = 20,
     ) -> Dict[str, Any]:
         """Execute BM25 search with ACL prefilter."""
+        # Return empty results if OpenSearch is not configured
+        if self._client is None:
+            return {"results": [], "facets": {}, "total": 0}
+            
         with _tracer.start_as_current_span("opensearch.query") as span:
             span.set_attribute("db.system", "opensearch")
             span.set_attribute("db.operation", "search")

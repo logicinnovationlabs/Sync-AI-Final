@@ -39,6 +39,7 @@ from app.connectors.org import router as connectors_org_router
 from app.connectors import provider_registry
 from app.api.v1 import reindex as reindex_routes
 from app.api.v1 import acl_debug as acl_debug_routes
+from app.api.v1 import diagnostic as diagnostic_routes
 
 from app.middleware.tenant_middleware import TenantMiddleware
 from app.middleware.http_metrics import HttpMetricsMiddleware
@@ -208,6 +209,7 @@ _include_product_and_legacy(document_routes.router, tags=["document-reader"])
 _include_product_and_legacy(assistant_routes.router, prefix="/assistant", tags=["assistant"])
 _include_product_and_legacy(mcp_gateway_router)
 _include_product_and_legacy(reindex_routes.router, tags=["reindex"])
+_include_product_and_legacy(diagnostic_routes.router, tags=["diagnostic"])
 # Only include debug routes in development/test environments for security
 if _is_relaxed_env:
     _include_product_and_legacy(acl_debug_routes.router, tags=["acl-debug"])
