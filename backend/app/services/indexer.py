@@ -236,8 +236,9 @@ class Indexer:
                 len(vector_chunks),
                 tenant_id,
             )
-        except Exception:
-            logger.warning("vector index fan-out skipped", exc_info=True)
+        except Exception as exc:
+            logger.error("vector index fan-out failed for tenant %s: %s", tenant_id, exc, exc_info=True)
+            raise
 
     async def delete_by_ids(
         self,

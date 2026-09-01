@@ -96,26 +96,40 @@ class GeminiEmbeddingProvider:
             if task_type:
                 kwargs["task_type"] = task_type
 
-            try:
-                result = await asyncio.to_thread(self.genai.embed_content, **kwargs)
-                embs = result.get("embedding", [])
-                if embs and isinstance(embs[0], (int, float)):
-                    return [embs]
-                return embs
-            except Exception as e:
-                logger.warning("Batch embedding failed (%s), falling back to individual calls", e)
-                async def _one(t: str):
-                    one_kw = {
-                        "model": self.model,
-                        "content": t[:10000],
-                        "output_dimensionality": self.dimension,
-                    }
-                    if task_type:
-                        one_kw["task_type"] = task_type
-                    res = await asyncio.to_thread(self.genai.embed_content, **one_kw)
-                    return res.get("embedding", [])
+            for attempt in range(3):
+                try:
+                    result = await asyncio.to_thread(self.genai.embed_content, **kwargs)
+                    embs = result.get("embedding", [])
+                    if embs and isinstance(embs[0], (int, float)):
+                        return [embs]
+                    return embs
+                except Exception as e:
+                    if ("429" in str(e) or "quota" in str(e).lower() or "resourceexhausted" in str(e).lower()) and attempt < 2:
+                        wait_sec = (attempt + 1) * 3
+                        logger.warning("Embedding rate limited (429), retrying in %ss: %s", wait_sec, e)
+                        await asyncio.sleep(wait_sec)
+                        continue
+                    
+                    logger.warning("Batch embedding failed (%s), falling back to individual calls with backoff", e)
+                    async def _one(t: str):
+                        one_kw = {
+                            "model": self.model,
+                            "content": t[:10000],
+                            "output_dimensionality": self.dimension,
+                        }
+                        if task_type:
+                            one_kw["task_type"] = task_type
+                        for ind_attempt in range(3):
+                            try:
+                                res = await asyncio.to_thread(self.genai.embed_content, **one_kw)
+                                return res.get("embedding", [])
+                            except Exception as ind_err:
+                                if ("429" in str(ind_err) or "quota" in str(ind_err).lower() or "resourceexhausted" in str(ind_err).lower()) and ind_attempt < 2:
+                                    await asyncio.sleep((ind_attempt + 1) * 2)
+                                    continue
+                                raise ind_err
 
-                return await asyncio.gather(*[_one(t) for t in batch])
+                    return await asyncio.gather(*[_one(t) for t in batch])
 
         batch_results = await asyncio.gather(*[_embed_batch(b) for b in batches])
         embeddings: List[List[float]] = []
