@@ -406,17 +406,14 @@ indexer = Indexer()
 def _acl_terms(
     permissions: List[str], extra_acl: Optional[List[str]] = None
 ) -> List[str]:
-    terms = []
-    seen = set()
-    for raw in list(permissions or []) + list(extra_acl or []):
-        value = str(raw)
-        if not value or value in seen:
-            continue
-        seen.add(value)
-        terms.append(value)
-        if value.startswith("user:") or value.startswith("group:"):
-            bare = value.split(":", 1)[-1]
-            if bare and bare not in seen:
-                seen.add(bare)
-                terms.append(bare)
-    return terms
+    """
+    Merge document permissions with extra ACL terms (owner/connector identity).
+    
+    Note: This function preserves all term formats from both sources.
+    The extra_acl should already contain properly formatted terms from
+    app.acl.term_generator.generate_acl_terms_for_user to ensure query matching.
+    """
+    from app.acl.term_generator import merge_acl_terms
+    
+    # Use the unified merger to deduplicate while preserving all formats
+    return merge_acl_terms(permissions or [], extra_acl or [])

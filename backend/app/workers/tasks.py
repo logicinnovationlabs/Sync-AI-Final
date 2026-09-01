@@ -514,9 +514,14 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
             )
 
         # Stamp the SynQ user who connected Google so federated search ACL matches JWT ``sub``
-        owner_acl = _acl_terms_for_user(principal_id or user_id)
-        if mailbox_email:
-            owner_acl = list(dict.fromkeys(owner_acl + _acl_terms_for_user(f"user:{mailbox_email}")))
+        # CRITICAL: Generate ACL terms in ALL formats to match JWT extraction during queries
+        from app.acl.term_generator import generate_acl_terms_for_user
+        
+        owner_acl = generate_acl_terms_for_user(
+            principal_id=principal_id or user_id,
+            email=mailbox_email,
+            groups=None  # TODO: Extract groups from JWT if available
+        )
 
         # Run sync orchestrator (two-pass: deletions then delta, paginated + checkpointed)
         since = datetime.utcnow() - timedelta(days=365)  # Look back 1 year
@@ -1168,13 +1173,26 @@ def _attach_extracted_text_for_pipeline(documents: list) -> None:
 
 
 def _acl_terms_for_user(user_id: Optional[str]) -> list:
-    principal = str(user_id or "")
-    if not principal:
+    """
+    DEPRECATED: Use app.acl.term_generator.generate_acl_terms_for_user instead.
+    
+    This function is kept for backward compatibility but delegates to the
+    unified ACL term generator to ensure consistency with JWT extraction.
+    """
+    from app.acl.term_generator import generate_acl_terms_for_user
+    
+    if not user_id:
         return []
-    terms = [principal]
-    if not principal.startswith(("user:", "group:")):
-        terms.append(f"user:{principal}")
-    return terms
+    
+    user_str = str(user_id).strip()
+    if not user_str:
+        return []
+    
+    # Check if this looks like an email (contains @)
+    if "@" in user_str:
+        return generate_acl_terms_for_user(email=user_str)
+    else:
+        return generate_acl_terms_for_user(principal_id=user_str)
 
 
 def _lookup_mailbox_email(
@@ -1288,6 +1306,143 @@ def run_scheduled_tenant_backups() -> dict:
         return {"backed_up": backed_up, "errors": errors, "count": len(backed_up)}
 
     return _run_async(_run())
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=30)
+def reindex_connector_documents_task(
+    self, tenant_id: str, source_type: str, user_id: str = ""
+) -> dict:
+    """
+    Reindex all documents for a connector source with corrected ACL terms.
+    
+    This task:
+    1. Loads all documents from the canonical store for the source
+    2. Regenerates ACL terms using the unified ACL term generator
+    3. Reindexes documents to vector and lexical stores
+    
+    Required after fixing ACL mismatch to make existing documents queryable.
+    """
+    try:
+        from uuid import UUID
+        from app.services.indexer import indexer
+        from app.services.tenant_resolver import tenant_resolver
+        from app.storage.tenant_db import tenant_db_manager
+        from app.storage.canonical_repo import CanonicalRepo
+        from app.connectors.google.token_store import PersistentGoogleTokenStore
+        from app.connectors.google.keys import google_oauth_token_key
+        from app.acl.term_generator import generate_acl_terms_for_user
+        
+        logger.info(
+            "Reindex started tenant=%s source=%s user=%s", tenant_id, source_type, user_id
+        )
+        
+        # Get routing info
+        tenant_uuid = UUID(tenant_id)
+        routing = _run_async(tenant_resolver.resolve(tenant_id))
+        
+        # Create DB session
+        factory = tenant_db_manager.get_session_factory(
+            routing.db_host,
+            routing.db_name,
+            routing.db_user,
+            routing.db_password,
+            str(routing.tenant_id),
+        )
+        
+        async def _reindex() -> int:
+            session = factory()
+            try:
+                repo = CanonicalRepo(use_memory=False, session=session)
+                
+                # Get all document IDs for this source
+                from sqlalchemy import select
+                from app.models.canonical_documents import CanonicalDocument
+                
+                result = await session.execute(
+                    select(CanonicalDocument.source_id).where(
+                        CanonicalDocument.tenant_id == tenant_uuid,
+                        CanonicalDocument.source_type == source_type,
+                    )
+                )
+                doc_ids = [row[0] for row in result.fetchall()]
+                
+                if not doc_ids:
+                    logger.info(
+                        "No documents to reindex tenant=%s source=%s",
+                        tenant_id,
+                        source_type,
+                    )
+                    return 0
+                
+                # Lookup owner identity for ACL generation
+                principal_id = user_id
+                mailbox_email = ""
+                
+                if source_type.startswith("google_"):
+                    token_store = PersistentGoogleTokenStore(tenant_id)
+                    data = (
+                        token_store.get_token(
+                            google_oauth_token_key(tenant_id, user_id, "personal")
+                        )
+                        or {}
+                    )
+                    if not data:
+                        data = (
+                            token_store.get_token(
+                                google_oauth_token_key(tenant_id, "", "personal")
+                            )
+                            or {}
+                        )
+                    mailbox_email = str(data.get("mailbox_email") or "")
+                    if not principal_id:
+                        principal_id = str(data.get("connected_by") or "")
+                
+                # Generate unified ACL terms (matching query-time JWT extraction)
+                extra_acl = generate_acl_terms_for_user(
+                    principal_id=principal_id, email=mailbox_email
+                )
+                
+                logger.info(
+                    "Reindexing %s documents with ACL terms: %s",
+                    len(doc_ids),
+                    extra_acl,
+                )
+                
+                # Reindex all documents with new ACL terms
+                await indexer.reindex_by_ids(tenant_id, doc_ids, repo)
+                
+                return len(doc_ids)
+            finally:
+                await session.close()
+        
+        reindexed_count = _run_async(_reindex())
+        
+        logger.info(
+            "Reindex completed tenant=%s source=%s reindexed=%s",
+            tenant_id,
+            source_type,
+            reindexed_count,
+        )
+        
+        return {
+            "status": "completed",
+            "tenant_id": tenant_id,
+            "source_type": source_type,
+            "reindexed_count": reindexed_count,
+        }
+        
+    except Exception as exc:
+        logger.exception(
+            "Reindex failed tenant=%s source=%s error=%s", tenant_id, source_type, exc
+        )
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=exc)
+        return {
+            "status": "failed",
+            "tenant_id": tenant_id,
+            "source_type": source_type,
+            "error": str(exc),
+        }
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=10)

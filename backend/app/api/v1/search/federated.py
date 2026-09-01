@@ -220,6 +220,14 @@ async def _safe_call_indexed(
 
         from app.storage.qdrant_client import qdrant_client
 
+        # Log ACL terms for debugging
+        logger.info(
+            "Indexed search: tenant=%s query=%s acl_terms=%s",
+            tenant_id,
+            query[:50] if query else "browse",
+            acl_terms[:5] if len(acl_terms) <= 5 else f"{acl_terms[:3]}... ({len(acl_terms)} total)",
+        )
+
         tenant_filter = Filter(
             must=[
                 FieldCondition(key="tenant_id", match=MatchValue(value=str(tenant_id)))
@@ -252,14 +260,34 @@ async def _safe_call_indexed(
             )
             raw = [(p.payload or {}, float(p.score or 0.0)) for p in scored]
 
+        total_docs = len(raw)
+        filtered_count = 0
+        
         for payload, score in raw:
-            if not document_is_visible(
-                acl_terms, payload.get("permissions") or payload.get("acl_terms")
-            ):
+            doc_acl = payload.get("permissions") or payload.get("acl_terms")
+            if not document_is_visible(acl_terms, doc_acl):
+                filtered_count += 1
+                # Log first few filtered documents for debugging
+                if filtered_count <= 3:
+                    logger.debug(
+                        "Document filtered by ACL: doc_id=%s doc_acl=%s user_acl=%s",
+                        payload.get("id", "unknown"),
+                        doc_acl[:3] if doc_acl and len(doc_acl) > 3 else doc_acl,
+                        acl_terms[:3] if len(acl_terms) > 3 else acl_terms,
+                    )
                 continue
             hit = _payload_to_hit(payload, score)
             if hit["document_id"]:
                 hits.append(hit)
+        
+        if filtered_count > 0:
+            logger.info(
+                "ACL filtering: %s/%s documents filtered out for tenant=%s",
+                filtered_count,
+                total_docs,
+                tenant_id,
+            )
+        
         status.ok = True
         status.hit_count = len(hits)
         return hits, status
