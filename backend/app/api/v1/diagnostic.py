@@ -19,8 +19,8 @@ async def check_environment(
     """
     return {
         "opensearch": {
-            "url_configured": bool(settings.opensearch_url),
-            "opensearch_url": settings.opensearch_url if settings.opensearch_url else "NOT SET",
+            "enabled": settings.lexical_enabled,
+            "resolved_url": settings.resolved_lexical_url or "NOT SET",
             "opensearch_host": settings.opensearch_host,
             "opensearch_port": settings.opensearch_port,
             "opensearch_index_prefix": settings.opensearch_index_prefix,
@@ -32,7 +32,7 @@ async def check_environment(
             "qdrant_port": settings.qdrant_port,
         },
         "lexical_search": {
-            "enabled": bool(settings.opensearch_url or settings.opensearch_host),
+            "enabled": settings.lexical_enabled,
             "lexical_search_url": getattr(settings, "lexical_search_url", None),
         },
         "embedding": {

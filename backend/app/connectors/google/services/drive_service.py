@@ -95,6 +95,17 @@ class DriveConnector(BaseConnector):
             DeltaResult with files and next cursor
         """
         token = await self.get_valid_token()
+
+        # Drive changes.list tokens are numeric. files.list pageTokens are not.
+        # After backfill we store startPageToken for incremental webhooks; a later
+        # backfill must not pass that token to files.list (HTTP 400 + full recrawl).
+        if cursor and str(cursor).strip().isdigit():
+            logger.info(
+                "fetch_delta skipping files.list; cursor %r is a Drive changes token "
+                "(backfill already complete)",
+                cursor,
+            )
+            return DeltaResult(documents=[], next_cursor=None, has_more=False)
         
         # Full bootstrap crawl lists non-trashed files. Time filter is only
         # applied when the caller passes a recent `since` (incremental-style).

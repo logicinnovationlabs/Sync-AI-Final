@@ -63,7 +63,7 @@ class QdrantVectorStore(VectorStore):
             or getattr(settings, "embedding_dimension", None)
             or 3072
         )
-        self._upsert_batch_size = 50
+        self._upsert_batch_size = 16
         self._ensured_collections: set[str] = set()
         logger.info(f"QdrantVectorStore initialized with prefix: {self.collection_prefix}, dimensions: {self.dimensions}")
     
@@ -195,8 +195,8 @@ class QdrantVectorStore(VectorStore):
                 filter_kwargs["must_not"] = must_not
             filter_obj = self.qm.Filter(**filter_kwargs)
 
-            fetch_k = top_k if is_bypass(acl_terms) else max(top_k * 3, top_k)
             try:
+                self._ensure_collection(tenant_id)
                 results = self._client.search(
                     collection_name=name,
                     query_vector=normalized_query,
@@ -206,7 +206,7 @@ class QdrantVectorStore(VectorStore):
                 )
             except Exception as e:
                 span.set_attribute("error", True)
-                logger.error(f"Qdrant search failed: {e}")
+                logger.warning(f"Qdrant search failed: {e}")
                 return []
 
             # --- Rule #2, Stage 5: vector retrieval BEFORE ACL post-filter ---

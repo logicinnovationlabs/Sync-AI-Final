@@ -69,10 +69,11 @@ async def readiness_payload() -> Dict[str, Any]:
     ok, detail = await _check_redis()
     checks["redis"] = {"ok": ok, "detail": detail}
 
-    opensearch_url = settings.opensearch_url
-    if not opensearch_url and settings.opensearch_host:
-        opensearch_url = f"http://{settings.opensearch_host}:{settings.opensearch_port}"
-    ok, detail = await _check_http("opensearch", opensearch_url)
+    opensearch_url = settings.resolved_lexical_url
+    if settings.lexical_enabled:
+        ok, detail = await _check_http("opensearch", opensearch_url)
+    else:
+        ok, detail = True, "not configured"
     checks["opensearch"] = {"ok": ok, "detail": detail}
 
     qdrant_url = settings.qdrant_url
@@ -90,7 +91,7 @@ async def readiness_payload() -> Dict[str, Any]:
 
     required = ["postgres", "redis"]
     if settings.environment not in ("development", "dev", "test"):
-        if settings.opensearch_url or settings.opensearch_host:
+        if settings.lexical_enabled:
             required.append("opensearch")
         if settings.qdrant_url or settings.qdrant_host:
             required.append("qdrant")

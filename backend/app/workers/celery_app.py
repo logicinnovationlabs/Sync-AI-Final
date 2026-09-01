@@ -6,6 +6,8 @@ Backend: Redis
 Task always eager: Configurable (true in tests for synchronous execution)
 """
 
+import os
+
 import app.core.compat  # noqa: F401 — pkg_resources shim before OpenTelemetry
 from celery import Celery
 from app.core.config import settings
@@ -40,6 +42,8 @@ celery_app.conf.update(
     task_soft_time_limit=3000,  # 50 minutes soft limit
     task_acks_late=True,
     worker_prefetch_multiplier=1,
+    worker_max_tasks_per_child=4,
+    worker_max_memory_per_child=int(os.getenv("CELERY_WORKER_MAX_MEMORY_KB", "400000")),
     task_routes={
         "app.workers.tasks.backfill_tenant_source": {"queue": "google"},
         "app.workers.tasks.backfill_source": {"queue": "google"},
@@ -67,7 +71,6 @@ except Exception:
     pass
 
 # Test mode: synchronous execution
-import os
 import sys
 
 task_always_eager = (

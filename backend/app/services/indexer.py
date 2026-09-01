@@ -153,6 +153,17 @@ class Indexer:
                     "parent_doc_id": doc_id,
                 }
             ]
+            max_chunks = max(1, int(getattr(settings, "max_chunks_per_document", None) or 80))
+            if len(pieces) > max_chunks:
+                logger.warning(
+                    "capping chunks for document %s from %s to %s to avoid worker OOM",
+                    doc_id,
+                    len(pieces),
+                    max_chunks,
+                )
+                head = max_chunks // 2
+                tail = max_chunks - head
+                pieces = pieces[:head] + pieces[-tail:]
             meta_extra = {
                 k: v
                 for k, v in (doc.get("structured_metadata") or {}).items()
@@ -206,34 +217,39 @@ class Indexer:
                     "document store upsert failed id=%s", doc_id, exc_info=True
                 )
 
-        if getattr(settings, "opensearch_url", None) or getattr(settings, "lexical_search_url", None):
+        if settings.lexical_enabled:
             try:
                 from app.services.lexical.opensearch_store import OpenSearchLexicalStore
 
-                await OpenSearchLexicalStore().index_batch(tenant_id, lexical_docs)
+                store = OpenSearchLexicalStore()
+                if store._client is not None:
+                    await store.index_batch(tenant_id, lexical_docs)
             except Exception as exc:
                 logger.info("lexical index fan-out skipped (using vector search): %s", exc)
-
 
         if not pending_chunks:
             return
 
         try:
-            # ROOT FIX vs dumb Phase 2 answers: embed EACH chunk, not the whole doc once.
-            chunk_vectors = await self.embedding_service.embed_documents(
-                chunk_embed_texts
-            )
-            vector_chunks = []
-            for meta, vec in zip(pending_chunks, chunk_vectors):
-                row = dict(meta)
-                row["embedding"] = vec
-                vector_chunks.append(row)
             from app.services.vector.qdrant_store import QdrantVectorStore
 
-            await QdrantVectorStore().upsert_batch(tenant_id, vector_chunks)
+            vector_store = QdrantVectorStore()
+            upsert_batch = max(1, int(getattr(settings, "embedding_batch_size", None) or 8))
+            total = 0
+            for i in range(0, len(pending_chunks), upsert_batch):
+                slice_meta = pending_chunks[i : i + upsert_batch]
+                slice_texts = chunk_embed_texts[i : i + upsert_batch]
+                chunk_vectors = await self.embedding_service.embed_documents(slice_texts)
+                vector_chunks = []
+                for meta, vec in zip(slice_meta, chunk_vectors):
+                    row = dict(meta)
+                    row["embedding"] = vec
+                    vector_chunks.append(row)
+                await vector_store.upsert_batch(tenant_id, vector_chunks)
+                total += len(vector_chunks)
             logger.info(
                 "Upserted %s chunk vectors for tenant %s",
-                len(vector_chunks),
+                total,
                 tenant_id,
             )
         except Exception as exc:

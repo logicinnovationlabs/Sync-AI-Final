@@ -50,6 +50,29 @@ logger = logging.getLogger(__name__)
 CONFIDENCE_THRESHOLD = 0.75
 
 
+def _extractive_answer_from_hits(hits: List[Dict[str, Any]]) -> str:
+    """Build a grounded answer from retrieved snippets when the LLM returns nothing."""
+    parts: List[str] = []
+    for i, hit in enumerate(hits[:8], start=1):
+        meta = hit.get("meta") if isinstance(hit.get("meta"), dict) else {}
+        title = str(
+            hit.get("title") or meta.get("title") or "Document"
+        ).strip() or "Document"
+        snippet = plain_source_text(
+            str(hit.get("snippet") or hit.get("body") or hit.get("chunk_text") or ""),
+            limit=1200,
+        )
+        if not snippet:
+            continue
+        parts.append(f"**{title}** [{i}]\n{snippet}")
+    if not parts:
+        return ""
+    return (
+        "I couldn't complete a generated summary, so here is the relevant content "
+        "from your documents:\n\n" + "\n\n".join(parts)
+    )
+
+
 class OrchestratorState(TypedDict, total=False):
     request: Dict[str, Any]
     authorization: Optional[str]
@@ -631,15 +654,24 @@ class OrchestratorGraph:
         if gen_error or not text:
             if gen_error:
                 errors.append(f"chat_provider: {gen_error}")
-            text = (
-                "The language model did not return a usable answer. "
-                "Please retry. No generated content was substituted."
-            )
-            logger.warning(
-                "[assistant.pipeline] Qwen payload invalid; refusing to fabricate an answer error=%s",
-                gen_error or "empty_text",
-            )
-            citations = []
+            extractive = _extractive_answer_from_hits(hits)
+            if extractive:
+                text = extractive
+                logger.warning(
+                    "[assistant.pipeline] LLM empty; using extractive answer from %s hits error=%s",
+                    len(hits),
+                    gen_error or "empty_text",
+                )
+            else:
+                text = (
+                    "The language model did not return a usable answer. "
+                    "Please retry. No generated content was substituted."
+                )
+                logger.warning(
+                    "[assistant.pipeline] Qwen payload invalid; refusing to fabricate an answer error=%s",
+                    gen_error or "empty_text",
+                )
+                citations = []
 
         # Refuse answers should not paint a misleading sources rail.
         from app.services.assistant.infrastructure.chat_provider import is_refuse_answer

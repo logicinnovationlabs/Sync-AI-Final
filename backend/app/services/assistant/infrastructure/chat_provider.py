@@ -717,109 +717,83 @@ class OpenRouterChatProvider:
             "temperature": temperature,
             "stream": False,
         }
-        # Only send reasoning controls to models that support them (Qwen3/thinking).
-        # Qwen 2.5 instruct can fail or return empty when this extra_body is present.
-        if self._may_reason(self.model):
-            create_kwargs["extra_body"] = {
-                "reasoning": {"effort": "none", "exclude": True},
-            }
+        FALLBACK_MODELS = [
+            "qwen/qwen-2.5-coder-32b-instruct",
+            "google/gemini-2.5-flash",
+            "openai/gpt-4o-mini",
+            "meta-llama/llama-3.3-70b-instruct",
+        ]
+        candidate_models = [self.model] + [m for m in FALLBACK_MODELS if m != self.model]
 
-        try:
-            completion = await self._create_completion(**create_kwargs)
-        except Exception as first_exc:  # noqa: BLE001
-            # Some models reject the reasoning extra_body; retry once without it.
-            logger.warning(
-                "[assistant.pipeline] Qwen first request failed; retrying without reasoning extras error=%s",
-                redact_provider_error(first_exc),
-            )
-            try:
-                create_kwargs.pop("extra_body", None)
-                completion = await self._create_completion(**create_kwargs)
-            except Exception as exc:  # noqa: BLE001
-                elapsed = (time.perf_counter() - started) * 1000.0
-                err = redact_provider_error(exc)
-                logger.warning(
-                    "[assistant.pipeline] Qwen request failed ms=%.1f error=%s",
-                    elapsed,
-                    err,
-                )
-                return ChatGeneration(
-                    text="",
-                    provider=self.name,
-                    error=f"provider_error:{err}",
-                    timings_ms={"qwen_completed_ms": elapsed},
-                )
+        completion = None
+        last_err = None
+        text = ""
 
-        text, err = _completion_text(completion)
-        data = _as_mapping(completion) or {}
-        finish = None
-        choices = data.get("choices") or getattr(completion, "choices", None) or []
-        if choices:
-            c0 = choices[0]
-            if isinstance(c0, dict):
-                finish = c0.get("finish_reason") or c0.get("native_finish_reason")
+        for active_model in candidate_models:
+            create_kwargs["model"] = active_model
+            if self._may_reason(active_model):
+                create_kwargs["extra_body"] = {
+                    "reasoning": {"effort": "none", "exclude": True},
+                }
             else:
-                finish = getattr(c0, "finish_reason", None)
-        usage = data.get("usage") or getattr(completion, "usage", None)
-        usage_bits = ""
-        if isinstance(usage, dict):
-            usage_bits = (
-                f" prompt={usage.get('prompt_tokens')}"
-                f" completion={usage.get('completion_tokens')}"
-            )
-        elif usage is not None:
-            usage_bits = (
-                f" prompt={getattr(usage, 'prompt_tokens', None)}"
-                f" completion={getattr(usage, 'completion_tokens', None)}"
-            )
+                create_kwargs.pop("extra_body", None)
 
-        if not text:
-            logger.warning(
-                "[assistant.pipeline] Qwen empty payload; retrying once with more tokens finish=%s error=%s",
-                finish,
-                err,
-            )
             try:
-                retry_kwargs = dict(create_kwargs)
-                retry_kwargs["max_tokens"] = max(token_budget, 2048)
-                # Do not re-introduce reasoning extras on empty-content retry.
-                retry_kwargs.pop("extra_body", None)
-                completion = await self._create_completion(**retry_kwargs)
-                text, err = _completion_text(completion)
-                data = _as_mapping(completion) or {}
-                choices = data.get("choices") or []
-                if choices and isinstance(choices[0], dict):
-                    finish = choices[0].get("finish_reason") or finish
-            except Exception as exc:  # noqa: BLE001
+                completion = await self._create_completion(**create_kwargs)
+            except Exception as first_exc:  # noqa: BLE001
+                # Retry once without reasoning extras if rejected
                 logger.warning(
-                    "[assistant.pipeline] Qwen retry failed error=%s",
-                    redact_provider_error(exc),
+                    "[assistant.pipeline] %s request failed; retrying without reasoning extras error=%s",
+                    active_model,
+                    redact_provider_error(first_exc),
                 )
+                try:
+                    create_kwargs.pop("extra_body", None)
+                    completion = await self._create_completion(**create_kwargs)
+                except Exception as exc:  # noqa: BLE001
+                    last_err = redact_provider_error(exc)
+                    logger.warning(
+                        "[assistant.pipeline] %s request failed error=%s",
+                        active_model,
+                        last_err,
+                    )
+                    continue
+
+            text, err = _completion_text(completion)
+            if not text:
+                try:
+                    retry_kwargs = dict(create_kwargs)
+                    retry_kwargs["max_tokens"] = max(token_budget, 2048)
+                    retry_kwargs.pop("extra_body", None)
+                    completion = await self._create_completion(**retry_kwargs)
+                    text, err = _completion_text(completion)
+                except Exception as exc:  # noqa: BLE001
+                    last_err = redact_provider_error(exc)
+                    continue
+
+            if text:
+                break
 
         elapsed = (time.perf_counter() - started) * 1000.0
         if not text:
             logger.warning(
-                "[assistant.pipeline] Qwen returned empty payload ms=%.1f error=%s finish=%s%s",
+                "[assistant.pipeline] OpenRouter all candidate models returned empty/failed ms=%.1f error=%s",
                 elapsed,
-                err or "empty_content",
-                finish,
-                usage_bits,
+                last_err or "empty_content",
             )
             return ChatGeneration(
                 text="",
                 provider=self.name,
-                error=err or "empty_content",
+                error=last_err or "empty_content",
                 timings_ms={
                     "qwen_first_token_ms": elapsed,
                     "qwen_completed_ms": elapsed,
                 },
             )
         logger.info(
-            "[assistant.pipeline] Qwen response completed ms=%.1f chars=%s finish=%s%s",
+            "[assistant.pipeline] LLM response completed ms=%.1f chars=%s",
             elapsed,
             len(text),
-            finish,
-            usage_bits,
         )
 
         # --- Rule #2, Stage 9: raw Qwen response ---

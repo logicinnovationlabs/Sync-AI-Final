@@ -238,6 +238,12 @@ class Settings(BaseSettings):
             "TENANT_BOOTSTRAP_TOKEN", "tenant_bootstrap_token"
         ),
     )
+    allowed_tenant_db_hosts: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "ALLOWED_TENANT_DB_HOSTS", "allowed_tenant_db_hosts"
+        ),
+    )
 
     google_client_id: Optional[str] = Field(
         default=None,
@@ -455,7 +461,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("EMBEDDING_MODEL_VERSION", "embedding_model_version"),
     )
     embedding_batch_size: int = Field(
-        default=100,
+        default=8,
         validation_alias=AliasChoices("EMBEDDING_BATCH_SIZE", "embedding_batch_size"),
     )
     embedding_dimensions: int = Field(
@@ -485,6 +491,10 @@ class Settings(BaseSettings):
     lexical_max_results: int = Field(
         default=100,
         validation_alias=AliasChoices("LEXICAL_MAX_RESULTS", "lexical_max_results"),
+    )
+    max_chunks_per_document: int = Field(
+        default=80,
+        validation_alias=AliasChoices("MAX_CHUNKS_PER_DOCUMENT", "max_chunks_per_document"),
     )
     
     # ------------------------------------------------------------------
@@ -589,6 +599,43 @@ class Settings(BaseSettings):
     @property
     def redis_url(self) -> str:
         return self.session_store_redis_url
+
+    @property
+    def lexical_enabled(self) -> bool:
+        """True only when a reachable remote OpenSearch URL is configured.
+
+        Loopback (localhost / 127.0.0.1) is allowed in development/test only.
+        Production must set OPENSEARCH_URL or LEXICAL_SEARCH_URL to a real host.
+        """
+        return self.resolved_lexical_url is not None
+
+    @property
+    def resolved_lexical_url(self) -> Optional[str]:
+        env = (self.environment or "").strip().lower()
+        allow_loopback = env in ("development", "dev", "test")
+        disabled = {"", "disabled", "none", "null", "false", "mock"}
+
+        def _loopback(value: str) -> bool:
+            v = value.lower()
+            return "localhost" in v or "127.0.0.1" in v
+
+        for raw in (self.opensearch_url, self.lexical_search_url):
+            if raw is None:
+                continue
+            url = str(raw).strip()
+            if not url or url.lower() in disabled:
+                continue
+            if _loopback(url) and not allow_loopback:
+                continue
+            if url.startswith(("http://", "https://")):
+                return url
+
+        host = str(self.opensearch_host or "").strip()
+        if not host or host.lower() in disabled:
+            return None
+        if _loopback(host) and not allow_loopback:
+            return None
+        return f"http://{host}:{int(self.opensearch_port or 9200)}"
 
     @property
     def qdrant_url(self) -> str:

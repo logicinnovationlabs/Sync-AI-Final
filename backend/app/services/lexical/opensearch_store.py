@@ -73,13 +73,43 @@ class OpenSearchLexicalStore(LexicalStore):
     """OpenSearch client with ACL filter clause on every query."""
     
     def __init__(self) -> None:
+        timeout = 3
+        self._client = None
+        self.index_prefix = getattr(settings, "opensearch_index_prefix", "snyq")
+
+        opensearch_url = settings.resolved_lexical_url
+        if not opensearch_url:
+            logger.debug(
+                "OpenSearch not configured. Lexical search disabled (vector search active)."
+            )
+            return
+
         try:
             from opensearchpy import OpenSearch
         except ImportError as exc:
             raise RuntimeError(
                 "opensearch-py is required for OpenSearch backend"
             ) from exc
-        
+
+        lowered = opensearch_url.lower()
+        if "localhost" in lowered or "127.0.0.1" in lowered:
+            import socket
+            import urllib.parse
+
+            try:
+                parsed = urllib.parse.urlparse(opensearch_url)
+                with socket.create_connection(
+                    (parsed.hostname or "localhost", parsed.port or 9200),
+                    timeout=0.5,
+                ):
+                    pass
+            except Exception:
+                logger.info(
+                    "OpenSearch at %s is not reachable. Lexical search disabled (vector search active).",
+                    opensearch_url,
+                )
+                return
+
         http_auth = None
         from app.storage.vault_client import PlatformSecretKeys, vault_client
 
@@ -87,21 +117,9 @@ class OpenSearchLexicalStore(LexicalStore):
         os_user = getattr(settings, "opensearch_user", None)
         if os_user and os_password and os_password not in ("", "mock-secret"):
             http_auth = (os_user, os_password)
-        opensearch_url = (
-            getattr(settings, "opensearch_url", None)
-            or getattr(settings, "lexical_search_url", None)
-        )
-        
-        # Skip if explicitly disabled or localhost (likely not configured in production)
-        if opensearch_url in ("", "disabled", "localhost", None):
-            opensearch_url = None
-            
-        # Fast failure timeout (5 seconds) so unreachable instances do not block pipeline
-        timeout = 5
-        
-        if opensearch_url:
-            use_ssl = opensearch_url.startswith("https://")
-            # Parse URL for host/port
+
+        use_ssl = opensearch_url.startswith("https://")
+        try:
             self._client = OpenSearch(
                 hosts=[opensearch_url],
                 http_auth=http_auth,
@@ -111,36 +129,13 @@ class OpenSearchLexicalStore(LexicalStore):
                 timeout=timeout,
                 max_retries=1,
             )
-        else:
-            # Fallback to host/port config
-            host = getattr(settings, 'opensearch_host', 'localhost')
-            port = getattr(settings, 'opensearch_port', 9200)
-            
-            # Skip if using default localhost (likely not configured in production)
-            if host in ('localhost', 'disabled', ''):
-                logger.warning(
-                    "OpenSearch not configured (host=%s). Lexical search disabled. "
-                    "Set OPENSEARCH_URL environment variable to enable.", 
-                    host
-                )
-                self._client = None
-                self.index_prefix = getattr(settings, 'opensearch_index_prefix', 'snyq')
-                return
-                
-            use_ssl = getattr(settings, 'opensearch_use_ssl', False)
-            self._client = OpenSearch(
-                hosts=[{"host": host, "port": port}],
-                http_auth=http_auth,
-                use_ssl=use_ssl,
-                verify_certs=False,
-                ssl_show_warn=False,
-                timeout=timeout,
-                max_retries=1,
+            logger.info(
+                "OpenSearchLexicalStore initialized with prefix: %s",
+                self.index_prefix,
             )
-
-        
-        self.index_prefix = getattr(settings, 'opensearch_index_prefix', 'snyq')
-        logger.info(f"OpenSearchLexicalStore initialized with prefix: {self.index_prefix}")
+        except Exception as e:
+            logger.warning("Failed to initialize OpenSearch client: %s", e)
+            self._client = None
     
     def _index_name(self, tenant_id: str) -> str:
         """Generate index name for tenant."""
@@ -281,6 +276,8 @@ class OpenSearchLexicalStore(LexicalStore):
         document: Dict[str, Any],
     ) -> None:
         """Index a single document."""
+        if self._client is None:
+            return
         index_name = self._index_name(tenant_id)
         
         # Ensure index exists
@@ -305,7 +302,7 @@ class OpenSearchLexicalStore(LexicalStore):
         documents: List[Dict[str, Any]],
     ) -> int:
         """Bulk index documents."""
-        if not documents:
+        if self._client is None or not documents:
             return 0
         
         index_name = self._index_name(tenant_id)
@@ -336,6 +333,8 @@ class OpenSearchLexicalStore(LexicalStore):
         document_id: str,
     ) -> None:
         """Delete a document from the index."""
+        if self._client is None:
+            return
         index_name = self._index_name(tenant_id)
         
         try:
@@ -346,6 +345,8 @@ class OpenSearchLexicalStore(LexicalStore):
     
     async def refresh_index(self, tenant_id: str) -> None:
         """Force refresh the index to make recent changes visible."""
+        if self._client is None:
+            return
         index_name = self._index_name(tenant_id)
         try:
             self._client.indices.refresh(index=index_name)
@@ -355,6 +356,8 @@ class OpenSearchLexicalStore(LexicalStore):
     
     async def delete_index(self, tenant_id: str) -> None:
         """Delete the entire index for a tenant."""
+        if self._client is None:
+            return
         index_name = self._index_name(tenant_id)
         try:
             if self._client.indices.exists(index=index_name):

@@ -63,9 +63,14 @@ async def _safe_call_lexical(
         # Import locally to avoid circular dependency
         from app.services.lexical.opensearch_store import OpenSearchLexicalStore
         from app.core.config import settings
-        
-        if settings.opensearch_url or settings.lexical_search_url:
-            store = OpenSearchLexicalStore()
+
+        if not settings.lexical_enabled:
+            status.ok = True
+            status.hit_count = 0
+            return [], status
+
+        store = OpenSearchLexicalStore()
+        if store._client is not None:
             payload = await store.search(
                 tenant_id=tenant_id,
                 query=query,
@@ -81,8 +86,12 @@ async def _safe_call_lexical(
             status.ok = True
             status.hit_count = len(results)
             return results, status
+        else:
+            status.ok = True
+            status.hit_count = 0
+            return [], status
     except Exception as exc:
-        logger.warning("Lexical search failed: %s", exc)
+        logger.info("Lexical search unavailable/skipped: %s", exc)
         status.error = str(exc)
     finally:
         status.latency_ms = (time.perf_counter() - started) * 1000
@@ -146,7 +155,7 @@ async def _safe_call_vector(
             status.hit_count = len(enriched)
             return enriched, status
     except Exception as exc:
-        logger.warning("Vector search failed: %s", exc)
+        logger.info("Vector search unavailable/skipped: %s", exc)
         status.error = str(exc)
     finally:
         status.latency_ms = (time.perf_counter() - started) * 1000
@@ -303,7 +312,7 @@ async def _safe_call_indexed(
         status.hit_count = len(hits)
         return hits, status
     except Exception as exc:
-        logger.warning("Indexed collection search failed: %s", exc)
+        logger.info("Indexed collection search unavailable/skipped: %s", exc)
         status.error = str(exc)
     finally:
         status.latency_ms = (time.perf_counter() - started) * 1000
@@ -544,7 +553,7 @@ async def federated_health() -> Dict[str, Any]:
     from app.core.config import settings
     
     backends = {
-        "lexical": bool(settings.opensearch_url or settings.lexical_search_url),
+        "lexical": bool(settings.lexical_enabled),
         "vector": bool(settings.qdrant_url),
         "graph": bool(settings.neo4j_uri),
     }
