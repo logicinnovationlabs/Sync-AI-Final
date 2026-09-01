@@ -284,7 +284,11 @@ def seed_token_store_from_env(
     if not rt:
         return False
 
-    existing = token_store.get_token(google_oauth_token_key(tenant_id, "", "personal")) or {}
+    existing = (
+        token_store.get_token(google_oauth_token_key(tenant_id, "", "personal"))
+        or token_store.get_token(f"google_oauth:{tenant_id}")
+        or {}
+    )
     if existing.get("refresh_token") or existing.get("access_token"):
         logger.info(
             "seed_token_store_from_env: skip, token already stored for tenant (will not clobber)"

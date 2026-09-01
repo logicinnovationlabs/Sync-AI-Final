@@ -57,8 +57,27 @@ class TextExtractor:
         if not content_bytes:
             return ""
         
+        # Normalize/resolve MIME type if missing or generic
+        mime_type = (mime_type or "").strip().lower()
+        if not mime_type or mime_type in ("application/octet-stream", "binary/octet-stream"):
+            ext = (file_extension or "").lower().lstrip(".")
+            if ext == "pdf":
+                mime_type = "application/pdf"
+            elif ext in ("docx", "doc"):
+                mime_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            elif ext in ("xlsx", "xls"):
+                mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            elif ext in ("pptx", "ppt"):
+                mime_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            elif ext in ("txt", "text", "md", "csv", "json", "log"):
+                mime_type = "text/plain"
+            elif ext in ("html", "htm"):
+                mime_type = "text/html"
+            elif ext in ("png", "jpg", "jpeg", "webp", "tiff", "bmp"):
+                mime_type = f"image/{ext}"
+
         # Route by MIME type
-        mime_major = mime_type.split("/")[0]
+        mime_major = mime_type.split("/")[0] if "/" in mime_type else mime_type
         
         try:
             if mime_type == "text/html":
@@ -135,12 +154,11 @@ class TextExtractor:
         """
         Extract text from PDF using pdfplumber.
         
-        Falls back to OCR for scanned/image-only pages.
+        Falls back to OCR for scanned/image-only pages, and pypdf if pdfplumber fails.
         """
+        text_parts = []
         try:
             import pdfplumber
-            
-            text_parts = []
             
             with pdfplumber.open(io.BytesIO(content_bytes)) as pdf:
                 for page in pdf.pages:
@@ -162,11 +180,19 @@ class TextExtractor:
                                 text_parts.append(ocr_text)
                         except Exception as ocr_error:
                             logger.warning(f"OCR fallback failed for PDF page: {ocr_error}")
-            
-            return "\n".join(text_parts)
         except Exception as e:
-            logger.error(f"PDF extraction failed: {e}")
-            return ""
+            logger.warning(f"PDF extraction with pdfplumber encountered error: {e}, trying pypdf fallback")
+            try:
+                import pypdf
+                reader = pypdf.PdfReader(io.BytesIO(content_bytes))
+                for page in reader.pages:
+                    page_text = page.extract_text()
+                    if page_text and page_text.strip():
+                        text_parts.append(page_text)
+            except Exception as pypdf_err:
+                logger.error(f"pypdf fallback also failed: {pypdf_err}")
+
+        return "\n".join(text_parts)
     
     def _extract_docx(self, content_bytes: bytes) -> str:
         """Extract text from DOCX.

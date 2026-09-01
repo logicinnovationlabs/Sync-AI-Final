@@ -139,8 +139,8 @@ class RedisTokenStore:
 
     _process: dict = {}
 
-    def __init__(self, tenant_id: str):
-        self.tenant_id = tenant_id
+    def __init__(self, tenant_id: str = ""):
+        self.tenant_id = str(tenant_id or "")
 
     def _ns(self, key: str) -> str:
         return f"{self.tenant_id}:{key}"

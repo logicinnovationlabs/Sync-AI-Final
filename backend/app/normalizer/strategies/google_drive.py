@@ -57,7 +57,7 @@ class GoogleDriveNormalizer(NormalizerStrategy):
         if isinstance(injected, str) and injected:
             return self._bound(injected)
 
-        for key in ("extractedText", "fullText", "content", "body"):
+        for key in ("_extracted_text", "extractedText", "fullText", "content", "body"):
             value = raw.get(key)
             if isinstance(value, str) and value.strip():
                 return self._bound(value)
