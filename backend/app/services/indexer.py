@@ -104,9 +104,9 @@ class Indexer:
         from app.services.chunking.prose import ProseChunker
         from app.services.ingest.local_index import local_ingest_index
 
-        # Increased chunk size for better detailed Q&A coverage
-        chunk_size = int(getattr(settings, "chunk_size", None) or 2000)  # Increased from 1000
-        chunk_overlap = int(getattr(settings, "chunk_overlap", None) or 400)  # Increased from 200
+        # Phase 1 used ~1000 tokens / 200 overlap. Char approx keeps passages usable.
+        chunk_size = int(getattr(settings, "chunk_size", None) or 1000)
+        chunk_overlap = int(getattr(settings, "chunk_overlap", None) or 200)
         chunker = ProseChunker(chunk_size=chunk_size, overlap=chunk_overlap)
         model_version = (
             getattr(settings, "embedding_model_version", None)

@@ -24,11 +24,11 @@ logger = logging.getLogger(__name__)
 
 OPENROUTER_DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 QWEN_TIMEOUT_S = 90.0
-# Increased limits for detailed document Q&A
-MAX_SOURCE_CHARS = 4000  # Increased from 1500 for detailed content
-MAX_CONTEXT_CHARS = 32000  # Increased from 12000 for longer documents  
+# Phase 1 sent ~1000 chars per source; allow more for stories / newsletters.
+MAX_SOURCE_CHARS = 1500
+MAX_CONTEXT_CHARS = 12000
 MAX_HISTORY_TURNS = 6
-TOP_K_SOURCES = 10  # Increased from 5 to retrieve more relevant chunks
+TOP_K_SOURCES = 5
 # Cosine / ANN similarity (Qdrant). Keep a low floor — empty context is worse.
 MIN_COSINE_SCORE = 0.02
 # Federator RRF uses k=60, so rank-1 is ~1/61 ≈ 0.016 — not cosine.
