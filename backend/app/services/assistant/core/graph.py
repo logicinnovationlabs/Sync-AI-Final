@@ -326,6 +326,21 @@ class OrchestratorGraph:
             if not r.ok and r.error:
                 errors.append(f"{r.tool_name}: {r.error}")
 
+        # --- Diagnostic: log each tool result ---
+        for r in gathered:
+            hit_count = len((r.payload or {}).get("results") or []) if r.ok else 0
+            backend_names = [b.get("name", "?") for b in (r.payload or {}).get("backends") or []]
+            backend_ok = [b.get("ok", False) for b in (r.payload or {}).get("backends") or []]
+            logger.info(
+                "[assistant.pipeline] search result tool=%s ok=%s hits=%s backends=%s backends_ok=%s error=%s",
+                r.tool_name,
+                r.ok,
+                hit_count,
+                backend_names,
+                backend_ok,
+                r.error or "",
+            )
+
         return {
             **state,
             "tool_results": [r.model_dump() for r in results],
@@ -389,18 +404,45 @@ class OrchestratorGraph:
         base_hits = extract_base_hits({"results": merged_results})
         boosted = apply_signal_boost(base_hits, state.get("signals") or {})
 
+        # --- Diagnostic: log retrieval quality before fallback decision ---
+        confidence = retrieval_confidence(boosted)
+        top_scores = [
+            {
+                "doc": h.document_id[:12],
+                "base": round(h.base_score, 4),
+                "boosted": round(h.boosted_score, 4),
+                "snippet_len": len(h.snippet or ""),
+                "usable": source_text_is_usable(str(h.snippet or h.title or "")),
+            }
+            for h in boosted[:5]
+        ]
+        any_usable = any(
+            source_text_is_usable(str(h.snippet or h.title or ""))
+            for h in boosted[:3]
+        )
+        logger.info(
+            "[assistant.pipeline] ranker: merged=%s base_hits=%s boosted=%s confidence=%.3f "
+            "threshold=%.3f any_usable_top3=%s top_scores=%s",
+            len(merged_results),
+            len(base_hits),
+            len(boosted),
+            confidence,
+            self.confidence_threshold,
+            any_usable,
+            top_scores,
+        )
+
         # Search vs Read switch: below threshold → Document Reader on top blob.
+        # IMPORTANT: Skip the document reader fallback when top snippets have
+        # usable text — the reader hits localhost which fails on Render/Railway.
         used_reader = False
         errors = list(state.get("errors") or [])
         rounds = int(state.get("tool_call_rounds") or 0)
         if (
-            retrieval_confidence(boosted) < self.confidence_threshold
+            confidence < self.confidence_threshold
             and boosted
             and rounds < self.max_tool_call_rounds
-            and not any(
-                source_text_is_usable(str(h.snippet or h.title or ""))
-                for h in boosted[:3]
-            )
+            and not any_usable
         ):
             top = boosted[0]
             acl = state["acl_compiled_filter"]
@@ -493,10 +535,21 @@ class OrchestratorGraph:
         tenant_id = str(req.get("tenant_id") or "")
         hits = await enrich_hits_with_full_bodies(hits, tenant_id)
         user_prompt = str(req.get("prompt") or "")
+        # --- Diagnostic: log what the LLM will actually see ---
+        grounding_details = [
+            {
+                "doc": str(h.get("document_id") or "")[:12],
+                "title": str(h.get("title") or "")[:40],
+                "snippet_len": len(str(h.get("snippet") or "")),
+                "score": h.get("boosted_score") or h.get("score"),
+            }
+            for h in hits[:5]
+        ]
         logger.info(
-            "[assistant.pipeline] grounding hits raw=%s kept=%s",
+            "[assistant.pipeline] grounding hits raw=%s kept=%s enriched_details=%s",
             len(raw_hits),
             len(hits),
+            grounding_details,
         )
         session = state.get("session") or {}
         history = list(session.get("history") or [])

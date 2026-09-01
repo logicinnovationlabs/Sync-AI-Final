@@ -147,6 +147,13 @@ async def orchestrator_chat(
     if is_fail_closed(acl_terms):
         acl_terms = [f"user:{user_id}"]
     acl_bytes = default_acl_from_claims(acl_terms)
+    logger.info(
+        "[assistant.pipeline] ACL for chat: tenant=%s user=%s email=%s acl_terms=%s",
+        tenant_id,
+        user_id[:12] if user_id else "",
+        current_user.get("email") or "(none)",
+        acl_terms[:5] if len(acl_terms) <= 5 else f"{acl_terms[:4]}... ({len(acl_terms)} total)",
+    )
 
     account_email = str(current_user.get("email") or "").strip() or None
     if not account_email:

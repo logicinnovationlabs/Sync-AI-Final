@@ -262,31 +262,42 @@ async def _safe_call_indexed(
 
         total_docs = len(raw)
         filtered_count = 0
+        first_filtered_acl = None
+        first_visible_acl = None
         
         for payload, score in raw:
             doc_acl = payload.get("permissions") or payload.get("acl_terms")
             if not document_is_visible(acl_terms, doc_acl):
                 filtered_count += 1
-                # Log first few filtered documents for debugging
-                if filtered_count <= 3:
-                    logger.debug(
-                        "Document filtered by ACL: doc_id=%s doc_acl=%s user_acl=%s",
-                        payload.get("id", "unknown"),
-                        doc_acl[:3] if doc_acl and len(doc_acl) > 3 else doc_acl,
-                        acl_terms[:3] if len(acl_terms) > 3 else acl_terms,
-                    )
+                # Capture first filtered doc for diagnostics
+                if first_filtered_acl is None:
+                    first_filtered_acl = {
+                        "doc_id": str(payload.get("id") or payload.get("document_id") or "unknown")[:30],
+                        "doc_acl": list(doc_acl or [])[:5],
+                        "score": round(score, 4),
+                    }
                 continue
+            if first_visible_acl is None:
+                first_visible_acl = {
+                    "doc_id": str(payload.get("id") or payload.get("document_id") or "unknown")[:30],
+                    "doc_acl": list((payload.get("permissions") or payload.get("acl_terms")) or [])[:5],
+                    "score": round(score, 4),
+                }
             hit = _payload_to_hit(payload, score)
             if hit["document_id"]:
                 hits.append(hit)
         
-        if filtered_count > 0:
-            logger.info(
-                "ACL filtering: %s/%s documents filtered out for tenant=%s",
-                filtered_count,
-                total_docs,
-                tenant_id,
-            )
+        logger.info(
+            "Indexed search result: total_raw=%s visible=%s filtered=%s tenant=%s "
+            "user_acl=%s first_visible=%s first_filtered=%s",
+            total_docs,
+            len(hits),
+            filtered_count,
+            tenant_id,
+            acl_terms[:4] if len(acl_terms) <= 4 else f"{acl_terms[:3]}... ({len(acl_terms)} total)",
+            first_visible_acl,
+            first_filtered_acl,
+        )
         
         status.ok = True
         status.hit_count = len(hits)
