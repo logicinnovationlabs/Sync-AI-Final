@@ -117,6 +117,52 @@ class RevocationService:
         }
         await redis_client.publish("revocation_events", json.dumps(event))
 
+    async def revoke_user(
+        self,
+        principal_id: str,
+        tenant_id: str,
+        db_session: AsyncSession,
+        user: "User",
+    ) -> int:
+        """
+        Revoke all tokens for a user and increment token_version.
+        
+        This is the shared revocation function for deactivation, role changes,
+        and any other user state changes that should invalidate existing sessions.
+        
+        Args:
+            principal_id: User UUID
+            tenant_id: Tenant UUID
+            db_session: Database session (tenant DB)
+            user: User object (must have token_version attribute)
+            
+        Returns:
+            New token_version value
+        """
+        from app.core.config import settings
+        
+        # Increment token_version on the user object
+        user.token_version = int(user.token_version or 0) + 1
+        new_version = user.token_version
+        
+        # Publish to Redis first so validation sees revoke even if DB commit lags
+        ttl = max(int(settings.token_ttl_access), 60)
+        await redis_client.set(
+            str(tenant_id),
+            f"token_version:{principal_id}",
+            str(new_version),
+            ex=ttl + int(settings.token_ttl_refresh),
+        )
+        
+        # Revoke all refresh tokens for this user
+        try:
+            await self.revoke_session(principal_id, tenant_id, db_session)
+        except Exception:
+            # Refresh-token table may be empty for native JWTs; version bump is enough.
+            pass
+        
+        return new_version
+
 
 # Global revocation service instance
 revocation_service = RevocationService()

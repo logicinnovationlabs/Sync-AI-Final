@@ -58,7 +58,9 @@ class DriveConnector(BaseConnector):
         super().__init__(config, token_store)
         self.tenant_id = config.get("tenant_id")
         self.oauth_manager = oauth_manager
-        self.connection_scope = connection_scope
+        self.connection_scope = str(
+            config.get("connection_scope") or connection_scope or "personal"
+        )
         self.drive_client = DriveClient()
     
     def get_source_type(self) -> str:

@@ -236,15 +236,15 @@ class HashiCorpVaultClient(VaultClient):
         self.client = hvac.Client(url=vault_url, token=token)
 
     def _get_kv_path(self, key_name: str) -> str:
-        """
-        Convert key name to KV v2 path.
-        KV v2 uses secret/data/<path> for reads/writes.
-        """
-        # Strip leading 'kv/' if present to avoid double prefix
-        path = key_name
+        """Logical KV v2 path. hvac adds mount ``secret`` and ``/data/`` itself."""
+        path = (key_name or "").strip().lstrip("/")
         if path.startswith("kv/"):
             path = path[3:]
-        return f"secret/data/{path}"
+        for prefix in ("secret/data/", "secret/"):
+            if path.startswith(prefix):
+                path = path[len(prefix):]
+                break
+        return path
 
     async def get_secret(self, key_name: str) -> str:
         """

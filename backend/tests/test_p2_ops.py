@@ -113,9 +113,10 @@ def test_p2_main_single_router_mount():
     import app.main as main_mod
 
     source = inspect.getsource(main_mod)
-    assert source.count("app.include_router(oauth.router") == 1
-    assert source.count("app.include_router(lexical.router") == 1
-    assert source.count("app.include_router(identity_routes.router") == 1
+    # Routers are now mounted via _include_product_and_legacy helper
+    assert source.count("_include_product_and_legacy(oauth.router)") == 1
+    assert source.count("_include_product_and_legacy(lexical.router") == 1
+    assert source.count("_include_product_and_legacy(identity_routes.router)") == 1
 
 
 def test_p2_rate_limit_middleware_registered():
@@ -134,6 +135,10 @@ def test_p2_celery_beat_schedules_backup():
     assert "scheduled-tenant-backups" in schedule
     assert schedule["scheduled-tenant-backups"]["task"] == (
         "app.workers.tasks.run_scheduled_tenant_backups"
+    )
+    assert "poll-sharepoint-delta" in schedule
+    assert schedule["poll-sharepoint-delta"]["task"] == (
+        "app.workers.tasks.poll_sharepoint_delta"
     )
 
 

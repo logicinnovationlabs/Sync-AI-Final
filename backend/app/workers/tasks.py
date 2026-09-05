@@ -22,7 +22,11 @@ from app.services.sync import sync_orchestrator
 from app.services.indexer import indexer
 from app.services.cursor_store import cursor_store
 from app.services.registry import connector_registry
-from app.connectors.google.oauth import GoogleOAuthManager, seed_token_store_from_env
+from app.connectors.google.oauth import (
+    GoogleOAuthManager,
+    google_oauth_from_settings,
+    seed_token_store_from_env,
+)
 from app.connectors.google.keys import cursor_scope_id, google_oauth_token_key
 from app.connectors.google.watch_manager import WatchManager
 from app.connectors.google.services.drive_service import DriveConnector
@@ -317,6 +321,55 @@ def _resolve_org_admin_user_id(tenant_id: str, source_type: str) -> str:
         return ""
 
 
+def _sharepoint_config_from_row(tenant_id: str, connection_scope: str) -> dict:
+    """Pull site_url / connected_by_email from the TenantConnector row."""
+    from app.storage.tenant_db import tenant_db_manager
+    from app.models.tenant_connector import TenantConnector
+
+    extras = {}
+    try:
+        routing = _safe_resolve_tenant(tenant_id)
+        if routing is None:
+            return extras
+        tenant_uuid = UUID(str(tenant_id))
+
+        async def _load(uuid_val):
+            factory = tenant_db_manager.get_session_factory(
+                routing.db_host,
+                routing.db_name,
+                routing.db_user,
+                routing.db_password,
+                str(routing.tenant_id),
+            )
+            async with factory() as session:
+                result = await session.execute(
+                    select(TenantConnector).where(
+                        TenantConnector.tenant_id == uuid_val,
+                        TenantConnector.source_type == "sharepoint",
+                        TenantConnector.connection_scope == connection_scope,
+                    )
+                )
+                row = result.scalar_one_or_none()
+                if not row:
+                    return {}
+                config = dict(row.config or {})
+                out = {}
+                if config.get("site_url"):
+                    out["site_url"] = config["site_url"]
+                email = config.get("connected_by_email") or config.get("mailbox_email")
+                if email:
+                    out["connected_by_email"] = email
+                    out["mailbox_email"] = email
+                if config.get("fixture_acl_emails"):
+                    out["fixture_acl_emails"] = config["fixture_acl_emails"]
+                return out
+
+        return _run_async(_load(tenant_uuid)) or extras
+    except Exception as exc:
+        logger.warning("Failed to load SharePoint connector config tenant=%s: %s", tenant_id, exc)
+        return extras
+
+
 def _token_store_for_tenant(tenant_id: str) -> RedisTokenStore:
     store = RedisTokenStore(tenant_id)
     client_id = getattr(settings, "google_client_id", None) or getattr(settings, "GOOGLE_CLIENT_ID", "") or ""
@@ -360,32 +413,33 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
         _validate_tenant_auth(tenant_id)
 
         token_store = PersistentGoogleTokenStore(tenant_id)
+        if source_type == "sharepoint":
+            from app.connectors.sharepoint.token_store import PersistentSharePointTokenStore
+
+            token_store = PersistentSharePointTokenStore(tenant_id)
         principal_id = str(user_id or "").strip()
-        
+        connection_scope = "organization" if principal_id == "organization" else "personal"
+
         # For organization scope, resolve the actual admin user_id from connector config
         if principal_id == "organization":
             admin_user_id = _resolve_org_admin_user_id(tenant_id, source_type)
             if admin_user_id:
                 principal_id = admin_user_id
                 logger.info("Organization scope: using admin user_id %s", principal_id)
-        
-        scope_id = cursor_scope_id(tenant_id, principal_id)
+
+        if connection_scope == "organization":
+            scope_id = cursor_scope_id(tenant_id, "organization")
+        else:
+            scope_id = cursor_scope_id(tenant_id, principal_id)
 
         oauth_manager = None
         client_id = ""
         client_secret = ""
         if source_type.startswith("google_"):
-            oauth_manager = GoogleOAuthManager(
+            oauth_manager = google_oauth_from_settings(
                 token_store,
-                settings.google_client_id or "",
-                settings.google_client_secret or "",
-                [
-                    "https://www.googleapis.com/auth/drive.readonly",
-                    "https://www.googleapis.com/auth/gmail.readonly",
-                    "https://www.googleapis.com/auth/userinfo.email",
-                    "openid",
-                ],
                 principal_id=principal_id,
+                connection_scope=connection_scope,
             )
             client_id = settings.google_client_id or ""
             client_secret = settings.google_client_secret or ""
@@ -393,6 +447,21 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
                 tenant_id,
                 source_type,
                 user_id=str(user_id or principal_id),  # Use original user_id for status tracking
+                connection_status="syncing",
+                last_error="",
+            )
+        elif source_type == "sharepoint":
+            from app.connectors.sharepoint.oauth import sharepoint_oauth_from_settings
+
+            oauth_manager = sharepoint_oauth_from_settings(
+                token_store,
+                principal_id=principal_id,
+                connection_scope=connection_scope,
+            )
+            status_store.set_status(
+                tenant_id,
+                source_type,
+                user_id=str(user_id or principal_id),
                 connection_status="syncing",
                 last_error="",
             )
@@ -426,14 +495,19 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
             "tenant_id": tenant_id,
             "mailbox_email": mailbox_email or "",
             "connected_by": user_id or principal_id or "",
+            "connection_scope": connection_scope,
         }
+        if source_type == "sharepoint":
+            config.update(_sharepoint_config_from_row(tenant_id, connection_scope))
         
         # Get connector instance
         connector = connector_registry.get_connector(source_type, config, token_store)
         
-        # Inject OAuth manager if Google connector
+        # Inject OAuth manager if the connector exposes one
         if hasattr(connector, "oauth_manager"):
             connector.oauth_manager = oauth_manager
+        if hasattr(connector, "connection_scope"):
+            connector.connection_scope = connection_scope
         
         # Resume from last mid-crawl checkpoint when present (Architecture B5)
         resume_cursor = _run_async(cursor_store.get_cursor(scope_id, source_type)) or None
@@ -469,6 +543,7 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
             cursor=resume_cursor,
             on_cursor_update=_persist_checkpoint,
             extra_acl=owner_acl,
+            config=config,
         )
         
         # Store final cursor (may already match last per-page checkpoint)
@@ -508,13 +583,22 @@ def backfill_tenant_source(self, tenant_id: str, source_type: str, user_id: str 
             f"{result.get('indexed_count', 0)} indexed, {result.get('deleted_count', 0)} deleted, "
             f"{result.get('pages_processed', 0)} pages"
         )
+        indexed = int(result.get("indexed_count") or 0)
+        status_kwargs = {
+            "user_id": str(user_id or principal_id),  # Use original user_id for correct Redis key (organization vs personal)
+            "connection_status": "active",
+            "last_error": "",
+        }
+        if source_type == "sharepoint":
+            # Incremental polls must add to the lifetime count, not replace it.
+            if indexed:
+                status_kwargs["increment_indexed"] = indexed
+        else:
+            status_kwargs["files_indexed"] = indexed
         status_store.set_status(
             tenant_id,
             source_type,
-            user_id=str(user_id or principal_id),  # Use original user_id for correct Redis key (organization vs personal)
-            connection_status="active",
-            files_indexed=int(result.get("indexed_count") or 0),
-            last_error="",
+            **status_kwargs,
         )
         
         return result
@@ -575,6 +659,7 @@ def process_drive_notification(self, tenant_id: str) -> dict:
         # Extract base tenant_id and principal_id from scoped tenant_id (e.g., "tenant_id:user_id" -> "tenant_id", "user_id")
         base_tenant_id = tenant_id.split(":")[0] if ":" in tenant_id else tenant_id
         principal_id = tenant_id.split(":")[1] if ":" in tenant_id else ""
+        connection_scope = "organization" if principal_id == "organization" else "personal"
         _validate_tenant_auth(base_tenant_id)
 
         # Get stored cursor using the scoped tenant_id
@@ -582,18 +667,16 @@ def process_drive_notification(self, tenant_id: str) -> dict:
         if not page_token:
             logger.warning(f"No cursor found for tenant {tenant_id}, skipping")
             return {"status": "no_cursor", "indexed_count": 0, "deleted_count": 0}
-        config = {"tenant_id": base_tenant_id}
+        config = {"tenant_id": base_tenant_id, "connection_scope": connection_scope}
         token_store = PersistentGoogleTokenStore(base_tenant_id)
 
-        oauth_manager = GoogleOAuthManager(
+        oauth_principal = principal_id
+        if principal_id == "organization":
+            oauth_principal = _resolve_org_admin_user_id(base_tenant_id, "google_drive") or ""
+        oauth_manager = google_oauth_from_settings(
             token_store,
-            settings.google_client_id or "",
-            settings.google_client_secret or "",
-            [
-                "https://www.googleapis.com/auth/drive.readonly",
-                "https://www.googleapis.com/auth/gmail.readonly",
-            ],
-            principal_id=principal_id,
+            principal_id=oauth_principal,
+            connection_scope=connection_scope,
         )
         client_id = settings.google_client_id or ""
         client_secret = settings.google_client_secret or ""
@@ -606,7 +689,7 @@ def process_drive_notification(self, tenant_id: str) -> dict:
         )
         
         # Create Drive connector
-        connector = DriveConnector(config, token_store, oauth_manager, connection_scope="organization")
+        connector = DriveConnector(config, token_store, oauth_manager, connection_scope=connection_scope)
         
         # Fetch changes since page token
         delta_result = _run_async(connector.fetch_since_page_token(page_token))
@@ -617,6 +700,43 @@ def process_drive_notification(self, tenant_id: str) -> dict:
         if hasattr(delta_result, "documents") and delta_result.documents:
             _attach_extracted_text_for_pipeline(delta_result.documents)
             from app.connectors.google.pipeline_bridge import process_raw_batch
+            
+            # Get connector config to determine connection_scope and connected_by
+            connection_scope = "personal"
+            connected_by = principal_id if principal_id else None
+            try:
+                from app.services.tenant_resolver import tenant_resolver
+                from app.storage.tenant_db import tenant_db_manager
+                from app.models.tenant_connector import TenantConnector
+                from sqlalchemy import select
+                
+                routing = _run_async(tenant_resolver.resolve(str(base_tenant_id)))
+                factory = tenant_db_manager.get_session_factory(
+                    routing.db_host,
+                    routing.db_name,
+                    routing.db_user,
+                    routing.db_password,
+                    str(routing.tenant_id),
+                )
+                async def _get_connector_config():
+                    async with factory() as session:
+                        result = await session.execute(
+                            select(TenantConnector).where(
+                                TenantConnector.tenant_id == base_tenant_id,
+                                TenantConnector.source_type == "google_drive",
+                            )
+                        )
+                        connector_row = result.scalar_one_or_none()
+                        if connector_row:
+                            return dict(connector_row.config or {})
+                        return {}
+                
+                connector_config = _run_async(_get_connector_config())
+                if connector_config:
+                    connection_scope = connector_config.get("connection_scope", "personal")
+                    connected_by = connector_config.get("connected_by") or connected_by
+            except Exception as e:
+                logger.warning(f"Failed to fetch connector config for ownership: {e}")
 
             unified_docs = _run_async(
                 process_raw_batch(
@@ -624,6 +744,8 @@ def process_drive_notification(self, tenant_id: str) -> dict:
                     "google_drive",
                     base_tenant_id,
                     require_postgres=True,
+                    connection_scope=connection_scope,
+                    connected_by=connected_by,
                 )
             )
             if unified_docs is None:
@@ -681,6 +803,30 @@ def poll_drive_acl_delta() -> dict:
     tenant_ids = _run_async(cursor_store.list_tenants_with_cursor("google_drive"))
     result = enqueue_drive_acl_poll(tenant_ids, process_drive_notification.delay)
     logger.info("poll_drive_acl_delta enqueued=%s", result["enqueued"])
+    return result
+
+
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=15)
+def poll_sharepoint_delta(self) -> dict:
+    """Beat: incremental Graph delta for every connected SharePoint/OneDrive account."""
+    from app.workers.sharepoint_poll import enqueue_sharepoint_delta_poll
+
+    scopes = _run_async(cursor_store.list_tenants_with_cursor("sharepoint"))
+
+    def _is_syncing(tenant_id: str, user_id: str) -> bool:
+        runtime = status_store.get_status(tenant_id, "sharepoint", user_id=user_id)
+        return str(runtime.get("connection_status") or "") == "syncing"
+
+    result = enqueue_sharepoint_delta_poll(
+        scopes,
+        is_syncing=_is_syncing,
+        delay=backfill_source.delay,
+    )
+    logger.info(
+        "poll_sharepoint_delta enqueued=%s skipped=%s",
+        result.get("enqueued"),
+        result.get("skipped"),
+    )
     return result
 
 
@@ -861,15 +1007,14 @@ def process_gmail_notification(self, tenant_id: str) -> dict:
                 principal_id = parts[1]
         
         token_store = PersistentGoogleTokenStore(base_tenant_id)
-        oauth_manager = GoogleOAuthManager(
+        connection_scope = "organization" if principal_id == "organization" else "personal"
+        oauth_principal = principal_id or ""
+        if principal_id == "organization":
+            oauth_principal = _resolve_org_admin_user_id(base_tenant_id, "google_gmail") or ""
+        oauth_manager = google_oauth_from_settings(
             token_store,
-            settings.google_client_id or "",
-            settings.google_client_secret or "",
-            [
-                "https://www.googleapis.com/auth/drive.readonly",
-                "https://www.googleapis.com/auth/gmail.readonly",
-            ],
-            principal_id=principal_id,
+            principal_id=oauth_principal,
+            connection_scope=connection_scope,
         )
         client_id = settings.google_client_id or ""
         client_secret = settings.google_client_secret or ""
@@ -895,13 +1040,52 @@ def process_gmail_notification(self, tenant_id: str) -> dict:
         unified_docs = []
         if hasattr(delta_result, "documents") and delta_result.documents:
             from app.connectors.google.pipeline_bridge import process_raw_batch
+            
+            # Get connector config to determine connection_scope and connected_by
+            connection_scope = "personal"
+            connected_by = principal_id if principal_id else None
+            try:
+                from app.services.tenant_resolver import tenant_resolver
+                from app.storage.tenant_db import tenant_db_manager
+                from app.models.tenant_connector import TenantConnector
+                from sqlalchemy import select
+                
+                routing = _run_async(tenant_resolver.resolve(str(base_tenant_id)))
+                factory = tenant_db_manager.get_session_factory(
+                    routing.db_host,
+                    routing.db_name,
+                    routing.db_user,
+                    routing.db_password,
+                    str(routing.tenant_id),
+                )
+                async def _get_connector_config():
+                    async with factory() as session:
+                        result = await session.execute(
+                            select(TenantConnector).where(
+                                TenantConnector.tenant_id == base_tenant_id,
+                                TenantConnector.source_type == "google_gmail",
+                            )
+                        )
+                        connector_row = result.scalar_one_or_none()
+                        if connector_row:
+                            return dict(connector_row.config or {})
+                        return {}
+                
+                connector_config = _run_async(_get_connector_config())
+                if connector_config:
+                    connection_scope = connector_config.get("connection_scope", "personal")
+                    connected_by = connector_config.get("connected_by") or connected_by
+            except Exception as e:
+                logger.warning(f"Failed to fetch connector config for ownership: {e}")
 
             unified_docs = _run_async(
                 process_raw_batch(
                     delta_result.documents,
                     "google_gmail",
-                    tenant_id,
+                    base_tenant_id,
                     require_postgres=True,
+                    connection_scope=connection_scope,
+                    connected_by=connected_by,
                 )
             )
             if unified_docs is None:

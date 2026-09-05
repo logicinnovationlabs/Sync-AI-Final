@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_tenant_session
+from app.api.deps import get_tenant_session, require_admin
 from app.core.models import ACLEntry
 from app.storage.canonical_repo import CanonicalRepo
 
@@ -30,15 +30,15 @@ class GetACLResponse(BaseModel):
 @router.get("/{document_id}", response_model=GetACLResponse)
 async def get_acl(
     document_id: str,
-    current_user: dict = Depends(get_current_user),
+    admin: dict = Depends(require_admin),
     db_session: AsyncSession = Depends(get_tenant_session),
 ):
     """
-    Get ACL entries for a document (debug/manual endpoint).
+    Get ACL entries for a document.
 
-    Tenant is taken from the JWT — callers cannot query another tenant.
+    Admin-only. Tenant is taken from the JWT — callers cannot query another tenant.
     """
-    token_tenant = current_user.get("tenant_id")
+    token_tenant = admin.get("tenant_id")
     if not token_tenant:
         raise HTTPException(status_code=401, detail="Token missing tenant_id claim")
     try:

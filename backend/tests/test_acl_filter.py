@@ -51,6 +51,33 @@ def test_acl_terms_from_jwt_empty_payload_is_fail_closed():
     assert is_fail_closed(acl_terms_from_jwt({}))
 
 
+def test_admin_deny_blocks_prefixed_and_raw_ids():
+    from app.acl.filter import admin_deny_blocks_document, document_is_visible_with_admin_override
+
+    denied = {"google_drive_abc123"}
+    assert admin_deny_blocks_document("google_drive_abc123", denied) is True
+    assert admin_deny_blocks_document("abc123", denied) is True
+    assert admin_deny_blocks_document("other", denied) is False
+    assert (
+        document_is_visible_with_admin_override(
+            ["user:alice"],
+            ["user:alice"],
+            admin_denied_ids=denied,
+            document_id="abc123",
+        )
+        is False
+    )
+    assert (
+        document_is_visible_with_admin_override(
+            ["user:alice"],
+            ["user:alice"],
+            admin_denied_ids=denied,
+            document_id="ok-doc",
+        )
+        is True
+    )
+
+
 @pytest.mark.asyncio
 async def test_vector_mock_does_not_leak_denied_chunk():
     store = MockVectorStore()

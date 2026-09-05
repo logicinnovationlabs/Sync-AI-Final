@@ -96,6 +96,7 @@ export async function apiFetch<T>(
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
       ...rest,
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
         ...(access ? { Authorization: `Bearer ${access}` } : {}),

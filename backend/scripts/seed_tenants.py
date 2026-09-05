@@ -103,6 +103,8 @@ async def create_dev_tenant(session, name: str, subdomain: str, db_name: str, db
         db_name=db_name,
         db_user="postgres",
         db_secret_key=db_secret_key,
+        google_org_workspace_enabled=False,
+        sharepoint_org_enabled=False,
     )
     
     session.add(tenant)
@@ -154,8 +156,18 @@ async def _ensure_user(session, *, email: str, password: str, display_name: str,
     from sqlalchemy import select
 
     existing = await session.execute(select(User).where(User.email == email))
-    if existing.scalar_one_or_none() is not None:
-        print(f"  [INFO] User already exists: {email}")
+    user = existing.scalar_one_or_none()
+    if user is not None:
+        # Update existing user to ensure demo accounts are always active
+        if user.status != "active" or not user.is_active:
+            user.status = "active"
+            user.is_active = True
+            # Reset password to ensure it matches the demo credentials
+            user.password_hash = native_auth_service.hash_password(password)
+            await session.commit()
+            print(f"  [OK] Updated {role} to active: {email}")
+        else:
+            print(f"  [INFO] User already exists and active: {email}")
         return
     await native_auth_service.create_native_user(
         email=email,

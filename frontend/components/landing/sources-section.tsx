@@ -9,7 +9,7 @@ import {
   TabsTrigger,
 } from "@/components/motion/tabs"
 import { Panel, SectionHead, SectionShell } from "@/components/landing/section"
-import { CONNECTORS } from "@/lib/connectors"
+import { CONNECTORS, type ConnectorSourceType } from "@/lib/connectors"
 
 /**
  * A tabbed panel rather than a four-card grid — one source at a time, with
@@ -18,7 +18,7 @@ import { CONNECTORS } from "@/lib/connectors"
  */
 
 const detail: Record<
-  string,
+  ConnectorSourceType,
   { reads: string[]; note: string }
 > = {
   google_personal: {
@@ -28,6 +28,14 @@ const detail: Record<
   google_organization: {
     reads: ["Organization Drive", "Shared Gmail", "Team drives"],
     note: "Service account integration with your organization's Google Workspace. Real-time webhooks for instant sync.",
+  },
+  sharepoint_personal: {
+    reads: ["SharePoint libraries", "OneDrive files", "Site documents"],
+    note: "OAuth consent from your Microsoft 365 account. SynQ indexes sites and libraries you can already open.",
+  },
+  sharepoint_organization: {
+    reads: ["Company SharePoint", "Document libraries", "Site files"],
+    note: "Admin-managed Microsoft Graph service principal, with ACL-mirrored permissions across the workspace.",
   },
   outlook: {
     reads: ["Outlook mail", "OneDrive files", "SharePoint documents"],
@@ -57,7 +65,7 @@ export function SourcesSection() {
       />
 
       <div className="mt-12">
-        <Tabs defaultValue="google" variant="pill">
+        <Tabs defaultValue="google_personal" variant="pill">
           <TabsList className="mx-auto w-fit">
             {CONNECTORS.map((c) => (
               <TabsTrigger

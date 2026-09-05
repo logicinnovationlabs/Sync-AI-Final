@@ -11,7 +11,7 @@ Implemented as PostgreSQL table for durability (survives Redis flushes).
 
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
-from sqlalchemy import Column, String, Integer, BigInteger, DateTime, JSON, Index
+from sqlalchemy import Column, String, Integer, BigInteger, DateTime, JSON, Index, Text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import and_, or_
@@ -31,8 +31,8 @@ class SyncCursor(Base, TimestampMixin):
     tenant_id: str = Column(String(255), primary_key=True, index=True)
     source_type: str = Column(String(100), primary_key=True, index=True)
     
-    # Resume cursor (Drive pageToken or Gmail historyId)
-    cursor: str = Column(String(500), nullable=True)
+    # Resume cursor (Drive pageToken, Gmail historyId, or SharePoint delta JSON)
+    cursor: str = Column(Text, nullable=True)
     
     # Watch/subscription info (JSON)
     watch_data: Dict[str, Any] = Column(JSON, nullable=True)

@@ -128,8 +128,8 @@ class NativeAuthService:
         Raises:
             ValueError if user with email already exists.
         """
-        if role not in ("admin", "member"):
-            raise ValueError("role must be 'admin' or 'member'")
+        if role not in ("owner", "admin", "member", "viewer"):
+            raise ValueError("role must be 'owner', 'admin', 'member', or 'viewer'")
 
         # Check if user already exists
         stmt = select(User).where(

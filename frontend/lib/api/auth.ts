@@ -67,5 +67,5 @@ export interface MeResponse {
 }
 
 export function getMe(token: string) {
-  return apiFetch<MeResponse>("/me", { token })
+  return apiFetch<MeResponse>("/me", { token, skipAuthRefresh: true })
 }

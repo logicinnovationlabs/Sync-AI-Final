@@ -76,7 +76,7 @@ class User(Base, TimestampMixin):
         nullable=False,
         default="member",
         server_default="member",
-        comment="Glean-style org role: 'admin' or 'member'",
+        comment="Glean-style org role: 'owner', 'admin', 'member', or 'viewer'",
     )
     invited_by: Mapped[Optional[UUID]] = mapped_column(
         PG_UUID(as_uuid=True),

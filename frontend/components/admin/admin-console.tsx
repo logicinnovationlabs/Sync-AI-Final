@@ -2,30 +2,31 @@
 
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { listAdminUsers, listAuditLogs, listPendingIdentities } from "@/lib/api/admin"
+import { listAuditLogs, listPendingIdentities } from "@/lib/api/admin"
 import {
   connectOrganizationConnector,
   disconnectOrganizationConnector,
   toggleOrganizationConnector,
   getOrganizationConnectorStatus,
+  connectSharePointOrganization,
+  disconnectSharePointOrganization,
+  toggleSharePointOrganization,
+  triggerSharePointOrganizationBackfill,
   type OrganizationConnectRequest,
+  type SharePointConnectRequest,
 } from "@/lib/api/connectors"
 import { ApiError } from "@/lib/api/client"
 import { useAuthStore } from "@/lib/auth/auth-store"
 import { Button } from "@/components/ui/button"
+import { MembersPanel } from "@/components/admin/members-panel"
 
 export function AdminConsole() {
   const token = useAuthStore((s) => s.accessToken)
   const queryClient = useQueryClient()
   const [vaultKey, setVaultKey] = useState("")
   const [impersonateEmail, setImpersonateEmail] = useState("")
-
-  const users = useQuery({
-    queryKey: ["admin-users"],
-    queryFn: () => listAdminUsers(token!),
-    enabled: Boolean(token),
-    retry: false,
-  })
+  const [sharepointVaultKey, setSharepointVaultKey] = useState("")
+  const [sharepointSiteUrl, setSharepointSiteUrl] = useState("")
 
   const audit = useQuery({
     queryKey: ["admin-audit"],
@@ -44,6 +45,13 @@ export function AdminConsole() {
   const orgDriveStatus = useQuery({
     queryKey: ["org-status", "google_drive"],
     queryFn: () => getOrganizationConnectorStatus(token!, "google_drive"),
+    enabled: Boolean(token),
+    retry: false,
+  })
+
+  const sharepointStatus = useQuery({
+    queryKey: ["org-status", "sharepoint"],
+    queryFn: () => getOrganizationConnectorStatus(token!, "sharepoint"),
     enabled: Boolean(token),
     retry: false,
   })
@@ -73,8 +81,44 @@ export function AdminConsole() {
     },
   })
 
+  const sharepointConnectMutation = useMutation({
+    mutationFn: (request: SharePointConnectRequest) =>
+      connectSharePointOrganization(token!, request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["org-status", "sharepoint"] })
+      setSharepointVaultKey("")
+      setSharepointSiteUrl("")
+    },
+  })
+
+  const sharepointDisconnectMutation = useMutation({
+    mutationFn: () => disconnectSharePointOrganization(token!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["org-status", "sharepoint"] })
+    },
+  })
+
+  const sharepointToggleMutation = useMutation({
+    mutationFn: (enabled: boolean) => toggleSharePointOrganization(token!, { enabled }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["org-status", "sharepoint"] })
+    },
+  })
+
+  const sharepointSyncMutation = useMutation({
+    mutationFn: () => triggerSharePointOrganizationBackfill(token!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["org-status", "sharepoint"] })
+    },
+  })
+
   const orgEnabled = Boolean(orgDriveStatus.data?.details?.org_enabled)
   const orgConnected = Boolean(orgDriveStatus.data?.details?.connected)
+  const sharepointEnabled = Boolean(sharepointStatus.data?.details?.org_enabled)
+  const sharepointConnected = Boolean(sharepointStatus.data?.details?.connected)
+  const sharepointFiles = Number(sharepointStatus.data?.details?.files_indexed || 0)
+  const sharepointSyncing =
+    String(sharepointStatus.data?.details?.connection_status || "") === "syncing"
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-8">
@@ -83,7 +127,7 @@ export function AdminConsole() {
         <p className="mt-1 text-xs text-muted-foreground">
           Admin-managed service account connector with ACL-mirrored permissions
         </p>
-        
+
         <div className="mt-4 rounded-2xl border border-border-subtle p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -116,7 +160,7 @@ export function AdminConsole() {
 
           {!orgConnected && (
             <div className="mt-4 border-t border-border-subtle pt-4">
-              <p className="text-sm font-medium mb-3">Connect Service Account</p>
+              <p className="mb-3 text-sm font-medium">Connect Service Account</p>
               <div className="flex flex-col gap-3">
                 <input
                   type="text"
@@ -134,7 +178,9 @@ export function AdminConsole() {
                 />
                 <Button
                   size="sm"
-                  onClick={() => connectMutation.mutate({ vault_key: vaultKey, impersonate_email: impersonateEmail })}
+                  onClick={() =>
+                    connectMutation.mutate({ vault_key: vaultKey, impersonate_email: impersonateEmail })
+                  }
                   disabled={connectMutation.isPending || !vaultKey || !impersonateEmail}
                 >
                   {connectMutation.isPending ? "Connecting…" : "Connect"}
@@ -153,40 +199,116 @@ export function AdminConsole() {
       </section>
 
       <section>
-        <h2 className="text-sm font-medium">Users</h2>
+        <h2 className="text-sm font-medium">Organization SharePoint</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          GET /admin/users — Block N, require_admin
+          Admin-managed Microsoft Graph service principal with ACL-mirrored permissions
         </p>
-        {users.isFetching && (
-          <p className="mt-3 text-sm text-muted-foreground">Loading users…</p>
-        )}
-        {users.error && (
-          <p role="alert" className="mt-3 text-sm text-destructive">
-            {users.error instanceof ApiError
-              ? users.error.message
-              : "Failed to load users"}
-          </p>
-        )}
-        {users.data && (
-          <ul className="mt-3 divide-y divide-border-subtle rounded-2xl border border-border-subtle">
-            {users.data.map((user) => (
-              <li key={user.principal_id} className="px-4 py-3 text-sm">
-                <span className="font-medium">{user.display_name}</span>
-                <span className="text-muted-foreground"> · {user.email}</span>
-                <span className="ml-2 font-mono text-[0.6875rem] text-muted-foreground">
-                  {user.role}
-                  {user.is_active ? "" : " · inactive"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+
+        <div className="mt-4 rounded-2xl border border-border-subtle p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Status</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {sharepointConnected ? "Connected" : "Not connected"} ·{" "}
+                {sharepointEnabled ? "Enabled" : "Disabled"}
+                {sharepointConnected
+                  ? ` · ${sharepointFiles} file${sharepointFiles === 1 ? "" : "s"} indexed`
+                  : ""}
+                {sharepointSyncing ? " · Syncing" : ""}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => sharepointToggleMutation.mutate(!sharepointEnabled)}
+                disabled={sharepointToggleMutation.isPending || !sharepointConnected}
+              >
+                {sharepointToggleMutation.isPending
+                  ? "Toggling…"
+                  : sharepointEnabled
+                    ? "Disable"
+                    : "Enable"}
+              </Button>
+              {sharepointConnected && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => sharepointSyncMutation.mutate()}
+                  disabled={sharepointSyncMutation.isPending || sharepointSyncing}
+                >
+                  {sharepointSyncMutation.isPending || sharepointSyncing ? "Syncing…" : "Sync"}
+                </Button>
+              )}
+              {sharepointConnected && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => sharepointDisconnectMutation.mutate()}
+                  disabled={sharepointDisconnectMutation.isPending}
+                >
+                  {sharepointDisconnectMutation.isPending ? "Disconnecting…" : "Disconnect"}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {!sharepointConnected && (
+            <div className="mt-4 border-t border-border-subtle pt-4">
+              <p className="mb-3 text-sm font-medium">Connect Service Principal</p>
+              <div className="flex flex-col gap-3">
+                <input
+                  type="text"
+                  placeholder="Vault key name (e.g., kv/tenant/dev-fake-sharepoint-app)"
+                  value={sharepointVaultKey}
+                  onChange={(e) => setSharepointVaultKey(e.target.value)}
+                  className="rounded-md border border-border px-3 py-2 text-sm"
+                />
+                <input
+                  type="text"
+                  placeholder="Site URL (optional — leave blank for all sites)"
+                  value={sharepointSiteUrl}
+                  onChange={(e) => setSharepointSiteUrl(e.target.value)}
+                  className="rounded-md border border-border px-3 py-2 text-sm"
+                />
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    sharepointConnectMutation.mutate({
+                      vault_key: sharepointVaultKey,
+                      site_url: sharepointSiteUrl || undefined,
+                    })
+                  }
+                  disabled={sharepointConnectMutation.isPending || !sharepointVaultKey}
+                >
+                  {sharepointConnectMutation.isPending ? "Connecting…" : "Connect"}
+                </Button>
+              </div>
+              {sharepointConnectMutation.error && (
+                <p role="alert" className="mt-2 text-xs text-destructive">
+                  {sharepointConnectMutation.error instanceof ApiError
+                    ? sharepointConnectMutation.error.message
+                    : "Failed to connect"}
+                </p>
+              )}
+            </div>
+          )}
+          {sharepointSyncMutation.error && (
+            <p role="alert" className="mt-2 text-xs text-destructive">
+              {sharepointSyncMutation.error instanceof ApiError
+                ? sharepointSyncMutation.error.message
+                : "Sync failed"}
+            </p>
+          )}
+        </div>
       </section>
+
+      <MembersPanel />
 
       <section>
         <h2 className="text-sm font-medium">Audit log</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          GET /admin/audit — Block N
+          Recent admin actions in this workspace.
         </p>
         {audit.isFetching && (
           <p className="mt-3 text-sm text-muted-foreground">Loading audit…</p>
@@ -221,7 +343,7 @@ export function AdminConsole() {
       <section>
         <h2 className="text-sm font-medium">Pending identities</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          GET /admin/pending-identities — ACL resolution queue
+          Share emails that have not been matched to a workspace account yet.
         </p>
         {pendingIdentities.isFetching && (
           <p className="mt-3 text-sm text-muted-foreground">Loading pending identities…</p>

@@ -1,0 +1,20 @@
+name: snyq_phase_2
+
+services:
+  app:
+    environment:
+      VAULT_URL: http://vault:8200
+      VAULT_PROVIDER: hashicorp
+      VAULT_TOKEN: root
+
+  celery_worker:
+    environment:
+      VAULT_URL: http://vault:8200
+      VAULT_PROVIDER: hashicorp
+      VAULT_TOKEN: root
+
+  celery_beat:
+    environment:
+      VAULT_URL: http://vault:8200
+      VAULT_PROVIDER: hashicorp
+      VAULT_TOKEN: root

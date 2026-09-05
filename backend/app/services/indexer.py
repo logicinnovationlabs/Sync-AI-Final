@@ -53,7 +53,6 @@ class Indexer:
                 for k, v in doc.structured_metadata.items()
                 if k in allowed_keys
             }
-            owner_acl = list(extra_acl or [])
             processed_docs.append(
                 {
                     "id": doc.id,
@@ -61,7 +60,7 @@ class Indexer:
                     "content": doc.content or "",
                     "source_type": doc.source_type,
                     "url": doc.url,
-                    "permissions": owner_acl or list(doc.permissions),
+                    "permissions": index_acl_terms(doc.permissions, extra_acl),
                     "created_at": doc.created_at.isoformat(),
                     "updated_at": doc.updated_at.isoformat(),
                     "source_updated_at": doc.source_updated_at.isoformat(),
@@ -116,11 +115,7 @@ class Indexer:
 
         for doc in processed_docs:
             doc_id = str(doc["id"])
-            acl_terms = (
-                _acl_terms(extra_acl, None)
-                if extra_acl
-                else _acl_terms(doc.get("permissions") or [], extra_acl)
-            )
+            acl_terms = index_acl_terms(doc.get("permissions"), extra_acl)
             body = doc.get("content") or ""
             title = doc.get("title") or ""
             local_ingest_index.upsert(
@@ -153,6 +148,15 @@ class Indexer:
                     "parent_doc_id": doc_id,
                 }
             ]
+            if str(doc.get("source_type") or "") == "sharepoint":
+                first = str((pieces[0] or {}).get("content") or "") if pieces else ""
+                logger.info(
+                    "SharePoint chunked doc_id=%s n_chunks=%s first_len=%s first_bounds=0:%s",
+                    doc_id,
+                    len(pieces),
+                    len(first),
+                    len(first),
+                )
             meta_extra = {
                 k: v
                 for k, v in (doc.get("structured_metadata") or {}).items()
@@ -229,10 +233,21 @@ class Indexer:
             from app.services.vector.qdrant_store import QdrantVectorStore
 
             await QdrantVectorStore().upsert_batch(tenant_id, vector_chunks)
+            provider_name = type(getattr(self.embedding_service, "provider", None)).__name__
+            first_vec = vector_chunks[0].get("embedding") if vector_chunks else None
+            sharepoint_n = sum(
+                1
+                for row in vector_chunks
+                if str((row.get("metadata") or {}).get("source_type") or "") == "sharepoint"
+            )
             logger.info(
-                "Upserted %s chunk vectors for tenant %s",
+                "Upserted %s chunk vectors tenant=%s provider=%s dim=%s sharepoint_chunks=%s sample_chunk_id=%s",
                 len(vector_chunks),
                 tenant_id,
+                provider_name,
+                len(first_vec) if isinstance(first_vec, list) else 0,
+                sharepoint_n,
+                (vector_chunks[0].get("chunk_id") if vector_chunks else None),
             )
         except Exception:
             logger.warning("vector index fan-out skipped", exc_info=True)
@@ -343,6 +358,18 @@ class Indexer:
 
 
 indexer = Indexer()
+
+
+def index_acl_terms(
+    permissions: Optional[List[str]], extra_acl: Optional[List[str]] = None
+) -> List[str]:
+    """Merge mirrored document ACL with connector-owner extra_acl.
+
+    extra_acl is additive so the connecting admin can search. It must not
+    replace Graph/Drive-compiled permissions or members on the source ACL
+    disappear from OpenSearch/Qdrant.
+    """
+    return _acl_terms(list(permissions or []), extra_acl)
 
 
 def _acl_terms(

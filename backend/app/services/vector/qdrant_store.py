@@ -42,12 +42,40 @@ class QdrantVectorStore(VectorStore):
                 "qdrant-client is required for Qdrant backend"
             ) from exc
         
+        from urllib.parse import urlparse
+
         from app.storage.vault_client import PlatformSecretKeys, vault_client
 
         qdrant_url = getattr(settings, "qdrant_url", None)
-        api_key = vault_client.get(PlatformSecretKeys.QDRANT_API_KEY) or None
-        if api_key in ("", "mock-secret"):
+        vault_key = vault_client.get(PlatformSecretKeys.QDRANT_API_KEY) or None
+        if vault_key in ("", "mock-secret"):
+            vault_key = None
+        settings_key = (getattr(settings, "qdrant_api_key", None) or "").strip() or None
+        if settings_key == "mock-secret":
+            settings_key = None
+        # Same source as app.storage.qdrant_client.QdrantClient: settings first
+        # if Vault has no platform key. Vault-only lookup caused Cloud 403s.
+        if vault_key:
+            api_key = vault_key
+            key_source = "vault"
+        elif settings_key:
+            api_key = settings_key
+            key_source = "settings"
+        else:
             api_key = None
+            key_source = "none"
+        self._api_key_present = bool(api_key)
+        self._qdrant_key_source = key_source
+        parsed = urlparse(qdrant_url or "")
+        logger.info(
+            "QdrantVectorStore connecting host=%s scheme=%s is_cloud=%s "
+            "api_key_present=%s key_source=%s",
+            parsed.hostname,
+            parsed.scheme,
+            "cloud.qdrant.io" in (parsed.hostname or ""),
+            self._api_key_present,
+            key_source,
+        )
         if qdrant_url:
             self._client = QdrantClient(url=qdrant_url, api_key=api_key, timeout=120)
         else:
@@ -65,6 +93,7 @@ class QdrantVectorStore(VectorStore):
         )
         self._upsert_batch_size = 50
         self._ensured_collections: set[str] = set()
+        self._local_fallback_done = False
         logger.info(f"QdrantVectorStore initialized with prefix: {self.collection_prefix}, dimensions: {self.dimensions}")
     
     def _normalize_embedding(self, embedding: List[float]) -> List[float]:
@@ -120,6 +149,9 @@ class QdrantVectorStore(VectorStore):
             # If already exists (409 Conflict), ignore
             if "already exists" in str(e).lower() or "conflict" in str(e).lower() or "409" in str(e):
                 logger.debug(f"Collection {name} already created")
+            elif self._fallback_to_local_qdrant(e):
+                self._ensure_collection(tenant_id)
+                return
             else:
                 raise e
         
@@ -136,6 +168,35 @@ class QdrantVectorStore(VectorStore):
         
         self._ensured_collections.add(name)
         logger.info(f"Created/verified Qdrant collection: {name} with dimensions {self.dimensions}")
+
+    def _fallback_to_local_qdrant(self, exc: Exception) -> bool:
+        """Local compose Qdrant is a last resort when no Cloud key is configured.
+
+        A 403 while an API key is present is a Cloud auth/plan problem, not a
+        reason to silently treat local Qdrant as the production path.
+        """
+        text = str(exc).lower()
+        if "403" not in text and "forbidden" not in text:
+            return False
+        if self._local_fallback_done:
+            return False
+        if self._api_key_present:
+            logger.error(
+                "Qdrant Cloud returned 403 with api_key_present=true key_source=%s; "
+                "not falling back to local Qdrant",
+                getattr(self, "_qdrant_key_source", "?"),
+            )
+            return False
+        from qdrant_client import QdrantClient
+
+        self._local_fallback_done = True
+        self._client = QdrantClient(url="http://qdrant:6333", timeout=120)
+        self._ensured_collections.clear()
+        logger.warning(
+            "Qdrant tenant collection create forbidden and no API key configured; "
+            "retrying against compose qdrant http://qdrant:6333"
+        )
+        return True
 
     
     async def search(

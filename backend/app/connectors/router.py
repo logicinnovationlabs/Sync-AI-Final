@@ -11,14 +11,16 @@ Endpoints:
 
 from typing import Dict, Any, Optional
 from uuid import UUID
-
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import RedirectResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 import logging
+import secrets
 
 from app.api.deps import get_current_user, get_tenant, require_scope, require_admin
+from app.services.token_service import token_service
 from app.services.tenant_resolver import TenantRouting
 from app.workers.tasks import backfill_source, backfill_tenant_source
 from app.services.cursor_store import cursor_store
@@ -42,14 +44,44 @@ from app.connectors.google import status_store
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/connectors", tags=["connectors"])
+security = HTTPBearer(auto_error=False)
 
 GOOGLE_SOURCES = ("google_drive", "google_gmail")
 _DEFAULT_GOOGLE_CALLBACK = "http://localhost:8000/connectors/google/callback"
+_ORG_GOOGLE_MODES = frozenset({"service_account_dwd", "oauth_admin"})
 
 
 def _google_redirect_uri() -> str:
     """Must match the URI registered on the Google OAuth client exactly."""
     return (settings.google_redirect_uri or _DEFAULT_GOOGLE_CALLBACK).rstrip("/")
+
+
+def organization_cursor_scope_id(tenant_id: str) -> str:
+    """Cursor PK used for organization Google ingest (matches worker backfill)."""
+    return cursor_scope_id(str(tenant_id), "organization")
+
+
+def is_organization_google_connected(row) -> bool:
+    """True when an enabled org Google connector row exists (DWD or admin OAuth)."""
+    if row is None or not bool(getattr(row, "enabled", False)):
+        return False
+    mode = str((getattr(row, "config", None) or {}).get("credential_mode") or "").strip().lower()
+    return (not mode) or mode in _ORG_GOOGLE_MODES
+
+
+async def set_google_org_workspace_enabled(tenant_id: str, enabled: bool) -> None:
+    """Tenant.google_org_workspace_enabled lives on the control-plane DB, not the tenant DB."""
+    from app.models.tenant import Tenant
+    from app.storage.control_plane_db import ControlPlaneSessionLocal
+
+    tenant_uuid = UUID(str(tenant_id))
+    async with ControlPlaneSessionLocal() as session:
+        result = await session.execute(select(Tenant).where(Tenant.tenant_id == tenant_uuid))
+        tenant_row = result.scalar_one_or_none()
+        if tenant_row is None:
+            raise HTTPException(status_code=404, detail="Tenant not found")
+        tenant_row.google_org_workspace_enabled = enabled
+        await session.commit()
 
 
 class BackfillRequest(BaseModel):
@@ -79,6 +111,11 @@ class OrganizationToggleRequest(BaseModel):
 
 def _user_id(current_user: Dict[str, Any]) -> str:
     return str(current_user.get("sub") or current_user.get("principal_id") or "")
+
+
+def _jti(current_user: Dict[str, Any]) -> str:
+    """Extract JWT token ID (jti) from current user payload."""
+    return str(current_user.get("jti") or "")
 
 
 @router.post(
@@ -162,6 +199,8 @@ async def connect_organization_connector(
             # Validate it's a service account key (has project_id, private_key, etc.)
             if not all(k in info for k in ["project_id", "private_key_id", "private_key"]):
                 raise HTTPException(status_code=400, detail="Vault secret is not a valid service account JSON")
+        except HTTPException:
+            raise
         except Exception as e:
             logger.exception("Vault validation failed for organization connector")
             raise HTTPException(status_code=400, detail=f"Invalid vault secret: {str(e)}")
@@ -207,6 +246,8 @@ async def connect_organization_connector(
                     row.credential_ref = request.vault_key
                     row.setup_by = actor_uuid
             await session.commit()
+
+        await set_google_org_workspace_enabled(tenant_id, True)
 
         return {
             "status": "connected",
@@ -299,35 +340,14 @@ async def toggle_organization_connector(
         raise HTTPException(status_code=403, detail="Cross-tenant execution rejected")
 
     try:
-        from app.services.tenant_resolver import tenant_resolver
-        from app.storage.tenant_db import tenant_db_manager
-        from app.models.tenant import Tenant
-
-        tenant_uuid = UUID(tenant_id)
-
-        routing = await tenant_resolver.resolve(tenant_id)
-        factory = tenant_db_manager.get_session_factory(
-            routing.db_host,
-            routing.db_name,
-            routing.db_user,
-            routing.db_password,
-            str(routing.tenant_id),
-        )
-
-        async with factory() as session:
-            result = await session.execute(
-                select(Tenant).where(Tenant.tenant_id == tenant_uuid)
-            )
-            tenant_row = result.scalar_one_or_none()
-            if tenant_row:
-                tenant_row.google_org_workspace_enabled = request.enabled
-                await session.commit()
-
+        await set_google_org_workspace_enabled(tenant_id, request.enabled)
         return {
             "status": "toggled",
             "tenant_id": tenant_id,
             "enabled": request.enabled,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Organization connector toggle failed")
         raise HTTPException(status_code=500, detail=f"Toggle failed: {str(e)}")
@@ -432,20 +452,28 @@ async def get_organization_connector_status(
             row = result.scalar_one_or_none()
 
             # Get cursor and watch info
-            scope_id = f"{tenant_id}_organization"
+            scope_id = organization_cursor_scope_id(tenant_id)
             cursor = await cursor_store.get_cursor(scope_id, source_type)
+            if not cursor:
+                cursor = await cursor_store.get_cursor(f"{tenant_id}_organization", source_type)
             watch_info = None
             try:
-                watch_info = await cursor_store.get_watch_info(tenant_id, source_type)
+                watch_info = await cursor_store.get_watch_info(scope_id, source_type)
             except Exception:
                 watch_info = None
 
             # Get runtime status
             runtime = status_store.get_status(tenant_id, source_type, user_id="organization")
             connection_status = runtime.get("connection_status") or "not_connected"
-            # If no organization connector row exists, force not_connected regardless of stale Redis status
-            if row is None:
+
+            is_valid_org_connector = is_organization_google_connected(row)
+
+            # If no valid organization connector exists, force not_connected and zero count
+            if not is_valid_org_connector:
                 connection_status = "not_connected"
+                runtime["files_indexed"] = 0
+                runtime["last_sync_at"] = None
+                runtime["last_error"] = None
             # Only show active/syncing if the organization connector is actually enabled
             elif connection_status == "not_connected" and org_enabled and cursor:
                 connection_status = "active" if cursor else "syncing"
@@ -456,7 +484,7 @@ async def get_organization_connector_status(
                 "last_sync_at": runtime.get("last_sync_at"),
                 "last_error": runtime.get("last_error"),
                 "org_enabled": org_enabled,
-                "connected": row is not None,
+                "connected": is_valid_org_connector,
             }
             if watch_info:
                 details["watch_info"] = watch_info
@@ -493,7 +521,11 @@ async def get_connector_status(
         raise HTTPException(status_code=403, detail="Cross-tenant execution rejected")
 
     user_id = _user_id(current_user)
-    scope_id = cursor_scope_id(tenant_id, user_id) if connection_scope == "personal" else f"{tenant_id}_organization"
+    scope_id = (
+        cursor_scope_id(tenant_id, user_id)
+        if connection_scope == "personal"
+        else organization_cursor_scope_id(tenant_id)
+    )
     cursor = await cursor_store.get_cursor(scope_id, source_type)
 
     watch_info = None
@@ -504,10 +536,20 @@ async def get_connector_status(
 
     runtime_user_id = user_id if connection_scope == "personal" else "organization"
     runtime = status_store.get_status(tenant_id, source_type, user_id=runtime_user_id)
-    token_store = PersistentGoogleTokenStore(tenant_id)
-    has_token = token_store.get_token(google_oauth_token_key(tenant_id, user_id, connection_scope)) is not None
-    if not has_token:
-        has_token = token_store.get_token(google_oauth_token_key(tenant_id, "", connection_scope)) is not None
+    if source_type == "sharepoint":
+        from app.connectors.sharepoint.keys import sharepoint_oauth_token_key
+        from app.connectors.sharepoint.token_store import PersistentSharePointTokenStore
+
+        sp_store = PersistentSharePointTokenStore(tenant_id)
+        has_token = (
+            sp_store.get_token(sharepoint_oauth_token_key(tenant_id, user_id, connection_scope))
+            is not None
+        )
+    else:
+        token_store = PersistentGoogleTokenStore(tenant_id)
+        has_token = token_store.get_token(google_oauth_token_key(tenant_id, user_id, connection_scope)) is not None
+        if not has_token:
+            has_token = token_store.get_token(google_oauth_token_key(tenant_id, "", connection_scope)) is not None
     connection_status = runtime.get("connection_status") or "not_connected"
     if connection_status == "not_connected" and (cursor or has_token):
         connection_status = "active" if cursor else "syncing"
@@ -572,11 +614,16 @@ async def disconnect_connector(
 async def get_google_authorize_url(
     current_user: Dict[str, Any] = Depends(get_current_user),
     tenant: TenantRouting = Depends(get_tenant),
+    response: Response = None,
 ):
     """
     Generate Google OAuth authorization link for the authenticated tenant.
 
-    State carries tenant_id + user_id + connection_scope (base64 JSON) plus a CSRF nonce.
+    SECURITY: Sets binding cookie to prevent URL forwarding attacks.
+    The attacker can mint a valid state, but the victim's browser won't have
+    the binding cookie set by the attacker's /authorize call.
+
+    Returns: JSON with authorization_url (XHR call), binding cookie set on response.
     """
     tenant_id = current_user.get("tenant_id")
     if not tenant_id or str(tenant.tenant_id) != str(tenant_id):
@@ -588,10 +635,26 @@ async def get_google_authorize_url(
 
     redirect_uri = _google_redirect_uri()
     user_id = _user_id(current_user)
-    state = encode_oauth_state(str(tenant_id), user_id, "personal")
+    jti = _jti(current_user)
+
+    # Generate binding token for cookie-based session binding
+    binding_token = secrets.token_urlsafe(32)
+
+    state = encode_oauth_state(str(tenant_id), user_id, "personal", jti=jti, binding_token=binding_token)
     token_store = PersistentGoogleTokenStore(str(tenant_id))
     oauth = google_oauth_from_settings(token_store, principal_id=user_id, connection_scope="personal")
     auth_url = oauth.build_authorization_url(str(tenant_id), redirect_uri, state=state)
+
+    # Set binding cookie: HttpOnly, Secure, SameSite=Lax, short TTL
+    # This cookie will be sent back on the callback from Google
+    response.set_cookie(
+        key="oauth_binding",
+        value=binding_token,
+        max_age=600,  # 10 minutes
+        httponly=True,
+        secure=True,
+        samesite="lax",
+    )
 
     return {
         "authorization_url": auth_url,
@@ -608,11 +671,13 @@ async def get_google_authorize_url(
 async def get_google_authorize_url_organization(
     current_user: Dict[str, Any] = Depends(get_current_user),
     tenant: TenantRouting = Depends(get_tenant),
+    response: Response = None,
 ):
     """
     Generate Google OAuth authorization link for organization scope (admin-only).
 
-    State carries tenant_id + user_id + connection_scope (base64 JSON) plus a CSRF nonce.
+    SECURITY: Sets binding cookie to prevent URL forwarding attacks.
+    Returns: JSON with authorization_url (XHR call), binding cookie set on response.
     """
     tenant_id = current_user.get("tenant_id")
     if not tenant_id or str(tenant.tenant_id) != str(tenant_id):
@@ -624,10 +689,25 @@ async def get_google_authorize_url_organization(
 
     redirect_uri = _google_redirect_uri()
     user_id = _user_id(current_user)
-    state = encode_oauth_state(str(tenant_id), user_id, "organization")
+    jti = _jti(current_user)
+
+    # Generate binding token for cookie-based session binding
+    binding_token = secrets.token_urlsafe(32)
+
+    state = encode_oauth_state(str(tenant_id), user_id, "organization", jti=jti, binding_token=binding_token)
     token_store = PersistentGoogleTokenStore(str(tenant_id))
     oauth = google_oauth_from_settings(token_store, principal_id=user_id, connection_scope="organization")
     auth_url = oauth.build_authorization_url(str(tenant_id), redirect_uri, state=state)
+
+    # Set binding cookie: HttpOnly, Secure, SameSite=Lax, short TTL
+    response.set_cookie(
+        key="oauth_binding",
+        value=binding_token,
+        max_age=600,  # 10 minutes
+        httponly=True,
+        secure=True,
+        samesite="lax",
+    )
 
     return {
         "authorization_url": auth_url,
@@ -647,8 +727,15 @@ async def google_oauth_callback(
     error: Optional[str] = Query(None),
 ):
     """
-    Unauthenticated by design: Google redirects the browser here without our JWT.
-    Binding is the CSRF state nonce issued by /google/authorize.
+    OAuth callback with cookie-based binding to prevent URL forwarding attacks.
+
+    SECURITY DESIGN:
+    - State is HMAC-SHA256 signed (prevents tampering)
+    - State contains binding_token bound to cookie (prevents URL forwarding)
+    - Nonce is one-time use (deleted after successful validation)
+    - Redis FAILS CLOSED on errors (rejects request if Redis unavailable)
+    - Cookie must match binding_token in state (attacker can't forward URL to victim)
+
     On success: encrypt+store tokens, enqueue Drive + Gmail full backfill, redirect UI.
     Handles both personal and organization connection scopes.
     """
@@ -663,14 +750,25 @@ async def google_oauth_callback(
             status_code=302,
         )
 
-    payload = decode_oauth_state(state)
+    # Extract binding cookie (CRITICAL: prevents URL forwarding attacks)
+    binding_cookie = request.cookies.get("oauth_binding")
+    if not binding_cookie:
+        logger.error("OAuth callback missing binding cookie - URL forwarding attack blocked")
+        return RedirectResponse(
+            frontend_connectors_redirect("error", "missing_binding_cookie"),
+            status_code=302,
+        )
+
+    # Decode and validate state (HMAC signature + nonce + cookie binding)
+    payload = decode_oauth_state(state, require_binding_token=binding_cookie)
     if not payload:
-        logger.error(f"OAuth callback invalid state: state={state}")
+        logger.error(f"OAuth callback invalid state or binding_token mismatch: state={state}")
         return RedirectResponse(
             frontend_connectors_redirect("error", "invalid_state"),
             status_code=302,
         )
 
+    # Extract identity from state (now trusted due to HMAC + cookie binding)
     tenant_id = str(payload["tenant_id"])
     user_id = str(payload["user_id"])
     connection_scope = str(payload.get("connection_scope") or "personal")
@@ -900,6 +998,13 @@ async def _record_organization_connector_rows(tenant_id: str, user_id: str, mail
                         str(exc),
                     )
             await session.commit()
+        try:
+            await set_google_org_workspace_enabled(tenant_id, True)
+        except Exception:
+            logger.exception(
+                "Failed to enable google_org_workspace_enabled after OAuth connect tenant=%s",
+                tenant_id,
+            )
     except Exception as exc:
         logger.exception(
             "Failed to initialize org connector row creation: tenant_id=%s user_id=%s error=%s",

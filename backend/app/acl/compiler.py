@@ -90,6 +90,30 @@ class ACLCompiler:
             all_entries.extend(inherited_entries)
             expanded_entries = await self._expand_group_membership(all_entries, tenant_id)
             all_entries.extend(expanded_entries)
+
+        # Personal connectors set owner_principal_id from connected_by when Graph
+        # emails are not platform users (MSA OneDrive). Search gets that via
+        # extra_acl; GET /document reads acl_entries and must have the same row.
+        if document.owner_principal_id and not any(
+            e.principal_id == document.owner_principal_id and not e.is_deny
+            for e in all_entries
+        ):
+            now = datetime.now(timezone.utc)
+            all_entries.append(
+                ACLEntry(
+                    document_id=document.id,
+                    principal_id=document.owner_principal_id,
+                    group_id=None,
+                    permission=PermissionLevel.OWNER,
+                    granted_via=_granted_via(document.source_type),
+                    source_container_id=None,
+                    is_deny=False,
+                    source_type=document.source_type,
+                    tenant_id=tenant_id,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
         
         # Apply deny overrides and deduplicate
         final_entries = self._apply_deny_overrides(all_entries)
@@ -374,4 +398,6 @@ def _granted_via(source_type: str) -> str:
         return "drive_share"
     if source_type == "google_gmail":
         return "gmail_mailbox"
+    if source_type == "sharepoint":
+        return "sharepoint_share"
     return "direct"

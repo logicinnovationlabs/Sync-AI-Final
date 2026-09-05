@@ -6,7 +6,7 @@ import { apiFetch } from "@/lib/api/client"
  * Google Workspace is two source types, `google_drive` and `google_gmail`.
  */
 
-export type BackendSourceType = "google_drive" | "google_gmail"
+export type BackendSourceType = "google_drive" | "google_gmail" | "sharepoint"
 
 export interface ConnectorStatus {
   tenant_id: string
@@ -64,6 +64,10 @@ export interface GoogleAuthorizeResponse {
   connection_scope: string
 }
 
+/**
+ * Calls the authorize endpoint via XHR (with JWT) to get the Google OAuth URL.
+ * The endpoint sets the oauth_binding cookie on the response for security.
+ */
 export function getGoogleAuthorizeUrl(token: string, connectionScope = "personal") {
   const endpoint = connectionScope === "organization"
     ? "/api/v1/connectors/google/authorize/organization"
@@ -118,7 +122,53 @@ export function toggleOrganizationConnector(token: string, request: Organization
 }
 
 export function getOrganizationConnectorStatus(token: string, sourceType: BackendSourceType) {
+  if (sourceType === "sharepoint") {
+    return apiFetch<ConnectorStatus>("/api/v1/connectors/sharepoint/organization/status", {
+      token,
+    })
+  }
   return apiFetch<ConnectorStatus>(`/api/v1/connectors/google/organization/status?source_type=${sourceType}`, {
+    token,
+  })
+}
+
+export interface SharePointConnectRequest {
+  vault_key: string
+  site_url?: string
+}
+
+export function connectSharePointOrganization(token: string, request: SharePointConnectRequest) {
+  return apiFetch<OrganizationConnectResponse>("/api/v1/connectors/admin/sharepoint/organization/connect", {
+    method: "POST",
+    token,
+    body: request,
+  })
+}
+
+export function disconnectSharePointOrganization(token: string) {
+  return apiFetch<{ status: string; tenant_id: string }>(
+    "/api/v1/connectors/admin/sharepoint/organization/disconnect",
+    { method: "POST", token }
+  )
+}
+
+export function toggleSharePointOrganization(token: string, request: OrganizationToggleRequest) {
+  return apiFetch<OrganizationToggleResponse>("/api/v1/connectors/admin/sharepoint/organization/toggle", {
+    method: "POST",
+    token,
+    body: request,
+  })
+}
+
+export function triggerSharePointOrganizationBackfill(token: string) {
+  return apiFetch<BackfillResponse>("/api/v1/connectors/admin/sharepoint/organization/backfill", {
+    method: "POST",
+    token,
+  })
+}
+
+export function getSharePointAuthorizeUrl(token: string) {
+  return apiFetch<GoogleAuthorizeResponse>("/api/v1/connectors/sharepoint/authorize", {
     token,
   })
 }

@@ -107,7 +107,7 @@ async def require_admin(
     db_session: AsyncSession = Depends(get_tenant_session),
 ) -> Dict[str, Any]:
     """
-    Block N admin guard: JWT must belong to an active user with role == 'admin'
+    Block N admin guard: JWT must belong to an active user with role == 'owner' or 'admin'
     in the tenant DB. Role is never taken from the request body; tenant_id
     always comes from the JWT.
     """
@@ -131,7 +131,7 @@ async def require_admin(
         raise ForbiddenError("Admin role required")
     if not user.is_active or user.status != "active":
         raise ForbiddenError("Admin account is inactive")
-    if user.role != "admin":
+    if user.role not in ("owner", "admin"):
         raise ForbiddenError("Admin role required")
 
     current_user["role"] = user.role

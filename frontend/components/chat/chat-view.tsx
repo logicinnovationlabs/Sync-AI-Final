@@ -39,13 +39,24 @@ type ChatWindow = {
 function citationsToSources(citations: AssistantCitation[]): SourceCardData[] {
   return citations.map((c, i) => ({
     n: i + 1,
+    source: mapCitationSource(c.source),
     title: c.title || c.document_id || `Source ${i + 1}`,
     snippet: c.quote || "",
     meta:
       c.score != null && Number.isFinite(c.score)
         ? `score ${Number(c.score).toFixed(3)}`
-        : "Source",
+        : c.source
+          ? String(c.source)
+          : "Source",
   }))
+}
+
+function mapCitationSource(source: string | null | undefined): SourceCardData["source"] {
+  const value = String(source || "").toLowerCase()
+  if (value.includes("sharepoint")) return "sharepoint_organization"
+  if (value.includes("gmail") || value.includes("google")) return "google_personal"
+  if (value.includes("outlook") || value.includes("onedrive")) return "outlook"
+  return undefined
 }
 
 function newSessionId() {

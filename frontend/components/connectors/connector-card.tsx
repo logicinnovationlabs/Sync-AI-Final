@@ -13,7 +13,9 @@ import {
   getConnectorStatus,
   getGoogleAuthorizeUrl,
   getOrganizationConnectorStatus,
+  getSharePointAuthorizeUrl,
   triggerOrganizationBackfill,
+  triggerSharePointOrganizationBackfill,
   triggerBackfill,
   type BackendSourceType,
   type ConnectorStatus,
@@ -52,6 +54,10 @@ const GOOGLE_ORGANIZATION_SOURCES: { id: BackendSourceType; label: string }[] = 
   { id: "google_gmail", label: "Gmail" },
 ]
 
+const SHAREPOINT_SOURCES: { id: BackendSourceType; label: string }[] = [
+  { id: "sharepoint", label: "Libraries" },
+]
+
 function sourceIsLinked(status: ConnectorStatus | undefined): boolean {
   const connectionStatus = String(status?.details?.connection_status || "")
   return (
@@ -59,6 +65,15 @@ function sourceIsLinked(status: ConnectorStatus | undefined): boolean {
     Boolean(status?.details?.token_present) ||
     ["active", "syncing"].includes(connectionStatus)
   )
+}
+
+function connectedStatusRefetchInterval(query: {
+  state: { data?: ConnectorStatus }
+}): number | false {
+  const st = String(query.state.data?.details?.connection_status || "")
+  if (st === "syncing") return 2500
+  if (st === "active") return 15000
+  return false
 }
 
 function StatTile({ label, value, on }: { label: string; value: string; on: boolean }) {
@@ -100,6 +115,7 @@ function GoogleSource({ id, label }: { id: BackendSourceType; label: string }) {
     queryFn: () => getConnectorStatus(token!, id),
     enabled: hydrated && Boolean(token) && canRead,
     retry: false,
+    refetchInterval: connectedStatusRefetchInterval,
   })
 
   const invalidate = () =>
@@ -327,6 +343,100 @@ function GoogleOrganizationSource({ id, label }: { id: BackendSourceType; label:
   )
 }
 
+function SharePointOrganizationSource() {
+  const hydrated = useAuthHydrated()
+  const token = useAuthStore((s) => s.accessToken)
+  const canRead = useAuthStore((s) =>
+    hasScope(s.effectiveScopes(), SCOPES.CONNECTORS_READ)
+  )
+  const canWrite = useAuthStore((s) =>
+    hasScope(s.effectiveScopes(), SCOPES.CONNECTORS_WRITE)
+  )
+  const isAdmin = useAuthStore((s) => s.isAdmin())
+  const queryClient = useQueryClient()
+
+  const status = useQuery({
+    queryKey: ["connector-status", "organization", "sharepoint"],
+    queryFn: () => getOrganizationConnectorStatus(token!, "sharepoint"),
+    enabled: hydrated && Boolean(token) && canRead,
+    retry: false,
+  })
+
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ["connector-status", "organization", "sharepoint"] })
+
+  const backfill = useMutation({
+    mutationFn: () => triggerSharePointOrganizationBackfill(token!),
+    onSuccess: invalidate,
+  })
+
+  const started = Boolean(status.data?.details?.connected)
+  const orgEnabled = Boolean(status.data?.details?.org_enabled)
+  const connectionStatus = String(status.data?.details?.connection_status || "")
+  const filesIndexed = Number(status.data?.details?.files_indexed || 0)
+  const statusLabel = !hydrated
+    ? "Checking…"
+    : !canRead
+      ? "Needs connectors.read"
+      : status.isPending
+        ? "Checking…"
+        : !orgEnabled
+          ? "Disabled by admin"
+          : connectionStatus === "syncing"
+            ? "Syncing"
+            : connectionStatus === "error"
+              ? "Error"
+              : started || connectionStatus === "active"
+                ? "Connected"
+                : "Not connected"
+
+  return (
+    <div className="flex flex-col gap-2.5 rounded-[1rem] bg-surface p-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[0.8125rem] font-medium">Libraries</span>
+        {status.error ? (
+          <span className="text-[0.75rem] text-destructive">
+            {status.error instanceof ApiError
+              ? status.error.message
+              : "Couldn't reach the API"}
+          </span>
+        ) : (
+          <span className="text-[0.75rem] text-muted-foreground">{statusLabel}</span>
+        )}
+      </div>
+      <div className="flex gap-2">
+        <StatTile
+          label="Ingestion"
+          value={
+            connectionStatus === "syncing"
+              ? "Syncing"
+              : filesIndexed > 0
+                ? `${filesIndexed} indexed`
+                : started
+                  ? "Started"
+                  : "Not started"
+          }
+          on={started || connectionStatus === "syncing"}
+        />
+        <StatTile label="Live updates" value="On sync" on={started} />
+      </div>
+      {hydrated && canWrite && isAdmin && started && !status.error && (
+        <div className="flex justify-end gap-1.5">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={backfill.isPending || !orgEnabled}
+            onClick={() => backfill.mutate()}
+          >
+            <RefreshCw className={cn("size-3.5", backfill.isPending && "animate-spin")} />
+            {backfill.isPending ? "Syncing…" : "Resync"}
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function ConnectorCard({
   connector,
   index,
@@ -348,7 +458,11 @@ export function ConnectorCard({
   const queryClient = useQueryClient()
   const isGooglePersonal = connector.source === "google_personal"
   const isGoogleOrganization = connector.source === "google_organization"
+  const isSharePointPersonal = connector.source === "sharepoint_personal"
+  const isSharePointOrganization = connector.source === "sharepoint_organization"
   const googleLive = (isGooglePersonal || isGoogleOrganization) && connector.available
+  const sharepointLive =
+    (isSharePointPersonal || isSharePointOrganization) && connector.available
 
   // Personal Google status queries
   const driveStatus = useQuery({
@@ -378,6 +492,22 @@ export function ConnectorCard({
     retry: false,
   })
 
+  const sharepointPersonalStatus = useQuery({
+    queryKey: ["connector-status", "sharepoint"],
+    queryFn: () => getConnectorStatus(token!, "sharepoint", "personal"),
+    enabled: isSharePointPersonal && sharepointLive && hydrated && Boolean(token) && canRead,
+    retry: false,
+    refetchInterval: connectedStatusRefetchInterval,
+  })
+
+  const sharepointOrgStatus = useQuery({
+    queryKey: ["connector-status", "organization", "sharepoint"],
+    queryFn: () => getOrganizationConnectorStatus(token!, "sharepoint"),
+    enabled:
+      isSharePointOrganization && sharepointLive && hydrated && Boolean(token) && canRead,
+    retry: false,
+  })
+
   const googleLinked =
     isGooglePersonal &&
     googleLive &&
@@ -387,6 +517,13 @@ export function ConnectorCard({
     isGoogleOrganization &&
     googleLive &&
     (orgDriveStatus.data?.details?.connected || orgGmailStatus.data?.details?.connected)
+
+  const sharepointLinked =
+    isSharePointPersonal && sharepointLive && sourceIsLinked(sharepointPersonalStatus.data)
+  const sharepointOrgLinked =
+    isSharePointOrganization &&
+    sharepointLive &&
+    Boolean(sharepointOrgStatus.data?.details?.connected)
 
   const authorize = useMutation({
     mutationFn: () => getGoogleAuthorizeUrl(token!, "personal"),
@@ -402,12 +539,28 @@ export function ConnectorCard({
     },
   })
 
+  const authorizeSharePoint = useMutation({
+    mutationFn: () => getSharePointAuthorizeUrl(token!),
+    onSuccess: (data) => {
+      if (data.authorization_url) window.location.href = data.authorization_url
+    },
+  })
+
   useEffect(() => {
-    if (!isGooglePersonal && !isGoogleOrganization) return
+    if (!isGooglePersonal && !isGoogleOrganization && !isSharePointPersonal && !isSharePointOrganization) return
     const google = searchParams.get("google")
-    if (!google) return
+    const sharepoint = searchParams.get("sharepoint")
+    if (!google && !sharepoint) return
     queryClient.invalidateQueries({ queryKey: ["connector-status"] })
-  }, [connector.source, queryClient, searchParams, isGooglePersonal, isGoogleOrganization])
+  }, [
+    connector.source,
+    queryClient,
+    searchParams,
+    isGooglePersonal,
+    isGoogleOrganization,
+    isSharePointPersonal,
+    isSharePointOrganization,
+  ])
 
   const live = connector.available
 
@@ -453,6 +606,10 @@ export function ConnectorCard({
           {isGoogleOrganization && GOOGLE_ORGANIZATION_SOURCES.map((source) => (
             <GoogleOrganizationSource key={source.id} {...source} />
           ))}
+          {isSharePointPersonal && SHAREPOINT_SOURCES.map((source) => (
+            <GoogleSource key={source.id} {...source} />
+          ))}
+          {isSharePointOrganization && <SharePointOrganizationSource />}
         </div>
       ) : (
         <div className="flex gap-2">
@@ -465,7 +622,9 @@ export function ConnectorCard({
         <p className="font-mono text-[0.6875rem] text-muted-foreground">
           {isGoogleOrganization && googleOrgLinked
             ? "OAuth (admin) · Polled every ~3 min"
-            : connector.handshake} · {connector.cadence}
+            : isSharePointOrganization && sharepointOrgLinked
+              ? "Service principal · Polled on sync"
+              : `${connector.handshake} · ${connector.cadence}`}
         </p>
         {live && isGooglePersonal ? (
           hydrated && canWrite && (
@@ -504,6 +663,27 @@ export function ConnectorCard({
               Admin-managed
             </Button>
           )
+        ) : live && isSharePointPersonal ? (
+          hydrated && canWrite && (
+            <Button
+              size="sm"
+              variant={sharepointLinked ? "outline" : "default"}
+              disabled={authorizeSharePoint.isPending}
+              onClick={() => authorizeSharePoint.mutate()}
+            >
+              <Plug className="size-3.5" />
+              {authorizeSharePoint.isPending
+                ? "Opening…"
+                : sharepointLinked
+                  ? "Reconnect"
+                  : "Connect"}
+            </Button>
+          )
+        ) : live && isSharePointOrganization ? (
+          <Button size="sm" variant="outline" disabled>
+            <Plug className="size-3.5" />
+            Admin-managed
+          </Button>
         ) : (
           <Button size="sm" variant="outline" disabled>
             <Plug className="size-3.5" />
@@ -517,6 +697,13 @@ export function ConnectorCard({
           {authorize.error instanceof ApiError
             ? authorize.error.message
             : "Couldn't start the Google consent flow."}
+        </p>
+      )}
+      {authorizeSharePoint.error && isSharePointPersonal && (
+        <p role="alert" className="text-[0.8125rem] text-destructive">
+          {authorizeSharePoint.error instanceof ApiError
+            ? authorizeSharePoint.error.message
+            : "Couldn't start the Microsoft consent flow."}
         </p>
       )}
     </motion.li>

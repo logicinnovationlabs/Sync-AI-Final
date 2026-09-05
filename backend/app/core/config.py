@@ -291,9 +291,56 @@ class Settings(BaseSettings):
             "GOOGLE_SERVICE_ACCOUNT_VAULT_KEY", "google_service_account_vault_key"
         ),
     )
+    microsoft_client_id: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("MICROSOFT_CLIENT_ID", "microsoft_client_id"),
+    )
+    microsoft_client_secret: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "MICROSOFT_CLIENT_SECRET", "microsoft_client_secret"
+        ),
+    )
+    microsoft_redirect_uri: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "MICROSOFT_REDIRECT_URI", "microsoft_redirect_uri"
+        ),
+    )
+    # SharePoint delegated OAuth — distinct from Outlook's MICROSOFT_* set.
+    microsoft_sharepoint_client_id: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "MICROSOFT_SHAREPOINT_CLIENT_ID", "microsoft_sharepoint_client_id"
+        ),
+    )
+    microsoft_sharepoint_tenant_id: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "MICROSOFT_SHAREPOINT_TENANT_ID", "microsoft_sharepoint_tenant_id"
+        ),
+    )
+    microsoft_sharepoint_client_secret: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "MICROSOFT_SHAREPOINT_CLIENT_SECRET", "microsoft_sharepoint_client_secret"
+        ),
+    )
+    microsoft_sharepoint_redirect_uri: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "MICROSOFT_SHAREPOINT_REDIRECT_URI", "microsoft_sharepoint_redirect_uri"
+        ),
+    )
     drive_acl_poll_seconds: int = Field(
         default=180,
         validation_alias=AliasChoices("DRIVE_ACL_POLL_SECONDS", "drive_acl_poll_seconds"),
+    )
+    sharepoint_poll_seconds: int = Field(
+        default=60,
+        validation_alias=AliasChoices(
+            "SHAREPOINT_POLL_SECONDS", "sharepoint_poll_seconds"
+        ),
     )
     google_pubsub_verification_token: Optional[str] = Field(
         default=None,

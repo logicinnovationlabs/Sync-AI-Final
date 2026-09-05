@@ -71,6 +71,12 @@ class Tenant(Base, TimestampMixin):
         default=False,
         comment="Admin toggle for organization Google Workspace connector availability",
     )
+    sharepoint_org_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        comment="Admin toggle for organization SharePoint connector availability",
+    )
 
     def __repr__(self) -> str:
         return f"<Tenant(id={self.tenant_id}, name={self.name}, subdomain={self.subdomain})>"

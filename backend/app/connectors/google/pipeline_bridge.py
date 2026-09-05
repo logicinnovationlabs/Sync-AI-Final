@@ -57,12 +57,16 @@ async def _run_pipeline(
     source_type: str,
     tenant_uuid: UUID,
     tenant_id: str,
+    connection_scope: Optional[str] = None,
+    connected_by: Optional[str] = None,
 ) -> Optional[List[UnifiedDocument]]:
     unified: List[UnifiedDocument] = []
     failures = 0
     for raw in raw_documents:
         try:
-            result = await pipeline.process_raw(raw, source_type, tenant_uuid)
+            result = await pipeline.process_raw(
+                raw, source_type, tenant_uuid, connection_scope, connected_by
+            )
             doc = result.get("unified_document")
             if doc is not None:
                 unified.append(doc)
@@ -103,6 +107,8 @@ async def process_raw_batch(
     tenant_id: str,
     *,
     require_postgres: bool = False,
+    connection_scope: Optional[str] = None,
+    connected_by: Optional[str] = None,
 ) -> Optional[List[UnifiedDocument]]:
     """
     Run Block C on each raw object. Returns UnifiedDocuments or None on failure
@@ -192,7 +198,8 @@ async def process_raw_batch(
             )
             return None
         result = await _run_pipeline(
-            pipeline, raw_documents, source_type, tenant_uuid, tenant_id
+            pipeline, raw_documents, source_type, tenant_uuid, tenant_id,
+            connection_scope, connected_by
         )
         await session.close()
         return result
@@ -219,5 +226,6 @@ async def process_raw_batch(
         )
         return None
     return await _run_pipeline(
-        pipeline, raw_documents, source_type, tenant_uuid, tenant_id
+        pipeline, raw_documents, source_type, tenant_uuid, tenant_id,
+        connection_scope, connected_by
     )

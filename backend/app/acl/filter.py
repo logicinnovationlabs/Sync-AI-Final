@@ -10,11 +10,18 @@ Term conventions (stored on the document/chunk):
 
 Fail-closed: empty caller ACL → no documents.
 ``*`` is a test/ops bypass (used by Block G recall harnesses).
+
+Admin access overrides (Part 2.3):
+Admin-set allow/deny overrides are checked BEFORE the existing ACL logic.
+- Deny override → exclude regardless of underlying ACL
+- Allow override → include (tenant boundary validated at set time)
+- No override → fall through to existing ACL compile logic
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Mapping
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Mapping, Set
+from uuid import UUID
 
 DENY_PREFIX = "deny:"
 
@@ -125,3 +132,162 @@ def acl_terms_from_jwt(payload: Mapping[str, Any]) -> List[str]:
                 _add(f"group:{group_str}")
 
     return terms
+
+
+def document_is_visible_with_admin_override(
+    user_acl: Sequence[str],
+    doc_acl: Optional[Iterable[str]],
+    admin_denied_ids: Optional[Set[str]] = None,
+    document_id: Optional[str] = None,
+) -> bool:
+    """
+    Return True iff ``user_acl`` may see a document with ``doc_acl`` terms,
+    checking admin access overrides BEFORE the existing ACL logic.
+    
+    Enforcement order (per Part 2.3 requirements):
+    1. Check admin_access_overrides for this (document, user) pair first
+    2. If deny → exclude regardless of what the underlying ACL says
+    3. If allow → include (tenant boundary validated at set time)
+    4. If no override → fall through to existing ACL compile logic unchanged
+    
+    Handles dual-indexing by normalizing document IDs (stripping source_type
+    prefixes) before comparison, ensuring a deny on one ID variant blocks all
+    variants of the same document.
+    
+    Args:
+        user_acl: User's ACL terms from JWT
+        doc_acl: Document's ACL terms
+        admin_denied_ids: Set of document IDs with deny overrides for this user
+        document_id: Document ID to check against admin_denied_ids
+        
+    Returns:
+        True if document is visible, False otherwise
+    """
+    if admin_deny_blocks_document(document_id, admin_denied_ids):
+        return False
+    return document_is_visible(user_acl, doc_acl)
+
+
+def _normalize_document_id(doc_id: Optional[str]) -> Optional[str]:
+    """
+    Normalize document ID by stripping source_type prefix if present.
+    
+    This handles dual-indexing where the same document may be stored with
+    both prefixed (e.g., "google_gmail_19c695373f33fcec") and unprefixed
+    (e.g., "19c695373f33fcec") IDs. Normalization ensures deny overrides
+    work regardless of which variant is stored or queried.
+    
+    Args:
+        doc_id: Document ID that may have a source_type prefix
+        
+    Returns:
+        Normalized document ID without prefix, or None if input is None or empty
+    """
+    if not doc_id or doc_id == "":
+        return None
+    
+    # Common source_type prefixes to strip
+    prefixes = [
+        "google_gmail_",
+        "google_drive_",
+        "slack_",
+        "notion_",
+        "confluence_",
+        "dropbox_",
+        "onedrive_",
+        "sharepoint_",
+    ]
+    
+    normalized = str(doc_id)
+    for prefix in prefixes:
+        if normalized.startswith(prefix):
+            normalized = normalized[len(prefix):]
+            break
+    
+    return normalized
+
+
+def admin_deny_blocks_document(
+    document_id: Optional[str],
+    admin_denied_ids: Optional[Set[str]],
+) -> bool:
+    """True if an admin deny override covers this document id or a dual-index alias."""
+    if not document_id or not admin_denied_ids:
+        return False
+    normalized_denied = {_normalize_document_id(did) for did in admin_denied_ids}
+    normalized_denied.discard(None)
+    candidates = {str(document_id)}
+    prefixes = ("google_gmail_", "google_drive_", "sharepoint_")
+    raw = str(document_id)
+    for prefix in prefixes:
+        if raw.startswith(prefix) and raw[len(prefix) :]:
+            candidates.add(raw[len(prefix) :])
+        elif not raw.startswith(prefix):
+            candidates.add(f"{prefix}{raw}")
+    for candidate in candidates:
+        if candidate in admin_denied_ids:
+            return True
+        if _normalize_document_id(candidate) in normalized_denied:
+            return True
+    return False
+
+
+def filter_results_with_admin_overrides(
+    results: List[Any],
+    admin_denied_ids: Set[str],
+    document_id_field: str = "document_id",
+) -> List[Any]:
+    """
+    Filter search results to remove documents with admin deny overrides.
+    
+    This is applied after search retrieval to enforce admin overrides
+    at query time without modifying the existing ACL compile pipeline.
+    
+    Handles dual-indexing by normalizing document IDs (stripping source_type
+    prefixes) before comparison, ensuring a deny on one ID variant blocks all
+    variants of the same document.
+    
+    Args:
+        results: List of search result dictionaries or Pydantic objects
+        admin_denied_ids: Set of document IDs with deny overrides
+        document_id_field: Field name containing document ID in results
+        
+    Returns:
+        Filtered list of results excluding denied documents
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    if not admin_denied_ids:
+        logger.info("No admin_denied_ids provided, returning all results")
+        return results
+    
+    # Normalize denied IDs to handle dual-indexing variants
+    normalized_denied_ids = {_normalize_document_id(did) for did in admin_denied_ids}
+    normalized_denied_ids.discard(None)  # Remove any None values
+    
+    logger.info(f"Filtering {len(results)} results, denied_ids: {admin_denied_ids}")
+    logger.info(f"Normalized denied_ids: {normalized_denied_ids}")
+    
+    # Handle both dict and Pydantic objects
+    def get_document_id(result):
+        if hasattr(result, 'get'):
+            # It's a dict-like object
+            return result.get(document_id_field)
+        else:
+            # It's a Pydantic object or similar
+            return getattr(result, document_id_field, None)
+    
+    # Log document IDs in results
+    result_ids = [get_document_id(result) for result in results]
+    logger.info(f"Result document IDs: {result_ids[:10]}")  # First 10
+    
+    filtered = [
+        result
+        for result in results
+        if not admin_deny_blocks_document(get_document_id(result), admin_denied_ids)
+    ]
+    
+    logger.info(f"Filtered to {len(filtered)} results")
+    
+    return filtered

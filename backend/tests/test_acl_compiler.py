@@ -324,3 +324,45 @@ async def test_compile_deny_override(acl_compiler, repo):
     # OR allow entries should be filtered if deny is present
     # This test verifies the logic doesn't crash with both
     assert isinstance(entries, list)
+
+
+@pytest.mark.asyncio
+async def test_compile_adds_owner_when_graph_emails_do_not_resolve(acl_compiler):
+    """MSA OneDrive: Graph emails are not tenant users; connected_by is owner."""
+    tenant_id = uuid4()
+    owner_id = uuid4()
+    doc = CanonicalDocument(
+        id="sharepoint_drive:item",
+        source_type="sharepoint",
+        source_id="drive:item",
+        tenant_id=tenant_id,
+        title="Getting started with OneDrive.pdf",
+        content="x",
+        url="https://example.com",
+        mime_type="application/pdf",
+        detected_mime_type="application/pdf",
+        mime_mismatch=False,
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+        source_updated_at=datetime.now(timezone.utc),
+        owner_principal_id=owner_id,
+        structured_metadata={},
+        parent_ids=[],
+    )
+    hints = [
+        (
+            IdentityHint(
+                source_type="sharepoint",
+                external_id="msa",
+                email="syncai740@gmail.com",
+                name="MSA",
+            ),
+            PermissionLevel.OWNER,
+        )
+    ]
+    entries = await acl_compiler.compile(doc, hints, tenant_id)
+    assert any(
+        e.principal_id == owner_id and not e.is_deny for e in entries
+    )
+    assert all(e.principal_id != None for e in entries if e.principal_id == owner_id)
+

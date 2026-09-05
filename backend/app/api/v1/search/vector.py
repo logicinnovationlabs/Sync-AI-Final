@@ -6,14 +6,16 @@ Provides semantic search with cosine similarity and ACL prefiltering.
 import logging
 import time
 from typing import Any, Dict, List, Optional
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
-from app.api.deps import get_current_user, require_scope
-from app.acl.filter import acl_terms_from_jwt, is_fail_closed
+from app.api.deps import get_current_user, require_scope, get_tenant_session
+from app.acl.filter import acl_terms_from_jwt, is_fail_closed, filter_results_with_admin_overrides
 from app.services.vector.qdrant_store import QdrantVectorStore
+from app.services.admin.access_override_service import access_override_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -75,6 +77,7 @@ async def search_vector(
     request: VectorSearchRequest,
     current_user: Dict[str, Any] = Depends(require_scope("search.read")),
     tenant_id: str = Depends(get_tenant),
+    db_session: AsyncSession = Depends(get_tenant_session),
     store: QdrantVectorStore = Depends(get_vector_store),
 ):
     """
@@ -110,6 +113,10 @@ async def search_vector(
         )
         return VectorSearchResponse(results=[], model_versions_used=[], took_ms=0.0)
     
+    admin_denied_ids = await access_override_service.load_denied_ids_for_caller(
+        current_user, tenant_id, db_session
+    )
+    
     # Execute search
     started = time.perf_counter()
     try:
@@ -131,6 +138,16 @@ async def search_vector(
         logger.warning(
             f"Performance outlier: took_ms={took_ms:.2f} tenant={request.tenant_id} top_k={request.top_k}"
         )
+    
+    # Apply admin deny override filtering (Part 2.3 enforcement)
+    if admin_denied_ids:
+        original_count = len(raw)
+        raw = filter_results_with_admin_overrides(raw, admin_denied_ids)
+        filtered_count = original_count - len(raw)
+        if filtered_count > 0:
+            logger.info(
+                f"Admin override filtering: removed {filtered_count} documents from results"
+            )
     
     # Build response
     results = [

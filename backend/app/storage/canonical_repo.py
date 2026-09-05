@@ -815,7 +815,9 @@ class CanonicalRepo:
                 )
             if any(e.is_deny for e in entries):
                 return False
-            return any(not e.is_deny for e in entries)
+            if any(not e.is_deny for e in entries):
+                return True
+            return await self._canonical_owner_may_read(tenant, principal, candidates)
 
         session = self._sql()
         result = await session.execute(
@@ -828,7 +830,32 @@ class CanonicalRepo:
         rows = list(result.scalars().all())
         if any(bool(row.is_deny) for row in rows):
             return False
-        return any(not bool(row.is_deny) for row in rows)
+        if any(not bool(row.is_deny) for row in rows):
+            return True
+        return await self._canonical_owner_may_read(tenant, principal, candidates)
+
+    async def _canonical_owner_may_read(
+        self,
+        tenant: UUID,
+        principal: UUID,
+        candidates: List[str],
+    ) -> bool:
+        """Owner on canonical_documents may read when acl_entries were never written."""
+        if self.use_memory:
+            for candidate in candidates:
+                doc = self._documents.get(candidate)
+                if doc is not None and doc.owner_principal_id == principal:
+                    return True
+            return False
+        session = self._sql()
+        result = await session.execute(
+            select(CanonicalDocumentRow).where(
+                CanonicalDocumentRow.tenant_id == tenant,
+                CanonicalDocumentRow.id.in_(candidates),
+                CanonicalDocumentRow.owner_principal_id == principal,
+            )
+        )
+        return result.scalar_one_or_none() is not None
 
 
 def _document_id_aliases(document_id: str) -> List[str]:
@@ -836,10 +863,11 @@ def _document_id_aliases(document_id: str) -> List[str]:
     if not raw:
         return []
     aliases = [raw]
-    for prefix in ("google_drive_", "google_gmail_"):
+    prefixes = ("google_drive_", "google_gmail_", "sharepoint_")
+    for prefix in prefixes:
         if raw.startswith(prefix) and raw[len(prefix) :]:
             aliases.append(raw[len(prefix) :])
-        elif not raw.startswith(("google_drive_", "google_gmail_")):
+        elif not raw.startswith(prefixes):
             aliases.append(f"{prefix}{raw}")
     seen = set()
     out = []
@@ -852,6 +880,8 @@ def _document_id_aliases(document_id: str) -> List[str]:
 
 def _source_type_from_document_id(document_id: str) -> str:
     raw = document_id or ""
+    if raw.startswith("sharepoint"):
+        return "sharepoint"
     if raw.startswith("google_gmail"):
         return "google_gmail"
     return "google_drive"
@@ -870,7 +900,11 @@ def _bound_share_acl_entry(document_id: str, principal_id: UUID, tenant_id: UUID
             else PermissionLevel.READ
         ),
         granted_via=(
-            "gmail_mailbox" if source_type == "google_gmail" else "drive_share"
+            "gmail_mailbox"
+            if source_type == "google_gmail"
+            else "sharepoint_share"
+            if source_type == "sharepoint"
+            else "drive_share"
         ),
         source_container_id=None,
         is_deny=False,

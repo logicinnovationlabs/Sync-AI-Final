@@ -6,6 +6,7 @@ export interface FederatedResultItem {
   title: string
   snippet: string
   sources: string[]
+  metadata?: Record<string, unknown> | null
 }
 
 export interface FederatedSearchResponse {
@@ -30,7 +31,7 @@ export function federatedSearch(token: string, query: string) {
     token,
     body: {
       query,
-      size: 20,
+      size: 50,
       enable_lexical: true,
       enable_vector: true,
     },

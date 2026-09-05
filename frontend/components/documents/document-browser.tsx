@@ -57,7 +57,7 @@ export function DocumentBrowser() {
           id="doc-search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search indexed Drive, Gmail, and files — or press Enter to list them"
+          placeholder="Search indexed Drive, Gmail, SharePoint, and files — or press Enter to list them"
           className="h-11 w-full rounded-full border border-border bg-card pr-4 pl-11 text-sm outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-foreground/25 focus:ring-2 focus:ring-ring/40"
         />
       </form>
@@ -113,6 +113,9 @@ export function DocumentBrowser() {
                       {row.snippet}
                     </p>
                     <p className="mt-2 font-mono text-[0.625rem] text-muted-foreground">
+                      {typeof row.metadata?.source_type === "string" && row.metadata.source_type
+                        ? `${row.metadata.source_type} · `
+                        : ""}
                       {row.document_id} · score {row.score.toFixed(3)}
                     </p>
                   </button>

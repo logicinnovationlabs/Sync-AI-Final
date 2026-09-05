@@ -45,6 +45,7 @@ celery_app.conf.update(
         "app.workers.tasks.backfill_source": {"queue": "google"},
         "app.workers.tasks.process_drive_notification": {"queue": "google"},
         "app.workers.tasks.poll_drive_acl_delta": {"queue": "google"},
+        "app.workers.tasks.poll_sharepoint_delta": {"queue": "google"},
         "app.workers.tasks.process_gmail_notification": {"queue": "google"},
         "app.workers.tasks.poll_gmail_pubsub": {"queue": "google"},
         "app.workers.tasks.renew_watch_channels": {"queue": "google"},

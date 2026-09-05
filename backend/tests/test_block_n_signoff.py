@@ -45,7 +45,7 @@ N2_QUERY_COUNT = 100  # F1 / G3 / J1 p95 sample size
 
 
 async def create_tenant_and_admin(test_db) -> tuple[Tenant, User, str]:
-    """Create a tenant + admin via services, returning (tenant, admin_user, admin_jwt)."""
+    """Create a tenant + owner via services, returning (tenant, owner_user, owner_jwt)."""
     tenant_id = uuid4()
     db_secret_key = f"kv/tenant-{tenant_id}/db_password"
     await vault_client.set_secret(db_secret_key, "testpass")
@@ -64,25 +64,25 @@ async def create_tenant_and_admin(test_db) -> tuple[Tenant, User, str]:
     await test_db.commit()
     await test_db.refresh(tenant)
 
-    admin = await native_auth_service.create_native_user(
-        email=f"admin@{tenant.subdomain}.com",
+    owner = await native_auth_service.create_native_user(
+        email=f"owner@{tenant.subdomain}.com",
         password="SecurePass123!",
-        display_name="Admin",
+        display_name="Owner",
         tenant_id=tenant_id,
         db_session=test_db,
-        role="admin",
+        role="owner",
         must_change_password=False,
         is_active=True,
     )
 
     token = await token_service.issue_access_token(
         str(tenant_id),
-        str(admin.principal_id),
-        scopes_for_role("admin"),
-        role="admin",
+        str(owner.principal_id),
+        scopes_for_role("owner"),
+        role="owner",
         token_version=0,
     )
-    return tenant, admin, token
+    return tenant, owner, token
 
 
 @pytest.fixture(scope="function")

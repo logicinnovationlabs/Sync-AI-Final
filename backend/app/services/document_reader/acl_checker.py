@@ -127,6 +127,14 @@ class PostgresACLChecker:
         )
         session = factory()
         try:
+            from app.acl.filter import admin_deny_blocks_document
+            from app.services.admin.access_override_service import access_override_service
+
+            denied_ids = await access_override_service.get_denied_document_ids(
+                tenant, principal, session
+            )
+            if admin_deny_blocks_document(doc_id, denied_ids):
+                return False
             live_repo = CanonicalRepo(use_memory=False, session=session)
             result = await live_repo.principal_can_read_document(tenant, principal, doc_id)
             return result

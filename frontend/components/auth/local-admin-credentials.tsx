@@ -1,8 +1,20 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { DEV_ADMIN_LOGIN, DEV_MEMBER_LOGIN } from "@/lib/dev-login"
 
 type DevAccount = typeof DEV_ADMIN_LOGIN | typeof DEV_MEMBER_LOGIN
+
+function isLocalBrowserHost(): boolean {
+  if (typeof window === "undefined") return false
+  const host = window.location.hostname.toLowerCase()
+  return (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "0.0.0.0" ||
+    host === "[::1]"
+  )
+}
 
 function AccountBlock({
   account,
@@ -44,7 +56,12 @@ function AccountBlock({
 }
 
 /**
- * Local-only hint for seeded Alpha accounts. Hidden in production builds.
+ * Seeded Alpha accounts for local testing.
+ *
+ * Gated on the browser hostname (localhost / loopback), not NODE_ENV.
+ * `npm start` sets NODE_ENV=production, which previously hid this box
+ * during local production-mode testing. Real deploys (vercel.app, a
+ * product domain) still do not show it.
  */
 export function LocalAdminCredentials({
   onUse,
@@ -53,10 +70,16 @@ export function LocalAdminCredentials({
   onUse?: (creds: { email: string; password: string }) => void
   includeMember?: boolean
 }) {
-  if (process.env.NODE_ENV !== "development") return null
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    setVisible(isLocalBrowserHost())
+  }, [])
+
+  if (!visible) return null
 
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-border-subtle bg-muted/40 px-4 py-3">
+    <div className="flex flex-col gap-4 rounded-2xl border border-yellow-200 bg-yellow-50 px-4 py-3">
       <AccountBlock
         account={DEV_ADMIN_LOGIN}
         description="Full access, including connectors, audit, and governance."

@@ -95,6 +95,10 @@ class SyncOrchestrator:
         stats = {"deleted": 0, "indexed": 0, "errors": 0, "final_cursor": None, "pipeline": None}
         extra_acl = extra_acl or _acl_from_config(config)
         
+        # Extract connection_scope and connected_by for ownership resolution
+        connection_scope = config.get("connection_scope", "personal")
+        connected_by = config.get("connected_by")
+        
         # Get connector from registry (blind - no name imports)
         connector = connector_registry.get_connector(source_type, config, token_store)
         
@@ -144,7 +148,6 @@ class SyncOrchestrator:
                 break
 
             if result.documents:
-                connection_scope = str((config or {}).get("connection_scope") or "personal")
                 _publish_raw_page(tenant_id, connector.source_type, result.documents, connection_scope)
                 # Transform to UnifiedDocument (Block B contract)
                 docs = await connector.transform(result.documents)
@@ -156,6 +159,8 @@ class SyncOrchestrator:
                         connector.source_type,
                         tenant_id,
                         require_postgres=True,
+                        connection_scope=connection_scope,
+                        connected_by=connected_by,
                     )
                     if piped:
                         docs = piped
@@ -218,6 +223,7 @@ class SyncOrchestrator:
         cursor: Optional[str] = None,
         on_cursor_update: Optional[CursorUpdateCallback] = None,
         extra_acl: Optional[List[str]] = None,
+        config: Optional[dict] = None,
     ) -> dict:
         """
         Run a two-pass sync (called synchronously or from Celery tasks):
@@ -243,7 +249,9 @@ class SyncOrchestrator:
                 "indexed_ids": [],
                 "pipeline": None,
             }
-
+            connector_config = config or {}
+            connection_scope = connector_config.get("connection_scope", "personal")
+            connected_by = connector_config.get("connected_by")
             # Pass 1: Deletions first.
             # IMPORTANT: never write changes.list tokens into final_cursor —
             # that cursor is resumed by fetch_delta (files.list / messages.list)
@@ -314,9 +322,15 @@ class SyncOrchestrator:
                     )
                     break
 
+                page_deleted = list(getattr(delta_res, "deleted_ids", None) or [])
+                if page_deleted:
+                    await indexer.delete_by_ids(
+                        page_deleted, tenant_id, connector.source_type
+                    )
+                    stats["deleted_count"] += len(page_deleted)
+
                 page_ids: List[str] = []
                 if hasattr(delta_res, "documents") and delta_res.documents:
-                    connection_scope = str((connector.config or {}).get("connection_scope") or "personal")
                     _publish_raw_page(tenant_id, connector.source_type, delta_res.documents, connection_scope)
                     docs = await connector.transform(delta_res.documents)
                     try:
@@ -327,6 +341,8 @@ class SyncOrchestrator:
                             connector.source_type,
                             tenant_id,
                             require_postgres=True,
+                            connection_scope=connection_scope,
+                            connected_by=connected_by,
                         )
                         if piped:
                             docs = piped

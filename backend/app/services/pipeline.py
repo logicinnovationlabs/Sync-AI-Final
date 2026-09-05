@@ -12,7 +12,7 @@ Called by Celery tasks in place of connector.transform() + indexer.bulk_index().
 """
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from uuid import UUID
 from datetime import datetime, timezone
 
@@ -65,7 +65,8 @@ class Pipeline:
         self.canonical_repo = canonical_repo
     
     async def process_raw(
-        self, raw: Dict[str, Any], source_type: str, tenant_id: UUID
+        self, raw: Dict[str, Any], source_type: str, tenant_id: UUID,
+        connection_scope: Optional[str] = None, connected_by: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Process a raw source document through Block C pipeline.
@@ -79,6 +80,8 @@ class Pipeline:
             raw: Raw document object from source
             source_type: Source type identifier
             tenant_id: Tenant ID for scoping
+            connection_scope: Connector scope ("personal" or "organization")
+            connected_by: User ID who connected the connector (for personal scope)
             
         Returns:
             Dict with canonical_document, acl_entries, unified_document
@@ -124,6 +127,23 @@ class Pipeline:
         created_at = self._parse_timestamp(raw.get("createdTime") or raw.get("internalDate"))
         source_updated_at = self._parse_timestamp(raw.get("modifiedTime") or raw.get("internalDate"))
         
+        # Determine owner_principal_id: for personal connectors, default to connected_by
+        # if identity resolution returns pending (external email not a platform user)
+        owner_id = None
+        logger.info(f"DEBUG: connection_scope={connection_scope}, connected_by={connected_by}")
+        if connection_scope == "personal" and connected_by:
+            if resolved.get("owner") and not resolved["owner"].is_pending:
+                owner_id = resolved["owner"].principal_id
+            else:
+                # Personal connector: use the user who connected it as owner
+                try:
+                    owner_id = UUID(connected_by)
+                    logger.info(f"DEBUG: Setting owner_id from connected_by: {owner_id}")
+                except (TypeError, ValueError):
+                    logger.warning(f"Invalid connected_by UUID: {connected_by}")
+        elif resolved.get("owner") and not resolved["owner"].is_pending:
+            owner_id = resolved["owner"].principal_id
+        
         doc = CanonicalDocument(
             id=doc_id,
             source_type=source_type,
@@ -140,11 +160,7 @@ class Pipeline:
             created_at=created_at,
             updated_at=datetime.now(timezone.utc),
             source_updated_at=source_updated_at,
-            owner_principal_id=(
-                resolved["owner"].principal_id
-                if resolved.get("owner") and not resolved["owner"].is_pending
-                else None
-            ),
+            owner_principal_id=owner_id,
             creator_principal_id=(
                 resolved["creator"].principal_id
                 if resolved.get("creator") and not resolved["creator"].is_pending

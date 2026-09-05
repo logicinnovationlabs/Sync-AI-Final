@@ -1,6 +1,13 @@
 import { HardDrive, Mail, MessageCircle, Receipt } from "lucide-react"
 
-export type ConnectorSourceType = "google_personal" | "google_organization" | "outlook" | "whatsapp" | "tally"
+export type ConnectorSourceType =
+  | "google_personal"
+  | "google_organization"
+  | "sharepoint_personal"
+  | "sharepoint_organization"
+  | "outlook"
+  | "whatsapp"
+  | "tally"
 
 export type ConnectionModel = "oauth" | "webhook" | "agent-token"
 
@@ -39,6 +46,28 @@ export const CONNECTORS: ConnectorMeta[] = [
     connectionModel: "oauth",
     handshake: "Service account",
     cadence: "Real-time webhooks",
+    icon: HardDrive,
+    available: true,
+  },
+  {
+    source: "sharepoint_personal",
+    name: "SharePoint (Personal)",
+    shortLabel: "SharePoint Personal",
+    description: "Your OneDrive and any SharePoint libraries your Microsoft account can open. Only you can search what you connect.",
+    connectionModel: "oauth",
+    handshake: "OAuth consent",
+    cadence: "Polled on sync",
+    icon: HardDrive,
+    available: true,
+  },
+  {
+    source: "sharepoint_organization",
+    name: "SharePoint (Organization)",
+    shortLabel: "SharePoint Org",
+    description: "Company SharePoint libraries, shared across your organization with ACL-mirrored permissions.",
+    connectionModel: "oauth",
+    handshake: "Service principal",
+    cadence: "Polled on sync",
     icon: HardDrive,
     available: true,
   },

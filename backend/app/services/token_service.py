@@ -110,9 +110,8 @@ class TokenService:
             tenant_id: Exactly one tenant UUID (A1)
             principal_id: User/principal UUID
             scopes: List of granted scopes
-            role: Optional org role claim (Block N). Omitted when None so
-                Block A–J tests that mint tokens without a User row stay valid.
-            token_version: Snapshot of users.token_version at issue time.
+            role: Optional org role claim (Block N). Always stamped when provided.
+            token_version: Snapshot of users.token_version at issue time. Always stamped.
             must_change_password: Hint for the client to force a password change.
             
         Returns:
@@ -131,10 +130,10 @@ class TokenService:
             "iat": now,
             "exp": now + timedelta(seconds=self.access_ttl),
             "jti": jti,
+            "token_version": token_version,  # Always stamped for revocation support
         }
         if role is not None:
             payload["role"] = role
-            payload["token_version"] = token_version
             payload["must_change_password"] = must_change_password
         
         token = jwt.encode(
@@ -204,6 +203,7 @@ class TokenService:
             principal_id=str(principal_id),
             scopes=list(payload.get("scopes") or []),
             role=payload.get("role"),
+            token_version=payload.get("token_version", 0),
         )
         new_refresh = await self.issue_refresh_token(str(tenant_id), str(principal_id))
         return access, new_refresh
@@ -254,18 +254,37 @@ class TokenService:
             if revoked:
                 raise RevokedTokenError(jti)
 
-        # Block N: principal-level session revoke via token_version (Redis,
-        # no tenant-DB lookup — Block A tests mint JWTs without a User row).
+        # Block N: principal-level session revoke via token_version (Redis).
+        # Access tokens must have token_version claim; refresh tokens are validated
+        # via DB lookup (JTI) and do not require token_version.
         principal_id = payload.get("sub")
         tv_claim = payload.get("token_version")
-        if tenant_id and principal_id is not None and tv_claim is not None:
-            stored = await redis_client.get(tenant_id, f"token_version:{principal_id}")
-            if stored is not None:
-                try:
-                    if int(stored) > int(tv_claim):
-                        raise RevokedTokenError(str(jti or principal_id))
-                except (TypeError, ValueError):
-                    pass
+        token_type = payload.get("token_type")
+        
+        # Only check token_version for access tokens, not refresh tokens
+        # Refresh tokens are revoked via DB lookup of their JTI in RefreshToken table
+        if token_type != "refresh":
+            if tv_claim is None:
+                # Missing token_version claim on access token indicates legacy token or bug - reject
+                raise InvalidTokenError("Access token missing required token_version claim")
+            
+            if tenant_id and principal_id is not None:
+                stored = await redis_client.get(tenant_id, f"token_version:{principal_id}")
+                # If Redis is unavailable (stored is None due to connection failure),
+                # we fail closed to prevent revocation bypass. The redis_client has
+                # fallback behavior, but for security-critical revocation checks we
+                # require actual Redis connectivity.
+                if stored is None:
+                    # Check if Redis client is actually connected (not using fallback)
+                    from app.storage.redis_client import redis_client as rc
+                    if rc._client is None:
+                        raise InvalidTokenError("Redis unavailable - cannot verify token revocation status")
+                else:
+                    try:
+                        if int(stored) > int(tv_claim):
+                            raise RevokedTokenError(str(jti or principal_id))
+                    except (TypeError, ValueError):
+                        pass
         
         # A1: Ensure exactly one tenant_id
         if "tenant_id" not in payload:

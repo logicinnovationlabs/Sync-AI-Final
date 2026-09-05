@@ -137,7 +137,16 @@ class OAuthService:
 
     async def _scopes_for_principal(
         self, principal_id: str, tenant_id: str, db_session: AsyncSession, fallback: list[str]
-    ) -> list[str]:
+    ) -> tuple[list[str], dict[str, Any]]:
+        """
+        Get scopes and user metadata for a principal.
+        
+        Returns:
+            Tuple of (scopes list, user metadata dict with role, token_version, etc.)
+            
+        Raises:
+            UnauthorizedError if user is inactive or not found.
+        """
         try:
             result = await db_session.execute(
                 select(User).where(
@@ -147,10 +156,28 @@ class OAuthService:
             )
             user = result.scalar_one_or_none()
         except Exception:
-            return list(fallback)
+            return list(fallback), {}
+        
         if user is None:
-            return list(fallback)
-        return scopes_for_role(getattr(user, "role", None) or "member")
+            return list(fallback), {}
+        
+        # Check account state - reject refresh for inactive/deactivated users
+        if getattr(user, "is_active", True) is False:
+            raise UnauthorizedError("User account is inactive")
+        if user.status != "active":
+            raise UnauthorizedError(f"User account is {user.status}")
+        
+        role = getattr(user, "role", None) or "member"
+        scopes = scopes_for_role(role)
+        
+        # Return user metadata for token issuance
+        user_metadata = {
+            "role": role,
+            "token_version": getattr(user, "token_version", 0) or 0,
+            "must_change_password": getattr(user, "must_change_password", False),
+        }
+        
+        return scopes, user_metadata
 
     async def exchange_authorization_code(
         self,
@@ -175,12 +202,15 @@ class OAuthService:
         tenant_id = str(code_data["tenant_id"])
         principal_id = str(code_data["principal_id"])
         scopes = list(code_data.get("scopes") or [])
-        scopes = await self._scopes_for_principal(principal_id, tenant_id, db_session, scopes)
+        scopes, user_metadata = await self._scopes_for_principal(principal_id, tenant_id, db_session, scopes)
 
         access_token = await token_service.issue_access_token(
             tenant_id=tenant_id,
             principal_id=principal_id,
             scopes=scopes,
+            role=user_metadata.get("role"),
+            token_version=user_metadata.get("token_version", 0),
+            must_change_password=user_metadata.get("must_change_password", False),
         )
         refresh_token = await token_service.issue_refresh_token(
             tenant_id=tenant_id,
@@ -211,10 +241,14 @@ class OAuthService:
         if client.client_type != "confidential":
             raise ForbiddenError("client_credentials flow requires a confidential client")
 
+        # For client_credentials, use client_id as principal and a fixed role
+        # Service-to-service tokens don't have a User row, so token_version defaults to 0
         access_token = await token_service.issue_access_token(
             tenant_id=str(client.tenant_id),
             principal_id=client_id,
             scopes=scopes,
+            role="service",  # Explicit role for service accounts
+            token_version=0,  # Service accounts don't have user-level versioning
         )
         return {
             "access_token": access_token,
@@ -256,11 +290,14 @@ class OAuthService:
         token_record.revoked = True
         await redis_client.sadd(str(tenant_id), f"revoked:{jti}", str(jti))
 
-        scopes = await self._scopes_for_principal(principal_id, str(tenant_id), db_session, [])
+        scopes, user_metadata = await self._scopes_for_principal(principal_id, str(tenant_id), db_session, [])
         access_token = await token_service.issue_access_token(
             tenant_id=str(tenant_id),
             principal_id=str(principal_id),
             scopes=scopes,
+            role=user_metadata.get("role"),
+            token_version=user_metadata.get("token_version", 0),
+            must_change_password=user_metadata.get("must_change_password", False),
         )
         new_refresh_token = await token_service.issue_refresh_token(
             tenant_id=str(tenant_id),

@@ -24,6 +24,7 @@ services:
     container_name: snyq_redis
     ports:
       - "6379:6379"
+    command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
     healthcheck:
@@ -279,6 +280,11 @@ services:
       GOOGLE_PUBSUB_SUBSCRIPTION: gmail-push-notifications-sub
       WEBHOOK_BASE_URL: https://sycq-ai-final-2.onrender.com
       GOOGLE_APPLICATION_CREDENTIALS: /app/keys/sync-ai-505006-service-account.json
+      VAULT_URL: http://vault:8200
+      VAULT_PROVIDER: hashicorp
+      VAULT_TOKEN: root
+      LLM_PROVIDER: gemini
+      EMBEDDING_PROVIDER: gemini
     volumes:
       - ./backend/app:/app/app
       - ./backend/migrations:/app/migrations
@@ -322,6 +328,11 @@ services:
       GOOGLE_PUBSUB_SUBSCRIPTION: gmail-push-notifications-sub
       WEBHOOK_BASE_URL: https://sycq-ai-final-2.onrender.com
       GOOGLE_APPLICATION_CREDENTIALS: /app/keys/sync-ai-505006-service-account.json
+      VAULT_URL: http://vault:8200
+      VAULT_PROVIDER: hashicorp
+      VAULT_TOKEN: root
+      LLM_PROVIDER: gemini
+      EMBEDDING_PROVIDER: gemini
     volumes:
       - ./backend/app:/app/app
       - ./backend/keys:/app/keys
@@ -347,6 +358,8 @@ services:
     container_name: snyq_celery_beat
     env_file:
       - .env.docker
+    volumes:
+      - ./backend/app:/app/app
     healthcheck:
       disable: true
     restart: unless-stopped

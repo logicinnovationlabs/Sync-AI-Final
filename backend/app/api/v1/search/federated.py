@@ -13,14 +13,15 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.services.rag_debug_trace import get_tracer as _get_rag_tracer
 
-from app.api.deps import require_scope
-from app.acl.filter import acl_terms_from_jwt, document_is_visible, is_fail_closed
+from app.api.deps import require_scope, get_tenant_session
+from app.acl.filter import acl_terms_from_jwt, document_is_visible, is_fail_closed, filter_results_with_admin_overrides
 from app.models.federated import (
     BackendStatus,
     FederatedSearchRequest,
     FederatedSearchResponse,
     ResultItem,
 )
+from app.services.admin.access_override_service import access_override_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["search-federated"])
@@ -181,7 +182,9 @@ def _payload_to_hit(payload: Dict[str, Any], score: float) -> Dict[str, Any]:
         or ""
     )
     subject = str(payload.get("subject") or meta.get("subject") or "")
-    source_type = str(payload.get("source_type") or meta.get("source_type") or "")
+    source_type = str(
+        payload.get("source_type") or meta.get("source_type") or payload.get("source") or ""
+    )
     hit_meta: Dict[str, Any] = {}
     if from_email:
         hit_meta["from_email"] = from_email
@@ -260,6 +263,7 @@ async def _safe_call_indexed(
             hit = _payload_to_hit(payload, score)
             if hit["document_id"]:
                 hits.append(hit)
+        
         status.ok = True
         status.hit_count = len(hits)
         return hits, status
@@ -292,10 +296,10 @@ def _ingest_hit_meta(bucket: Dict[str, Any], doc: Dict[str, Any]) -> None:
         from_email = str(meta.get("from_email") or meta.get("from") or "")
     if from_email and not bucket.get("from_email"):
         bucket["from_email"] = from_email
-    source_type = str(doc.get("source_type") or "")
+    source_type = str(doc.get("source_type") or doc.get("source") or "")
     if not source_type:
         meta = doc.get("metadata") if isinstance(doc.get("metadata"), dict) else {}
-        source_type = str(meta.get("source_type") or "")
+        source_type = str(meta.get("source_type") or meta.get("source") or "")
     if source_type and not bucket.get("source_type"):
         bucket["source_type"] = source_type
     extra = doc.get("metadata") if isinstance(doc.get("metadata"), dict) else None
@@ -309,13 +313,41 @@ def _merge_and_rank(
     lexical_results: List[Dict[str, Any]],
     vector_results: List[Dict[str, Any]],
     size: int,
+    indexed_results: Optional[List[Dict[str, Any]]] = None,
 ) -> List[ResultItem]:
-    """Merge and rank results using reciprocal rank fusion."""
+    """Merge and rank results using reciprocal rank fusion.
+
+    Each backend is its own RRF stream. Concatenating indexed+lexical into one
+    list buried connector-specific lexical hits (e.g. SharePoint) under a long
+    Qdrant documents ranking.
+    """
     # Simple RRF fusion
     scores: Dict[str, float] = {}
     metadata: Dict[str, Dict[str, Any]] = {}
     
     k = 60  # RRF constant
+
+    for rank, doc in enumerate(indexed_results or [], 1):
+        doc_id = doc.get("document_id") or doc.get("id", "")
+        if not doc_id:
+            continue
+        scores[doc_id] = scores.get(doc_id, 0) + 1 / (k + rank)
+        if doc_id not in metadata:
+            metadata[doc_id] = {
+                "title": doc.get("title", ""),
+                "snippet": doc.get("snippet", ""),
+                "sources": list(doc.get("sources") or ["indexed"]),
+                "from_email": doc.get("from_email") or "",
+                "source_type": doc.get("source_type") or "",
+                "metadata": dict(doc.get("metadata") or {}) if isinstance(doc.get("metadata"), dict) else {},
+            }
+            _ingest_hit_meta(metadata[doc_id], doc)
+        else:
+            src = metadata[doc_id]["sources"]
+            for s in doc.get("sources") or ["indexed"]:
+                if s not in src:
+                    src.append(s)
+            _ingest_hit_meta(metadata[doc_id], doc)
     
     for rank, doc in enumerate(lexical_results, 1):
         doc_id = doc.get("document_id") or doc.get("id", "")
@@ -434,9 +466,10 @@ async def run_federated_backends(
         vector_results = rest[0][0]
     statuses = [r[1] for r in results]
     merged = _merge_and_rank(
-        indexed_results + lexical_results,
+        lexical_results,
         vector_results,
         size,
+        indexed_results=indexed_results,
     )
     return merged, statuses
 
@@ -445,6 +478,7 @@ async def run_federated_backends(
 async def federated_search(
     body: FederatedSearchRequest,
     current_user: Dict[str, Any] = Depends(require_scope("search.read")),
+    db_session = Depends(get_tenant_session),
 ) -> FederatedSearchResponse:
     """
     Federated search across lexical and vector backends.
@@ -480,6 +514,15 @@ async def federated_search(
 
     if not any(s.ok for s in statuses):
         raise HTTPException(status_code=503, detail="All search backends unavailable")
+    
+    admin_denied_ids = await access_override_service.load_denied_ids_for_caller(
+        current_user, tenant_id, db_session
+    )
+    if admin_denied_ids:
+        merged = filter_results_with_admin_overrides(
+            results=merged,
+            admin_denied_ids=admin_denied_ids
+        )
     
     # Pagination
     start = body.from_

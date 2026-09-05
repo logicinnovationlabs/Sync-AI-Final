@@ -93,7 +93,32 @@ class GeminiEmbeddingProvider:
                 kwargs["task_type"] = task_type
             
             result = self.genai.embed_content(**kwargs)
-            embeddings.append(result["embedding"])
+            if isinstance(result, dict):
+                response_keys = sorted(result.keys())
+                vector = result.get("embedding")
+            else:
+                response_keys = sorted(
+                    a for a in dir(result) if not a.startswith("_")
+                )
+                vector = getattr(result, "embedding", None)
+            if not isinstance(vector, list):
+                raise TypeError(
+                    f"Gemini embed_content returned non-list embedding type={type(vector).__name__}"
+                )
+            head = [round(float(x), 6) for x in vector[:4]]
+            logger.info(
+                "Gemini embed_content sdk=google.generativeai "
+                "http=generativelanguage.googleapis.com/v1beta/models/...:embedContent "
+                "model=%s task_type=%s output_dimensionality=%s "
+                "response_keys=%s embedding_dim=%s embedding_head=%s",
+                self.model,
+                task_type,
+                self.dimension,
+                response_keys,
+                len(vector),
+                head,
+            )
+            embeddings.append(vector)
         
         return embeddings
 

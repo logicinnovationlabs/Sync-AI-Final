@@ -8,7 +8,7 @@ Critical for Signoff A1-A7.
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Protocol
 from pydantic import BaseModel, Field, field_validator
@@ -33,6 +33,7 @@ class DeltaResult:
     documents: List[Dict[str, Any]]
     next_cursor: Optional[str]
     has_more: bool
+    deleted_ids: List[str] = field(default_factory=list)
 
 
 @dataclass

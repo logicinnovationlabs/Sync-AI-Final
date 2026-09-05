@@ -4,7 +4,9 @@ Google Workspace connector — OAuth URL generation and token encryption round-t
 Does not print secret values. Does not call the live Google token endpoint.
 """
 
+import json
 import pytest
+from unittest.mock import MagicMock, patch
 from urllib.parse import parse_qs, urlparse
 
 from app.connectors.google.oauth import GoogleOAuthManager, google_oauth_from_settings
@@ -28,45 +30,57 @@ class _MemoryTokenStore:
 
 
 def test_oauth_authorization_url_shape():
-    store = _MemoryTokenStore()
-    manager = GoogleOAuthManager(
-        store,
-        client_id="test-client-id.apps.googleusercontent.com",
-        client_secret="not-a-real-secret",
-        scopes=[
-            "https://www.googleapis.com/auth/drive.readonly",
-            "https://www.googleapis.com/auth/gmail.readonly",
-        ],
-    )
-    state = encode_oauth_state(
-        "11111111-1111-1111-1111-111111111111",
-        "22222222-2222-2222-2222-222222222222",
-    )
-    url = manager.build_authorization_url(
-        tenant_id="11111111-1111-1111-1111-111111111111",
-        redirect_uri="http://localhost:8000/connectors/google/callback",
-        state=state,
-    )
-    parsed = urlparse(url)
-    qs = parse_qs(parsed.query)
+    # Mock Redis for state encoding
+    mock_redis = MagicMock()
+    with patch("app.connectors.google.oauth_state._sync_redis", return_value=mock_redis):
+        store = _MemoryTokenStore()
+        manager = GoogleOAuthManager(
+            store,
+            client_id="test-client-id.apps.googleusercontent.com",
+            client_secret="not-a-real-secret",
+            scopes=[
+                "https://www.googleapis.com/auth/drive.readonly",
+                "https://www.googleapis.com/auth/gmail.readonly",
+            ],
+        )
+        state = encode_oauth_state(
+            "11111111-1111-1111-1111-111111111111",
+            "22222222-2222-2222-2222-222222222222",
+            jti="test-jti-123",
+        )
+        url = manager.build_authorization_url(
+            tenant_id="11111111-1111-1111-1111-111111111111",
+            redirect_uri="http://localhost:8000/connectors/google/callback",
+            state=state,
+        )
+        parsed = urlparse(url)
+        qs = parse_qs(parsed.query)
 
-    assert parsed.scheme == "https"
-    assert parsed.netloc == "accounts.google.com"
-    assert parsed.path == "/o/oauth2/v2/auth"
-    assert qs["client_id"] == ["test-client-id.apps.googleusercontent.com"]
-    assert qs["redirect_uri"] == [
-        "http://localhost:8000/connectors/google/callback"
-    ]
-    assert qs["response_type"] == ["code"]
-    assert qs["access_type"] == ["offline"]
-    assert qs["prompt"] == ["consent"]
-    assert "drive.readonly" in qs["scope"][0]
-    assert "gmail.readonly" in qs["scope"][0]
-    decoded = decode_oauth_state(qs["state"][0])
-    assert decoded is not None
-    assert decoded["tenant_id"] == "11111111-1111-1111-1111-111111111111"
-    assert decoded["user_id"] == "22222222-2222-2222-2222-222222222222"
-    assert decoded["nonce"]
+        assert parsed.scheme == "https"
+        assert parsed.netloc == "accounts.google.com"
+        assert parsed.path == "/o/oauth2/v2/auth"
+        assert qs["client_id"] == ["test-client-id.apps.googleusercontent.com"]
+        assert qs["redirect_uri"] == [
+            "http://localhost:8000/connectors/google/callback"
+        ]
+        assert qs["response_type"] == ["code"]
+        assert qs["access_type"] == ["offline"]
+        assert qs["prompt"] == ["consent"]
+        assert "drive.readonly" in qs["scope"][0]
+        assert "gmail.readonly" in qs["scope"][0]
+        
+        # Mock Redis for state decoding
+        mock_redis.get.return_value = json.dumps({
+            "nonce": "test-nonce",
+            "jti": "test-jti-123",
+            "connection_scope": "personal"
+        })
+        decoded = decode_oauth_state(qs["state"][0], require_jti_match="test-jti-123")
+        assert decoded is not None
+        assert decoded["tenant_id"] == "11111111-1111-1111-1111-111111111111"
+        assert decoded["user_id"] == "22222222-2222-2222-2222-222222222222"
+        assert decoded["nonce"]
+        assert decoded["jti"] == "test-jti-123"
 
 
 def test_token_blob_encrypt_decrypt_roundtrip():
@@ -155,8 +169,13 @@ async def test_authorize_endpoint_returns_google_url(monkeypatch):
         principal_id=principal_id,
         scopes=["connectors.write", "connectors.read"],
     )
+    
+    # Mock Redis for state encoding
+    mock_redis = MagicMock()
+    
     client = TestClient(app)
-    with patch("app.api.deps.tenant_resolver.resolve") as mock_resolve:
+    with patch("app.api.deps.tenant_resolver.resolve") as mock_resolve, \
+         patch("app.connectors.google.oauth_state._sync_redis", return_value=mock_redis):
         mock_resolve.return_value = MagicMock(tenant_id=tenant_id)
         response = client.get(
             "/connectors/google/authorize",
@@ -175,6 +194,13 @@ async def test_authorize_endpoint_returns_google_url(monkeypatch):
     assert "drive.readonly" in qs["scope"][0]
     assert "gmail.readonly" in qs["scope"][0]
     assert qs["access_type"] == ["offline"]
-    decoded = decode_oauth_state(qs["state"][0])
-    assert decoded["tenant_id"] == tenant_id
-    assert decoded["user_id"] == principal_id
+    # Mock Redis for state validation
+    mock_redis.get.return_value = json.dumps({
+        "nonce": "test-nonce",
+        "jti": "test-jti-456",
+        "connection_scope": "personal"
+    })
+    with patch("app.connectors.google.oauth_state._sync_redis", return_value=mock_redis):
+        decoded = decode_oauth_state(qs["state"][0], require_jti_match="test-jti-456")
+        assert decoded["tenant_id"] == tenant_id
+        assert decoded["user_id"] == principal_id

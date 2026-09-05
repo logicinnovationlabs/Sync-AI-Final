@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # Drive shares and Gmail mailbox owners bind to users.principal_id.
 # They never mint a second identity_principals row when the compiler
 # passes document_id (the ACL write path).
-MIRROR_BIND_SOURCES = frozenset({"google_drive", "google_gmail"})
+MIRROR_BIND_SOURCES = frozenset({"google_drive", "google_gmail", "sharepoint"})
 
 
 class IdentityResolver:
@@ -280,12 +280,24 @@ class IdentityResolver:
             return None
         
         email = email.strip().lower()
-        
+        email = _mail_from_guest_upn(email)
+
         # Validate format
         try:
-            validate_email(email, check_deliverability=False)
+            validate_email(email, check_deliverability=False, test_environment=True)
         except EmailNotValidError as e:
             logger.warning(f"Invalid email format '{email}': {e}")
             return None
         
         return email
+
+
+def _mail_from_guest_upn(email: str) -> str:
+    """Azure AD guest UPNs are ``mail#EXT#@tenant.onmicrosoft.com``.
+
+    Identity lookup and pending_identity_queue use the recovered mail.
+    """
+    marker = "#ext#"
+    if marker in email:
+        return email.split(marker, 1)[0]
+    return email

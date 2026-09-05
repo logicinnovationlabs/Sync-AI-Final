@@ -8,9 +8,10 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.api.deps import get_current_user, require_scope
-from app.acl.filter import document_is_visible
+from app.api.deps import get_current_user, require_scope, get_tenant_session
+from app.acl.filter import document_is_visible, filter_results_with_admin_overrides
 from app.core.config import settings
+from app.services.admin.access_override_service import access_override_service
 from app.models.graph import (
     GraphNode,
     GraphRelationship,
@@ -58,6 +59,7 @@ async def traverse_graph(
     body: TraverseRequest,
     current_user: Dict[str, Any] = Depends(require_scope("graph.read")),
     store: GraphStore = Depends(get_graph_store),
+    db_session = Depends(get_tenant_session),
 ) -> TraverseResponse:
     """Expand relationships from a start node up to depth (max 2 for signoff)."""
     token_tenant = str(current_user.get("tenant_id") or "")
@@ -102,6 +104,15 @@ async def traverse_graph(
             (n.get("properties") or {}).get("acl_terms") or n.get("acl_terms") or [],
         )
     ]
+    
+    admin_denied_ids = await access_override_service.load_denied_ids_for_caller(
+        current_user, tenant_id, db_session
+    )
+    if admin_denied_ids:
+        nodes = filter_results_with_admin_overrides(
+            results=nodes,
+            admin_denied_ids=admin_denied_ids
+        )
     rels = [
         GraphRelationship(
             type=r["type"],

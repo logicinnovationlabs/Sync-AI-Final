@@ -37,6 +37,13 @@ celery_app.conf.beat_schedule = {
             "expires": 120,
         },
     },
+    "poll-sharepoint-delta": {
+        "task": "app.workers.tasks.poll_sharepoint_delta",
+        "schedule": float(getattr(settings, "sharepoint_poll_seconds", 60) or 60),
+        "options": {
+            "expires": 50,
+        },
+    },
     "poll-gmail-pubsub": {
         "task": "app.workers.tasks.poll_gmail_pubsub",
         "schedule": 60.0,  # Every 60 seconds

@@ -1,0 +1,24 @@
+source_type: sharepoint
+display_name: "SharePoint"
+auth_type: oauth2
+oauth_scopes:
+  - https://graph.microsoft.com/Sites.Read.All
+  - https://graph.microsoft.com/Files.Read.All
+  - https://graph.microsoft.com/User.Read
+  - offline_access
+  # GroupMember.Read.All is not requested on the delegated app; group ACEs fail closed.
+services:
+  sharepoint:
+    display_name: "SharePoint"
+    supports_deletion_detection: true
+    push_mechanism: graph_delta
+    allowed_metadata_keys:
+      - mime_type
+      - file_extension
+      - owner_email
+      - site_id
+      - site_name
+      - drive_id
+      - parent_folder_id
+      - web_view_link
+      - size_bytes

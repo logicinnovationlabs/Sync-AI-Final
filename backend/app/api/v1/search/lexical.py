@@ -11,9 +11,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
-from app.api.deps import get_current_user, require_scope
-from app.acl.filter import acl_terms_from_jwt, is_fail_closed
+from app.api.deps import get_current_user, require_scope, get_tenant_session
+from app.acl.filter import acl_terms_from_jwt, is_fail_closed, filter_results_with_admin_overrides
 from app.services.lexical.opensearch_store import OpenSearchLexicalStore
+from app.services.admin.access_override_service import access_override_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -91,6 +92,7 @@ async def search_lexical(
     current_user: Dict[str, Any] = Depends(require_scope("search.read")),
     tenant_id: str = Depends(get_tenant),
     store: OpenSearchLexicalStore = Depends(get_lexical_store),
+    db_session = Depends(get_tenant_session),
 ):
     """
     Execute full-text lexical search with BM25 ranking.
@@ -115,6 +117,10 @@ async def search_lexical(
             request.tenant_id,
         )
         return SearchResponse(results=[], facets={}, total=0, took_ms=0.0)
+
+    admin_denied_ids = await access_override_service.load_denied_ids_for_caller(
+        current_user, tenant_id, db_session
+    )
     
     # Execute search
     started = time.perf_counter()
@@ -130,6 +136,16 @@ async def search_lexical(
             from_=request.from_,
             size=request.size,
         )
+
+        if admin_denied_ids:
+            raw_results = raw.get("results", [])
+            filtered_results = filter_results_with_admin_overrides(
+                results=raw_results,
+                admin_denied_ids=admin_denied_ids
+            )
+            raw["results"] = filtered_results
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("Lexical search failed: %s", exc)
         raise HTTPException(status_code=500, detail="Lexical search failed") from exc

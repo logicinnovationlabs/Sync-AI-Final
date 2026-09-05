@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
@@ -75,21 +76,38 @@ async def test_oauth_callback_enqueues_drive_and_gmail_backfill(monkeypatch):
 
     tenant_id = str(uuid4())
     user_id = str(uuid4())
-    state = encode_oauth_state(tenant_id, user_id)
+    jti = str(uuid4())
+    binding_token = "test-binding-token-123"
+    
+    # Mock Redis for state encoding
+    mock_redis = MagicMock()
+    with patch("app.connectors.google.oauth_state._sync_redis", return_value=mock_redis):
+        state = encode_oauth_state(tenant_id, user_id, jti=jti, binding_token=binding_token)
 
     client = TestClient(app)
     manager = MagicMock()
     manager.exchange_code_for_tokens = AsyncMock(
         return_value={"access_token": "x", "refresh_token": "y"}
     )
+    
+    # Mock Redis for state decoding in callback
+    mock_redis.get.return_value = json.dumps({
+        "nonce": "test-nonce",
+        "jti": jti,
+        "connection_scope": "personal",
+        "binding_token": binding_token
+    })
+    
     with patch("app.connectors.router.google_oauth_from_settings", return_value=manager), \
          patch("app.connectors.router.backfill_source.delay") as mock_delay, \
          patch("app.connectors.router._record_connector_rows", new=AsyncMock(return_value=None)), \
-         patch("app.connectors.router._resolve_mailbox_email", new=AsyncMock(return_value="user@example.com")):
+         patch("app.connectors.router._resolve_mailbox_email", new=AsyncMock(return_value="user@example.com")), \
+         patch("app.connectors.google.oauth_state._sync_redis", return_value=mock_redis):
         mock_delay.return_value = MagicMock(id="task-1")
         response = client.get(
             "/connectors/google/callback",
             params={"code": "test-code", "state": state},
+            cookies={"oauth_binding": binding_token},
             follow_redirects=False,
         )
 

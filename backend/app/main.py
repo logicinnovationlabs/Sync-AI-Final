@@ -37,6 +37,7 @@ from app.services.mcp_gateway import router as mcp_gateway_router
 from app.connectors.google.webhooks import router as webhooks_router
 from app.connectors.router import router as connectors_router
 from app.connectors.org import router as connectors_org_router
+from app.connectors.sharepoint.router import router as sharepoint_connectors_router
 
 from app.middleware.tenant_middleware import TenantMiddleware
 from app.middleware.http_metrics import HttpMetricsMiddleware
@@ -184,6 +185,7 @@ _include_product_and_legacy(admin_router, tags=["admin"])
 app.include_router(tenant_bootstrap_router, prefix="/admin", tags=["admin"])
 _include_product_and_legacy(connectors_router)
 _include_product_and_legacy(connectors_org_router)
+_include_product_and_legacy(sharepoint_connectors_router)
 _include_product_and_legacy(scoped_probes.router)
 _include_product_and_legacy(webhooks_router)
 _include_product_and_legacy(identity_routes.router)

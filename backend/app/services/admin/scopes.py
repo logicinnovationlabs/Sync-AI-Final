@@ -26,9 +26,19 @@ MEMBER_SCOPES: List[str] = [
     "connectors.write",
 ]
 
+VIEWER_SCOPES: List[str] = [
+    "search.read",
+    "document.read",
+    "connectors.read",
+]
+
 
 def scopes_for_role(role: str) -> List[str]:
     """Return the JWT scope list for a persisted user role."""
+    if role == "owner":
+        return list(ADMIN_SCOPES)
     if role == "admin":
         return list(ADMIN_SCOPES)
+    if role == "viewer":
+        return list(VIEWER_SCOPES)
     return list(MEMBER_SCOPES)

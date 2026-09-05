@@ -368,3 +368,42 @@ def make_bearer(tenant_id: str, principal_id: str, scopes: list = None) -> str:
         algorithm=token_service.algorithm,
         headers={"kid": token_service._active_kid},
     )
+
+
+# ---------------------------------------------------------------------------
+# Admin Access Control Test Fixtures (Part 2)
+# ---------------------------------------------------------------------------
+@pytest.fixture
+def test_tenant_id():
+    """Fixture for test tenant ID."""
+    from uuid import uuid4
+    return str(uuid4())
+
+
+@pytest.fixture
+def test_user_id():
+    """Fixture for test user ID."""
+    from uuid import uuid4
+    return str(uuid4())
+
+
+@pytest.fixture
+def test_document_id():
+    """Fixture for test document ID."""
+    return "google_drive_test_doc_123"
+
+
+@pytest.fixture
+def admin_token(test_tenant_id):
+    """Fixture for admin JWT token with admin scope."""
+    from uuid import uuid4
+    admin_principal_id = str(uuid4())
+    return make_bearer(test_tenant_id, admin_principal_id, scopes=["read", "write", "admin"])
+
+
+@pytest.fixture
+def member_token(test_tenant_id):
+    """Fixture for member JWT token without admin scope."""
+    from uuid import uuid4
+    member_principal_id = str(uuid4())
+    return make_bearer(test_tenant_id, member_principal_id, scopes=["read", "write"])

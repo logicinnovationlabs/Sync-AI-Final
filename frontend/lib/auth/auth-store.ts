@@ -28,6 +28,8 @@ interface AuthState {
   claims: AccessTokenClaims | null
   /** Captured at login time only — /me returns no email/display_name today. */
   email: string | null
+  /** User role from JWT claim (owner, admin, member, viewer) */
+  role: string | null
   setSession: (params: {
     accessToken: string
     refreshToken: string
@@ -38,6 +40,7 @@ interface AuthState {
   /** Scopes including the local dev-only admin override, if enabled. */
   effectiveScopes: () => string[]
   isAdmin: () => boolean
+  isOwner: () => boolean
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -47,17 +50,18 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       claims: null,
       email: null,
+      role: null,
 
       setSession: ({ accessToken, refreshToken, email }) => {
         const claims = decodeAccessToken(accessToken)
-        set({ accessToken, refreshToken, claims, email })
+        set({ accessToken, refreshToken, claims, email, role: claims?.role || null })
         if (claims) {
           setSessionCookie(claims.exp - Math.floor(Date.now() / 1000))
         }
       },
 
       clearSession: () => {
-        set({ accessToken: null, refreshToken: null, claims: null, email: null })
+        set({ accessToken: null, refreshToken: null, claims: null, email: null, role: null })
         clearSessionCookie()
       },
 
@@ -76,6 +80,8 @@ export const useAuthStore = create<AuthState>()(
       },
 
       isAdmin: () => scopesIsAdmin(get().effectiveScopes()),
+
+      isOwner: () => get().role === "owner",
     }),
     {
       name: "synq-auth",
@@ -84,6 +90,7 @@ export const useAuthStore = create<AuthState>()(
         refreshToken: state.refreshToken,
         claims: state.claims,
         email: state.email,
+        role: state.role,
       }),
     }
   )

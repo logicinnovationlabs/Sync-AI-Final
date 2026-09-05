@@ -72,7 +72,7 @@ const FRAGMENTS: Fragment[] = [
     meta: "14 Mar",
   },
   {
-    source: "google",
+    source: "google_personal",
     n: 4,
     kind: "File",
     title: "INV-2026-0334.pdf",
