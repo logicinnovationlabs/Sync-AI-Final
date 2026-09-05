@@ -24,7 +24,16 @@
 const BARE_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "[::1]"])
 
 /** Subdomains that are ours, not a tenant's. */
-const RESERVED = new Set(["www", "app", "api", "admin", "staging", "preview"])
+const RESERVED = new Set([
+  "www",
+  "app",
+  "api",
+  "admin",
+  "staging",
+  "preview",
+  // Product host synqai.logicilabs.com — not a tenant workspace.
+  "synqai",
+])
 
 /** Platform hosts whose first label is the app name, not a tenant (e.g. foo.vercel.app). */
 const PLATFORM_SUFFIXES = [
